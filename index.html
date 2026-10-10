@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TasteFit: will this restaurant fit the neighborhood?</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  :root { --ink:#1d1b16; --muted:#6b6457; --paper:#faf6ee; --accent:#c2410c; --line:#e7dfcf; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:16px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--ink); background:var(--paper); }
+  main { max-width:860px; margin:0 auto; padding:48px 20px 80px; }
+  h1 { font:700 40px/1.1 Georgia, serif; margin:0 0 8px; letter-spacing:-0.5px; }
+  .lede { color:var(--muted); margin:0 0 28px; max-width:620px; }
+  form { display:grid; gap:12px; grid-template-columns:1fr 1fr auto; align-items:end; }
+  label { font-size:13px; color:var(--muted); display:grid; gap:4px; }
+  input { font:inherit; padding:11px 12px; border:1px solid var(--line); border-radius:10px; background:#fff; }
+  button { font:600 15px/1 inherit; padding:13px 18px; border:0; border-radius:10px; background:var(--accent); color:#fff; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:wait; }
+  .examples { margin:10px 0 0; font-size:13px; color:var(--muted); }
+  .examples a { color:var(--accent); cursor:pointer; margin-right:10px; }
+  #steps { margin:28px 0 0; padding:0; list-style:none; font:12.5px/1.45 ui-monospace, Menlo, monospace; color:var(--muted); }
+  #steps li { padding:6px 0; border-top:1px dashed var(--line); overflow-wrap:anywhere; }
+  #memo { margin-top:24px; background:#fff; border:1px solid var(--line); border-radius:14px; padding:4px 26px 18px; display:none; }
+  #memo h2 { font:700 20px Georgia, serif; margin:22px 0 6px; }
+  @media (max-width:700px) { form { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>TasteFit</h1>
+  <p class="lede">Most new restaurants fail on fit, not food. Describe your concept and where you want to open:
+    the agent reads the local taste from Qloo's taste graph, maps the competition and the hotspots, and writes a go / no-go memo.</p>
+  <form id="f">
+    <label>Concept<input name="concept" required placeholder="Specialty coffee + Moroccan pastries, mid-price"></label>
+    <label>Location<input name="location" required placeholder="Williamsburg, Brooklyn"></label>
+    <button id="go">Test the fit</button>
+  </form>
+  <p class="examples">Try:
+    <a data-c="Late-night Korean fried chicken, casual, mid-price" data-l="Austin, Texas">Korean chicken in Austin</a>
+    <a data-c="Natural wine bar with small plates" data-l="Silver Lake, Los Angeles">Wine bar in Silver Lake</a>
+    <a data-c="Moroccan tea house with pastries" data-l="Lower East Side, New York">Moroccan tea house in NYC</a>
+  </p>
+  <ol id="steps"></ol>
+  <article id="memo"></article>
+</main>
+<script>
+const f = document.getElementById('f'), steps = document.getElementById('steps'), memo = document.getElementById('memo'), go = document.getElementById('go');
+document.querySelectorAll('.examples a').forEach(a => a.onclick = () => { f.concept.value = a.dataset.c; f.location.value = a.dataset.l; });
+f.onsubmit = e => {
+  e.preventDefault();
+  steps.innerHTML = ''; memo.style.display = 'none'; go.disabled = true; go.textContent = 'Analyzing…';
+  const es = new EventSource('/run?' + new URLSearchParams({concept: f.concept.value, location: f.location.value}));
+  const done = () => { es.close(); go.disabled = false; go.textContent = 'Test the fit'; };
+  es.addEventListener('step', ev => { const li = document.createElement('li'); li.textContent = JSON.parse(ev.data); steps.appendChild(li); });
+  es.addEventListener('memo', ev => { memo.innerHTML = marked.parse(JSON.parse(ev.data)); memo.style.display = 'block'; done(); });
+  es.addEventListener('error', ev => { if (ev.data) { memo.textContent = 'Error: ' + JSON.parse(ev.data); memo.style.display = 'block'; } done(); });
+};
+</script>
+</body>
+</html>

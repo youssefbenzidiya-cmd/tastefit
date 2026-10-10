@@ -1,0 +1,45 @@
+"""TasteFit web app: stdlib HTTP server streaming the agent's steps (Server-Sent Events)."""
+import json
+import os
+import urllib.parse
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+import agent
+
+INDEX = (Path(__file__).parent / "index.html").read_bytes()
+
+
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        url = urllib.parse.urlparse(self.path)
+        if url.path == "/":
+            self._send(200, "text/html; charset=utf-8", INDEX)
+        elif url.path == "/run":
+            q = urllib.parse.parse_qs(url.query)
+            concept, location = q.get("concept", [""])[0][:300], q.get("location", [""])[0][:120]
+            if not concept or not location:
+                return self._send(400, "text/plain", b"concept and location are required")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            try:
+                for kind, text in agent.run(concept, location):
+                    self.wfile.write(f"event: {kind}\ndata: {json.dumps(text)}\n\n".encode())
+                    self.wfile.flush()
+            except Exception as e:  # noqa: BLE001  report to the page instead of dropping the stream
+                self.wfile.write(f"event: error\ndata: {json.dumps(str(e))}\n\n".encode())
+        else:
+            self._send(404, "text/plain", b"not found")
+
+    def _send(self, code, ctype, body):
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+if __name__ == "__main__":
+    ThreadingHTTPServer(("0.0.0.0", int(os.environ.get("PORT", 8000))), Handler).serve_forever()

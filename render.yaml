@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: tastefit
+    runtime: python
+    plan: free
+    buildCommand: "true"
+    startCommand: python app.py
+    envVars:
+      - key: QLOO_API_KEY
+        sync: false
+      - key: QLOO_BASE_URL
+        value: https://hackathon.api.qloo.com
+      - key: LLM_BASE_URL
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        sync: false
