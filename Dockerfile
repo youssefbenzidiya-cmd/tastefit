@@ -1,5 +1,6 @@
-FROM node:22-slim
-RUN apt-get update && apt-get install -y --no-install-recommends python3 && rm -rf /var/lib/apt/lists/*
+FROM node:22-trixie-slim
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends python3 \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY package.json .
 RUN npm install --omit=dev
