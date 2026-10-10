@@ -8,6 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
   :root {
@@ -114,6 +116,22 @@
   .sec-block.limits { color: var(--muted); font-size: 14px; }
   .sec-block.limits h3 { font-size: 16px; color: var(--muted); }
 
+  .site { margin-top: 40px; display: grid; grid-template-columns: 1fr 260px; gap: 0; border: 1px solid var(--rule); border-radius: 20px; overflow: hidden; background: var(--card); }
+  #map { height: 100%; min-height: 440px; background: #e8ebe5; }
+  #map .leaflet-tile-pane { filter: grayscale(1) contrast(.92) brightness(1.04); }
+  .site-side { padding: 24px; border-left: 1px solid var(--rule); display: flex; flex-direction: column; gap: 18px; }
+  .site-side h3 { font: 600 20px/1.25 var(--display); margin: 0; letter-spacing: -0.01em; }
+  .fig b { display: block; font: 700 26px/1.1 var(--display); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .fig span { font-size: 13px; color: var(--muted); }
+  .legend { list-style: none; margin: 0; padding: 0; font-size: 13px; color: var(--muted); display: grid; gap: 6px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: -1px; }
+  .gm { display: grid; gap: 8px; margin-top: auto; }
+  .gm a { font: 600 14px/1 var(--body); text-decoration: none; text-align: center; padding: 12px 14px; border-radius: 999px; border: 1px solid var(--ink); }
+  .gm a:first-child { background: var(--ink); color: #fff; }
+  .site-note { grid-column: 1 / -1; padding: 14px 24px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--muted); }
+  .pin { width: 22px; height: 22px; border-radius: 50%; background: var(--saffron); border: 3px solid var(--pine); box-sizing: border-box; }
+  .xmark { width: 14px; height: 14px; border: 2px solid var(--pine); background: #fff; transform: rotate(45deg); box-sizing: border-box; }
+  .xmark.comp { border-color: var(--nogo); }
   .skeleton { height: 14px; border-radius: 6px; background: #e3e7e0; margin: 14px 0; animation: pulse 1.4s ease-in-out infinite; }
   .waiting { padding: 36px; border: 1px dashed var(--rule); border-radius: 20px; }
   .waiting p { margin: 0 0 8px; color: var(--muted); }
@@ -137,6 +155,9 @@
     .method, .work, .sections { grid-template-columns: 1fr; gap: 28px; }
     .progress { position: static; }
     .verdict { grid-template-columns: 1fr; padding: 28px; gap: 24px; }
+    .site { grid-template-columns: 1fr; }
+    #map { min-height: 340px; }
+    .site-side { border-left: 0; border-top: 1px solid var(--rule); }
     .sec-block.wide { grid-column: auto; }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -216,7 +237,7 @@
 <script>
 const $ = s => document.querySelector(s);
 const f = $('#f'), go = $('#go'), intro = $('#intro'), work = $('#work'), stepsEl = $('#steps'), report = $('#report'), clock = $('#clock');
-let es, timer, started, live;
+let es, timer, started, live, geoData = null, map;
 
 document.querySelectorAll('.try button').forEach(b => b.onclick = () => {
   f.concept.value = b.dataset.c; f.location.value = b.dataset.l; f.requestSubmit();
@@ -232,7 +253,8 @@ function describe(s) {
     case 'find_tags':   return ['Translating "' + a.query + '" into taste tags', found];
     case 'area_taste':  return ['Reading what ' + a.location + ' already loves', n.length ? 'Top places: ' + list(n) : found];
     case 'competitors': return ['Ranking places that match your concept', n.length ? 'Closest matches: ' + list(n) : found];
-    case 'hotspots':    return ['Finding where ' + a.place + ' is most loved', n.length ? 'Strongest areas: ' + list(n) : found];
+    case 'hotspots':    return ['Finding where ' + a.place + ' is most loved', n.length ? 'Strongest areas: ' + list(n) : 'Mapped the strongest areas'];
+    case 'site_math':   return ['Computing the demand barycenter and best spot', s.site ? 'Suggested spot ' + s.site.recommended.km_from_demand_center + ' km from the demand center, catchment ' + s.site.catchment_km + ' km' : 'Placing every venue on the map'];
     default:            return [s.tool, found];
   }
 }
@@ -284,8 +306,58 @@ function renderMemo(md) {
       '<div><p class="call ' + cls + '">' + label + '</p>' + (why ? '<p class="why">' + why + '</p>' : '') +
       '<p class="ctx">' + esc(f.concept.value) + ' in ' + esc(f.location.value) + '</p></div>' +
     '</div>' +
+    (geoData ? siteHTML(geoData) : '') +
     '<div class="sections">' + blocks + '</div>' +
     '<button class="again" type="button" onclick="window.scrollTo({top:0,behavior:\'smooth\'});f.concept.focus()">Test another concept</button>';
+}
+
+const gmaps = (lat, lon) => 'https://www.google.com/maps/search/?api=1&query=' + lat + ',' + lon;
+const street = (lat, lon) => 'https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=' + lat + ',' + lon;
+
+function siteHTML(g) {
+  const r = g.recommended;
+  return '<div class="site"><div id="map" role="img" aria-label="Map of demand, competition and the suggested spot"></div>' +
+    '<div class="site-side"><h3>Where to open</h3>' +
+      '<div class="fig"><b>' + r.opportunity_index + '<small style="font-size:15px">/100</small></b><span>Opportunity index at the suggested spot</span></div>' +
+      '<div class="fig"><b>' + g.catchment_km + ' km</b><span>Catchment radius around the demand center</span></div>' +
+      (r.nearest_competitor_km != null ? '<div class="fig"><b>' + r.nearest_competitor_km + ' km</b><span>From the suggested spot to the nearest competitor</span></div>' : '') +
+      '<ul class="legend"><li><i style="background:var(--saffron);border:2px solid var(--pine)"></i>Suggested spot</li>' +
+      '<li><i style="background:var(--pine)"></i>Places locals love</li><li><i style="background:var(--nogo)"></i>Competitors</li>' +
+      '<li><i style="background:#fff;border:2px solid var(--pine);border-radius:1px;transform:rotate(45deg)"></i>Demand center</li>' +
+      (g.competition_center ? '<li><i style="background:#fff;border:2px solid var(--nogo);border-radius:1px;transform:rotate(45deg)"></i>Competition center</li>' : '') +
+      '<li><i style="border:1px dashed var(--pine)"></i>Catchment around the demand center</li></ul>' +
+      '<div class="gm"><a href="' + gmaps(r.lat, r.lon) + '" target="_blank" rel="noopener">Open in Google Maps</a>' +
+      '<a href="' + street(r.lat, r.lon) + '" target="_blank" rel="noopener">See it in Street View</a></div>' +
+    '</div><p class="site-note">Demand center: the affinity-weighted barycenter of ' + g.demand_points + ' places and hotspots locals favor. ' +
+    'The suggested spot maximizes pull from that demand minus 0.7 times the pull of ' + g.competitor_points + ' competitors. ' +
+    'It points to a block to scout, not a vetted address.</p></div>';
+}
+
+function drawMap(g) {
+  if (!window.L || !document.getElementById('map')) return;
+  if (map) map.remove();
+  map = L.map('map', { scrollWheelZoom: false });
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(map);
+  const css = getComputedStyle(document.documentElement), c = n => css.getPropertyValue(n).trim();
+  const all = [];
+  const dot = (p, color) => {
+    all.push([p.lat, p.lon]);
+    L.circleMarker([p.lat, p.lon], { radius: 4 + 6 * Math.min(1, p.w), color: '#fff', weight: 1.5, fillColor: color, fillOpacity: .85 })
+      .addTo(map).bindTooltip(p.name || 'Hotspot area');
+  };
+  g.demand.forEach(p => dot(p, c('--pine')));
+  g.competition.forEach(p => dot(p, c('--nogo')));
+  const dc = [g.demand_center.lat, g.demand_center.lon];
+  L.circle(dc, { radius: Math.max(150, g.catchment_km * 1000), color: c('--pine'), weight: 1, dashArray: '4 4', fill: false }).addTo(map);
+  const icon = cls => L.divIcon({ className: '', html: '<div class="' + cls + '"></div>', iconSize: cls === 'pin' ? [22, 22] : [14, 14] });
+  L.marker(dc, { icon: icon('xmark') }).addTo(map).bindTooltip('Demand center (barycenter)');
+  if (g.competition_center) L.marker([g.competition_center.lat, g.competition_center.lon], { icon: icon('xmark comp') }).addTo(map).bindTooltip('Competition center (barycenter)');
+  const r = [g.recommended.lat, g.recommended.lon];
+  all.push(r, dc);
+  L.marker(r, { icon: icon('pin'), zIndexOffset: 1000 }).addTo(map).bindTooltip('Suggested spot', { permanent: true, direction: 'top', offset: [0, -12] });
+  map.fitBounds(L.latLngBounds(all).pad(0.15));
 }
 
 function notice(title, text) {
@@ -303,7 +375,7 @@ f.onsubmit = e => {
   e.preventDefault();
   if (es) es.close();
   intro.hidden = true; work.hidden = false;
-  stepsEl.innerHTML = ''; addLive();
+  stepsEl.innerHTML = ''; addLive(); geoData = null;
   report.innerHTML = '<div class="waiting"><p>Your report will appear here.</p><div class="skeleton" style="width:55%"></div><div class="skeleton" style="width:85%"></div><div class="skeleton" style="width:70%"></div></div>';
   go.disabled = true; go.textContent = 'Analyzing';
   started = Date.now(); clearInterval(timer);
@@ -312,7 +384,8 @@ f.onsubmit = e => {
 
   es = new EventSource('/run?' + new URLSearchParams({ concept: f.concept.value, location: f.location.value }));
   es.addEventListener('step', ev => addStep(JSON.parse(ev.data)));
-  es.addEventListener('memo', ev => { finish(); renderMemo(JSON.parse(ev.data)); });
+  es.addEventListener('geo', ev => { geoData = JSON.parse(ev.data); });
+  es.addEventListener('memo', ev => { finish(); renderMemo(JSON.parse(ev.data)); if (geoData) drawMap(geoData); });
   es.addEventListener('error', ev => {
     finish();
     const msg = ev.data ? JSON.parse(ev.data) : null;

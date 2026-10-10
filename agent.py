@@ -3,6 +3,7 @@ import json
 import os
 import urllib.request
 
+import geo
 import qloo
 
 SYSTEM = """You are TasteFit, an analyst that checks whether a food & drink concept fits the local taste of an area,
@@ -13,12 +14,15 @@ Method:
    different types; pick the one that matches the concept and use its tag URN. If none matches, refine the query.
 2. Read the area's overall taste with area_taste, then the places that best match the concept's tags with competitors.
 3. Take the strongest benchmark place and call hotspots to see which sub-areas over-index for that taste.
-4. Look for a gap: strong affinity for the concept's tags but few strong places serving it.
+4. Call site_math: it geocodes what you gathered and returns the demand barycenter, the competition barycenter,
+   the catchment radius and the suggested opening point with its distance to the nearest competitor.
+5. Look for a gap: strong affinity for the concept's tags but few strong places serving it.
 If a tool returns status "needs_input", fix the inputs and retry once.
 Finish with a memo in Markdown:
 ## Verdict: GO / ADJUST / NO-GO (fit score 0-100)
 ## Evidence (3-5 bullets, each citing a place, tag or number returned by a tool)
-## Best location within the area
+## Best location within the area (use the site_math numbers in km; describe the suggested point by nearby streets
+   or sub-areas you saw in tool results, never invent an address)
 ## Positioning: menu signatures, price tier, vibe (grounded in the tags)
 ## Risks
 ## Limits: Qloo describes aggregate group affinities, not foot traffic, rents or individual behaviour; say what this memo does not establish.
@@ -38,11 +42,38 @@ TOOLS = [
     {"name": "hotspots", "description": "Sub-areas within the area where one place (name or Qloo id) has the strongest affinity.",
      "parameters": {"type": "object", "properties": {"place": {"type": "string"}, "location": {"type": "string"}},
                     "required": ["place", "location"]}},
+    {"name": "site_math", "description": "Barycenter site analysis over everything gathered so far (call after competitors and hotspots).",
+     "parameters": {"type": "object", "properties": {}}},
 ]
 
 
-def call_tool(name, a):
+class Site:
+    """Places gathered during a run, for the barycenter analysis and the map."""
+
+    def __init__(self, area):
+        self.area, self.demand, self.competition, self.result = area, [], [], None
+
+    def add(self, tool, result):
+        if tool in ("area_taste", "hotspots"):
+            self.demand += geo.extract(result)
+        elif tool == "competitors":
+            self.competition += geo.extract(result)
+
+    def compute(self):
+        self.demand = geo.locate(self.demand, self.area)
+        self.competition = geo.locate(self.competition, self.area)
+        self.result = geo.analyze(self.demand, self.competition)
+        return self.result or {"error": "not enough located places for a barycenter (need 2+ demand points)"}
+
+    def payload(self):
+        pts = lambda ps: [{k: p[k] for k in ("name", "lat", "lon", "w")} for p in ps]  # noqa: E731
+        return {**self.result, "demand": pts(self.demand), "competition": pts(self.competition)}
+
+
+def call_tool(name, a, site=None):
     try:
+        if name == "site_math":
+            return site.compute()
         if name == "find_tags":
             return qloo.find_tags(a["query"])
         if name == "area_taste":
@@ -88,20 +119,28 @@ def _names(obj, limit=6):
 
 
 def run(concept, location, max_steps=14):
-    """Yields ('step', dict) events while working, then ('memo', markdown)."""
+    """Yields ('step', dict) events while working, ('geo', dict) for the map, then ('memo', markdown)."""
     messages = [{"role": "system", "content": SYSTEM},
                 {"role": "user", "content": f"Concept: {concept}\nLocation: {location}"}]
+    site = Site(location)
     for _ in range(max_steps):
         msg = chat(messages)
         messages.append({k: v for k, v in msg.items() if k in ("role", "content", "tool_calls")})
         if not msg.get("tool_calls"):
+            if site.result is None:
+                site.compute()
+            if site.result:
+                yield "geo", site.payload()
             yield "memo", msg.get("content") or ""
             return
         for tc in msg["tool_calls"]:
+            name = tc["function"]["name"]
             args = json.loads(tc["function"].get("arguments") or "{}")
-            result = call_tool(tc["function"]["name"], args)
-            yield "step", {"tool": tc["function"]["name"], "args": args, "names": _names(result),
-                           "error": result.get("error") if isinstance(result, dict) else None}
+            result = call_tool(name, args, site)
+            site.add(name, result)
+            yield "step", {"tool": name, "args": args, "names": _names(result),
+                           "error": result.get("error") if isinstance(result, dict) else None,
+                           "site": result if name == "site_math" and isinstance(result, dict) and "error" not in result else None}
             messages.append({"role": "tool", "tool_call_id": tc["id"], "content": json.dumps(result, ensure_ascii=False)[:6000]})
     yield "memo", "Stopped: step limit reached."
 

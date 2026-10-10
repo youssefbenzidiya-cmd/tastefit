@@ -26,6 +26,19 @@ An LLM agent runs a tool loop over the official Qloo hackathon harness (`qloo ex
 | `area_taste` | `recommend` (place, location signal) | Places the area's audience has the highest affinity for |
 | `competitors` | `recommend` (place, concept tags, location filter) | Existing places that match the concept: competition and benchmarks |
 | `hotspots` | `where_popular` | Sub-areas where the strongest benchmark over-indexes |
+| `site_math` | local (`geo.py`) | Barycenter site analysis over everything gathered, shown on a map |
+
+### Site math (`geo.py`)
+
+Hotspot cells come with coordinates; places carry an address, geocoded with OpenStreetMap Nominatim (keyless, max 1 request per second).
+
+- **Demand center**: affinity-weighted barycenter of the places and hotspot cells the area favors, `c = Σ wᵢ pᵢ / Σ wᵢ`.
+- **Competition center**: the same barycenter over places that match the concept.
+- **Catchment radius**: weighted standard distance of demand around its center.
+- **Suggested spot**: on a 41×41 grid over the area, maximize `Σ wᵢ·K(x, dᵢ) − 0.7 · Σ wⱼ·K(x, cⱼ)`, with a Gaussian kernel `K` whose width follows the demand spread (0.3 to 3 km). This is a gravity model: be close to demand, away from look-alike competitors.
+- **Opportunity index**: the score at the suggested spot as a share of the peak demand pull (0 to 100).
+
+The map uses Leaflet with OpenStreetMap tiles, and the suggested spot links to Google Maps and Street View (plain links, no API key). It points to a block to scout, not a vetted address.
 
 The memo only cites places, tags and numbers returned by Qloo, keeps Qloo results separate from interpretation, and ends with a **Limits** section: Qloo describes aggregate group affinities, not foot traffic, rents or individual behaviour. No personal data is sent to Qloo; inputs are a concept and a place name.
 
@@ -49,7 +62,7 @@ CLI: `python agent.py "Korean fried chicken counter" "Austin, TX"`
 
 ## Deploy
 
-`render.yaml` deploys it as a free Render web service; set the environment variables above in the Render dashboard.
+Deployed on Render (free Docker web service) from the `Dockerfile`; set the environment variables above in the Render dashboard.
 
 ## License
 
