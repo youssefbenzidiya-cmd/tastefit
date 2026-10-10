@@ -147,6 +147,46 @@
   footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  .nav { display: flex; gap: 24px; align-items: center; font-size: 14px; color: #9fb2a7; }
+  .nav a { color: #dfe7e1; text-decoration: none; font-weight: 500; }
+  .nav a:hover { color: var(--saffron); }
+
+  .plans { padding: 72px 0 88px; border-top: 1px solid var(--rule); }
+  .plans-head { display: flex; justify-content: space-between; align-items: baseline; gap: 24px; flex-wrap: wrap; margin-bottom: 32px; }
+  .plans-head h2 { font: 600 34px/1.1 var(--display); letter-spacing: -0.02em; margin: 0; }
+  .plans-head p { margin: 0; color: var(--muted); }
+  .tiers { display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 0; border: 1px solid var(--rule); border-radius: 20px; overflow: hidden; background: var(--card); }
+  .tier { padding: 32px; }
+  .tier + .tier { border-left: 1px solid var(--rule); }
+  .tier.lead-tier { background: var(--pine); color: #eef2ec; }
+  .tier h3 { font: 600 18px/1.3 var(--body); margin: 0 0 14px; }
+  .tier .price { margin: 0 0 14px; color: var(--muted); }
+  .tier .price b { font: 700 40px/1 var(--display); letter-spacing: -0.03em; color: var(--ink); margin-right: 6px; }
+  .tier.lead-tier .price, .tier.lead-tier p, .tier.lead-tier li { color: #c5d3ca; }
+  .lead-tier .price b { color: var(--saffron); }
+  .tier p { margin: 0 0 16px; color: var(--muted); }
+  .tier ul { margin: 0; padding-left: 18px; }
+  .tier li { margin-bottom: 6px; }
+  .tier li::marker { color: var(--saffron); }
+  .cta-line { margin: 28px 0 0; color: var(--muted); }
+  .cta-line .plain { color: var(--ink); text-underline-offset: 3px; }
+  .cta-line a:not(.plain) { font: 600 15px/1 var(--body); display: inline-block; padding: 14px 22px; border-radius: 999px; background: var(--ink); color: #fff; text-decoration: none; margin-right: 16px; }
+
+  .tools { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 32px; }
+  .tools button { font: 600 15px/1 var(--body); background: none; border: 1px solid var(--ink); color: var(--ink); padding: 14px 22px; border-radius: 999px; cursor: pointer; }
+  .tools button:hover { background: var(--ink); color: #fff; }
+  .tools button.primary { background: var(--ink); color: #fff; }
+
+  @media print {
+    .brief, .progress, .plans, footer, .tools, .leaflet-control-zoom, .gm { display: none !important; }
+    body { background: #fff; }
+    .stage { padding: 0; }
+    .work { display: block; }
+    .verdict, .site { break-inside: avoid; }
+    .print-head { display: block !important; font: 600 22px/1.3 var(--display); margin: 0 0 20px; }
+  }
+  .print-head { display: none; }
   [hidden] { display: none !important; }
 
   @media (max-width: 860px) {
@@ -159,6 +199,9 @@
     #map { min-height: 340px; }
     .site-side { border-left: 0; border-top: 1px solid var(--rule); }
     .sec-block.wide { grid-column: auto; }
+    .tiers { grid-template-columns: 1fr; }
+    .tier + .tier { border-left: 0; border-top: 1px solid var(--rule); }
+    .nav span { display: none; }
   }
   @media (prefers-reduced-motion: reduce) {
     * { animation: none !important; transition: none !important; }
@@ -171,7 +214,7 @@
   <div class="wrap">
     <div class="bar">
       <div class="logo"><i></i>TasteFit</div>
-      <small>Site check for restaurants and cafés, built on Qloo taste data</small>
+      <nav class="nav"><span>Site check for restaurants and cafés, built on Qloo taste data</span><a href="#plans">Plans</a></nav>
     </div>
 
     <form id="f" autocomplete="off">
@@ -226,6 +269,36 @@
 
   </div>
 </main>
+
+<section class="plans" id="plans">
+  <div class="wrap">
+    <div class="plans-head">
+      <h2>Plans</h2>
+      <p>Free while the Qloo hackathon runs. Paid plans open after judging in November.</p>
+    </div>
+    <div class="tiers">
+      <div class="tier">
+        <h3>Founder</h3>
+        <p class="price"><b>$79</b> per report</p>
+        <p>For an owner choosing between a few spots before signing a lease.</p>
+        <ul><li>Verdict, fit score and evidence</li><li>Map with the suggested spot</li><li>PDF to share with partners or a landlord</li></ul>
+      </div>
+      <div class="tier lead-tier">
+        <h3>Broker and landlord</h3>
+        <p class="price"><b>$249</b> per month</p>
+        <p>For agents and owners filling ground-floor retail, who need to show a tenant why a unit fits.</p>
+        <ul><li>25 reports a month</li><li>Your logo on every PDF</li><li>Compare a unit against several concepts</li></ul>
+      </div>
+      <div class="tier">
+        <h3>Franchise and API</h3>
+        <p class="price"><b>Custom</b></p>
+        <p>For chains screening many markets, or platforms that list commercial space.</p>
+        <ul><li>Batch runs across cities</li><li>API access to scores and maps</li><li>Annual contract</li></ul>
+      </div>
+    </div>
+    <p class="cta-line" id="cta-line">{{CTA}}</p>
+  </div>
+</section>
 
 <footer>
   <div class="wrap">
@@ -301,6 +374,7 @@ function renderMemo(md) {
     return '<div class="sec-block ' + k + '"><h3>' + esc(s.title) + '</h3>' + marked.parse(s.body) + '</div>';
   }).join('');
   report.innerHTML =
+    '<p class="print-head">TasteFit: ' + esc(f.concept.value) + ' in ' + esc(f.location.value) + '</p>' +
     '<div class="verdict">' +
       (m.score != null ? '<div class="dial" style="--v:' + m.score + ';--c:' + color + '"><div><div><b>' + m.score + '</b><span>fit score</span></div></div></div>' : '<div></div>') +
       '<div><p class="call ' + cls + '">' + label + '</p>' + (why ? '<p class="why">' + why + '</p>' : '') +
@@ -308,7 +382,9 @@ function renderMemo(md) {
     '</div>' +
     (geoData ? siteHTML(geoData) : '') +
     '<div class="sections">' + blocks + '</div>' +
-    '<button class="again" type="button" onclick="window.scrollTo({top:0,behavior:\'smooth\'});f.concept.focus()">Test another concept</button>';
+    '<div class="tools"><button class="primary" type="button" onclick="window.print()">Save as PDF</button>' +
+    '<button type="button" id="share">Copy link to this check</button>' +
+    '<button type="button" onclick="window.scrollTo({top:0,behavior:\'smooth\'});f.concept.focus()">Test another concept</button></div>';
 }
 
 const gmaps = (lat, lon) => 'https://www.google.com/maps/search/?api=1&query=' + lat + ',' + lon;
@@ -360,6 +436,12 @@ function drawMap(g) {
   map.fitBounds(L.latLngBounds(all).pad(0.15));
 }
 
+const shareURL = () => location.origin + location.pathname + '?' + new URLSearchParams({ c: f.concept.value, l: f.location.value });
+document.addEventListener('click', e => {
+  if (e.target.id !== 'share') return;
+  navigator.clipboard.writeText(shareURL()).then(() => { e.target.textContent = 'Link copied'; setTimeout(() => e.target.textContent = 'Copy link to this check', 2000); });
+});
+
 function notice(title, text) {
   report.innerHTML = '<div class="notice"><h3>' + esc(title) + '</h3><p>' + esc(text) + '</p></div>';
 }
@@ -393,6 +475,10 @@ f.onsubmit = e => {
     else notice('The analysis stopped before finishing', msg ? 'Reason: ' + msg + '. Run it again; if it repeats, try a broader location such as the city name.' : 'The connection dropped. Run it again.');
   });
 };
+{
+  const q = new URLSearchParams(location.search);
+  if (q.get('c') && q.get('l')) { f.concept.value = q.get('c'); f.location.value = q.get('l'); f.requestSubmit(); }
+}
 </script>
 </body>
 </html>

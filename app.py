@@ -1,4 +1,5 @@
 """TasteFit web app: stdlib HTTP server streaming the agent's steps (Server-Sent Events)."""
+import html
 import json
 import os
 import urllib.parse
@@ -7,7 +8,13 @@ from pathlib import Path
 
 import agent
 
-INDEX = (Path(__file__).parent / "index.html").read_bytes()
+_CONTACT = os.environ.get("CONTACT_EMAIL", "").strip()
+_CTA = (f'<a href="mailto:{html.escape(_CONTACT)}?subject=TasteFit%20early%20access">Request early access</a>'
+        "Tell us your city and how many sites you check a year."
+        if _CONTACT else
+        'Paid plans are not open yet. Follow the launch on '
+        '<a class="plain" href="https://github.com/youssefbenzidiya-cmd/tastefit">GitHub</a>.')
+INDEX = (Path(__file__).parent / "index.html").read_text().replace("{{CTA}}", _CTA).encode()
 
 
 class Handler(BaseHTTPRequestHandler):
