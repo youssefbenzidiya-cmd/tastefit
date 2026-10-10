@@ -141,6 +141,20 @@
   .sec-block.checklist ul { list-style: none; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 32px; }
   .sec-block.checklist li { position: relative; padding-left: 30px; }
   .sec-block.checklist li::before { content: ""; position: absolute; left: 0; top: 4px; width: 16px; height: 16px; border: 1.5px solid var(--ink); border-radius: 4px; }
+  .compare-wrap { margin-top: 40px; }
+  .compare-wrap h3 { font: 600 22px/1.25 var(--display); margin: 0 0 14px; letter-spacing: -0.01em; }
+  .compare-table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--rule); border-radius: 16px; overflow: hidden; font-variant-numeric: tabular-nums; }
+  .compare-table th, .compare-table td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  .compare-table tr:last-child th, .compare-table tr:last-child td { border-bottom: 0; }
+  .compare-table th[scope=row] { font-weight: 500; color: var(--muted); width: 180px; }
+  .compare-table thead th, .compare-table tr:first-child th { font-weight: 600; }
+  .compare-table tr:first-child th span { display: block; }
+  .compare-table tr:first-child th small { display: block; font-weight: 400; color: var(--muted); font-size: 13px; }
+  .compare-table .best { background: #f6f1e2; }
+  .compare-table td b { font: 700 22px/1 var(--display); }
+  .call-mini { font-weight: 600; }
+  .call-mini.go { color: var(--go); } .call-mini.adjust { color: var(--adjust); } .call-mini.nogo { color: var(--nogo); }
+  .cmp-note { font-size: 13px; color: var(--muted); margin: 10px 0 0; }
   .skeleton { height: 14px; border-radius: 6px; background: #e3e7e0; margin: 14px 0; animation: pulse 1.4s ease-in-out infinite; }
   .waiting { padding: 36px; border: 1px dashed var(--rule); border-radius: 20px; }
   .waiting p { margin: 0 0 8px; color: var(--muted); }
@@ -211,6 +225,7 @@
     .sec-block.wide { grid-column: auto; }
     .scorecard, .sec-block.checklist ul { grid-template-columns: 1fr; }
     .tiers { grid-template-columns: 1fr; }
+    .compare-wrap { overflow-x: auto; }
     .tier + .tier { border-left: 0; border-top: 1px solid var(--rule); }
     .nav span { display: none; }
   }
@@ -374,6 +389,23 @@ function parseMemo(md) {
            rest: sections.filter(s => s !== v) };
 }
 
+let checks = [];
+try { checks = JSON.parse(sessionStorage.getItem('tf-checks') || '[]'); } catch (e) {}
+
+function compareHTML() {
+  if (checks.length < 2) return '';
+  const best = Math.max(...checks.map(c => c.score ?? -1));
+  const names = [...new Set(checks.flatMap(c => c.bars.map(b => b[0])))];
+  const head = '<tr><th></th>' + checks.map(c => '<th' + (c.score === best ? ' class="best"' : '') + '><span>' + esc(c.location) + '</span><small>' + esc(c.concept) + '</small></th>').join('') + '</tr>';
+  const row = (title, cell) => '<tr><th scope="row">' + title + '</th>' + checks.map(c => '<td' + (c.score === best ? ' class="best"' : '') + '>' + cell(c) + '</td>').join('') + '</tr>';
+  return '<div class="compare-wrap"><h3>Your checks side by side</h3><table class="compare-table">' + head +
+    row('Verdict', c => '<span class="call-mini ' + c.cls + '">' + esc(c.label) + '</span>') +
+    row('Fit score', c => '<b>' + (c.score ?? '–') + '</b>') +
+    names.map(n => row(esc(n), c => { const b = c.bars.find(x => x[0] === n); return b ? b[1] : '–'; })).join('') +
+    row('Opportunity index', c => c.opp ?? '–') +
+    '</table><p class="cmp-note">Highest fit score is highlighted. Checks are kept in this browser tab only.</p></div>';
+}
+
 function renderMemo(md) {
   const m = parseMemo(md);
   if (!m || !m.call) { report.innerHTML = '<div class="sections"><div class="sec-block wide">' + marked.parse(md) + '</div></div>'; return; }
@@ -391,6 +423,12 @@ function renderMemo(md) {
     const k = /evidence/i.test(s.title) ? 'wide' : /limit/i.test(s.title) ? 'wide limits' : /before you sign/i.test(s.title) ? 'wide checklist' : '';
     return '<div class="sec-block ' + k + '"><h3>' + esc(s.title) + '</h3>' + marked.parse(s.body) + '</div>';
   }).join('');
+  checks = checks.filter(c => !(c.concept === f.concept.value && c.location === f.location.value));
+  checks.push({ concept: f.concept.value, location: f.location.value, label, cls, score: m.score,
+                bars: bars.map(b => [b[1].trim(), Math.min(100, +b[2])]),
+                opp: geoData ? geoData.recommended.opportunity_index : null });
+  checks = checks.slice(-4);
+  try { sessionStorage.setItem('tf-checks', JSON.stringify(checks)); } catch (e) {}
   report.innerHTML =
     '<p class="print-head">TasteFit: ' + esc(f.concept.value) + ' in ' + esc(f.location.value) + '</p>' +
     '<div class="verdict">' +
@@ -399,10 +437,12 @@ function renderMemo(md) {
       '<p class="ctx">' + esc(f.concept.value) + ' in ' + esc(f.location.value) + '</p></div>' +
     '</div>' +
     scoreHTML +
+    compareHTML() +
     (geoData ? siteHTML(geoData) : '') +
     '<div class="sections">' + blocks + '</div>' +
     '<div class="tools"><button class="primary" type="button" onclick="window.print()">Save as PDF</button>' +
     '<button type="button" id="share">Copy link to this check</button>' +
+    '<button type="button" onclick="f.location.value=\'\';window.scrollTo({top:0,behavior:\'smooth\'});f.location.focus()">Compare another neighborhood</button>' +
     '<button type="button" onclick="window.scrollTo({top:0,behavior:\'smooth\'});f.concept.focus()">Test another concept</button></div>';
 }
 
