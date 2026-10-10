@@ -30,6 +30,10 @@ image-build:
   script:
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
     - docker build -t "$IMAGE" .
+    - docker run --rm "$IMAGE" node node_modules/.bin/qloo --help > /dev/null
+    - docker run -d --name app -p 7860:7860 "$IMAGE"
+    - for i in $(seq 1 20); do wget -qO- http://docker:7860/health | grep -q "^ok" && break; sleep 1; done
+    - wget -qO- http://docker:7860/health | grep "^ok"
     - docker push "$IMAGE"
 
 semgrep-sast:

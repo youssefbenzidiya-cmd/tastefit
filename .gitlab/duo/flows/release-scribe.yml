@@ -47,8 +47,13 @@ prompts:
              /projects/{{project_id}}/pipelines/<id>/jobs) and quote the health line it verified;
            - security results for this pipeline: list_security_findings for the SAST, secret detection
              and container scanning reports, plus list_vulnerabilities for anything still open.
-        4. For every High or Critical finding that has no linked issue yet, create one with
-           create_vulnerability_issue.
+        4. For High or Critical findings that have no linked issue yet, create one issue per affected
+           package with create_vulnerability_issue. If that tool rejects the call, fall back to a single
+           create_issue titled "Security: <n> Critical/High findings in <sha>" (label `security`) that
+           groups findings by package, lists the CVEs and the fixed version when known, and
+           recommends the smallest change (package upgrade or base-image bump). Never skip this step
+           silently, and do not open a duplicate if an open `security` issue already covers the same
+           packages.
         5. Create an issue titled "Shipped <short sha>: <one-line summary>" with label `release-notes`:
            - "What changed for restaurant owners": 1 to 4 plain-language bullets, no jargon.
            - "What changed under the hood": short technical bullets with commit links.
