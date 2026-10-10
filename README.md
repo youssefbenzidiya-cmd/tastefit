@@ -68,7 +68,7 @@ Deployed on Render (free Docker web service) from the `Dockerfile`; set the envi
 
 TasteFit started on GitHub (https://github.com/youssefbenzidiya-cmd/tastefit) with no CI, no tests and manual deploys. On GitLab, every commit goes through a pipeline and three GitLab Duo Agent Platform flows look after the project without being asked.
 
-**Pipeline** (`.gitlab-ci.yml`): `test` (unit tests, lint) → `build` (Docker image pushed to the GitLab container registry) → `security` (SAST, secret detection, container scanning of that image) → `deploy` (Render deploy hook pinned to the exact commit) → `verify` (smoke test polls `/health` until it returns `ok <commit sha>`, then checks the page and the input validation).
+**Pipeline** (`.gitlab-ci.yml`): `test` (unit tests, lint) → `build` (Docker image pushed to the GitLab container registry) → `security` (SAST, secret detection, container scanning of that image) → `deploy` (Render deploy hook pinned to the exact commit) → `verify` (smoke test polls `/health` until it returns `ok <commit sha>`, then checks the page and the input validation). A daily scheduled pipeline rebuilds and rescans the image for newly published CVEs and runs an uptime check on production, so an outage or a new vulnerability also wakes Pipeline Medic.
 
 **Flows** (definitions in `.gitlab/duo/flows/`, rules in `AGENTS.md` and `skills/tastefit-guardrails/`):
 

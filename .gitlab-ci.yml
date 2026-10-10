@@ -50,6 +50,8 @@ deploy-render:
   stage: deploy
   image: curlimages/curl:8.10.1
   rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $RENDER_DEPLOY_KEY
   environment:
     name: production
@@ -62,6 +64,8 @@ smoke-test:
   image: curlimages/curl:8.10.1
   needs: [deploy-render]
   rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $RENDER_DEPLOY_KEY
   script:
     - |
@@ -72,4 +76,20 @@ smoke-test:
       done
       [ "$live" = "ok $CI_COMMIT_SHA" ] || { echo "live is '$live', expected $CI_COMMIT_SHA"; exit 1; }
     - curl -fsS "$LIVE_URL/" | grep "Will your restaurant fit" > /dev/null
+    - test "$(curl -s -o /dev/null -w '%{http_code}' "$LIVE_URL/run?concept=x")" = 400
+
+uptime-check:
+  stage: verify
+  image: curlimages/curl:8.10.1
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  script:
+    - |
+      for i in 1 2 3 4 5 6; do
+        live=$(curl -fsS -m 60 "$LIVE_URL/health" || true)
+        case "$live" in ok*) break;; esac
+        sleep 20
+      done
+      echo "live: $live"
+      case "$live" in ok*) ;; *) echo "production is down"; exit 1;; esac
     - test "$(curl -s -o /dev/null -w '%{http_code}' "$LIVE_URL/run?concept=x")" = 400
