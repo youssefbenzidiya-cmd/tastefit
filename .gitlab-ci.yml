@@ -5,6 +5,14 @@ include:
   - template: Jobs/Secret-Detection.gitlab-ci.yml
   - template: Jobs/Container-Scanning.gitlab-ci.yml
 
+.code-paths: &code-paths
+  - Dockerfile
+  - .dockerignore
+  - package.json
+  - "**/*.py"
+  - index.html
+  - .gitlab-ci.yml
+
 variables:
   LIVE_URL: https://tastefit.onrender.com
   IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
@@ -12,12 +20,20 @@ variables:
 
 unit-tests:
   stage: test
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - changes: *code-paths
   image: python:3.12-slim
   script:
     - python -m unittest discover -s tests -t . -v
 
 lint:
   stage: test
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - changes: *code-paths
   image: python:3.12-slim
   script:
     - pip install --quiet ruff
@@ -25,6 +41,8 @@ lint:
 
 image-build:
   stage: build
+  rules:
+    - changes: *code-paths
   image: docker:27
   services: [docker:27-dind]
   script:
@@ -38,12 +56,16 @@ image-build:
 
 semgrep-sast:
   stage: security
+  rules:
+    - changes: *code-paths
 
 secret_detection:
   stage: security
 
 container_scanning:
   stage: security
+  rules:
+    - changes: *code-paths
   needs: [image-build]
 
 deploy-render:
@@ -53,6 +75,7 @@ deploy-render:
     - if: $CI_PIPELINE_SOURCE == "schedule"
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $RENDER_DEPLOY_KEY
+      changes: *code-paths
   environment:
     name: production
     url: $LIVE_URL
@@ -67,6 +90,7 @@ smoke-test:
     - if: $CI_PIPELINE_SOURCE == "schedule"
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $RENDER_DEPLOY_KEY
+      changes: *code-paths
   script:
     - |
       for i in $(seq 1 40); do

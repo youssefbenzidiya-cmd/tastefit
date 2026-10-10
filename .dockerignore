@@ -1,0 +1,9 @@
+.git
+.gitlab
+.gitlab-ci.yml
+__pycache__
+**/__pycache__
+tests
+skills
+node_modules
+*.md
