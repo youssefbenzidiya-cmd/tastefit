@@ -64,6 +64,31 @@ CLI: `python agent.py "Korean fried chicken counter" "Austin, TX"`
 
 Deployed on Render (free Docker web service) from the `Dockerfile`; set the environment variables above in the Render dashboard.
 
+## Agentic DevSecOps on GitLab
+
+TasteFit started on GitHub (https://github.com/youssefbenzidiya-cmd/tastefit) with no CI, no tests and manual deploys. On GitLab, every commit goes through a pipeline and three GitLab Duo Agent Platform flows look after the project without being asked.
+
+**Pipeline** (`.gitlab-ci.yml`): `test` (unit tests, lint) → `build` (Docker image pushed to the GitLab container registry) → `security` (SAST, secret detection, container scanning of that image) → `deploy` (Render deploy hook pinned to the exact commit) → `verify` (smoke test polls `/health` until it returns `ok <commit sha>`, then checks the page and the input validation).
+
+**Flows** (definitions in `.gitlab/duo/flows/`, rules in `AGENTS.md` and `skills/tastefit-guardrails/`):
+
+| Flow | Runs when | What it does |
+|---|---|---|
+| Pipeline Medic | any pipeline fails | Reads the failing job logs, classifies the failure (code, config, infra), and opens a minimal fix merge request validated with the CI linter, or a diagnosis issue. It never touches its own `medic/` branches twice, so it cannot loop. |
+| Domain Reviewer | a merge request is created, or the bot is assigned as reviewer | Checks the rules a generic reviewer cannot know: secrets, Qloo data terms, privacy, Nominatim policy, site-maths tests, memo honesty, protected security jobs. Answers GO / ADJUST / NO-GO, like TasteFit itself. |
+| Release Scribe | a pipeline on `main` passes | Writes release notes for restaurant owners, with deployment proof (the smoke-tested commit SHA) and a security summary across all three scanners; opens issues for High or Critical findings. |
+
+| | Before (GitHub) | After (GitLab) |
+|---|---|---|
+| Tests | none | 9 unit tests on every push |
+| Security | none | SAST, secret detection, container scanning |
+| Deploy | manual | exact commit, verified live by SHA |
+| Broken pipeline | noticed by chance | diagnosed, fix MR opened and reviewed in under 4 minutes ([pipeline](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipelines/2934704707) failed 22:16:08 UTC, [fix MR](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/1) opened 22:17:47, review posted 22:19:51) |
+| Review | none | product-rule review on every merge request |
+| Release notes | none | written for owners on every production deploy |
+
+The human stays the supervisor: agents open merge requests and issues, a person merges.
+
 ## License
 
 MIT
