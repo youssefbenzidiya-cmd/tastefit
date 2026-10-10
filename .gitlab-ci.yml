@@ -1,5 +1,12 @@
 stages: [test, build, security, deploy, verify]
 
+workflow:
+  auto_cancel:
+    on_new_commit: interruptible
+
+default:
+  interruptible: true
+
 include:
   - template: Jobs/SAST.gitlab-ci.yml
   - template: Jobs/Secret-Detection.gitlab-ci.yml
@@ -48,6 +55,7 @@ container_scanning:
 
 deploy-render:
   stage: deploy
+  interruptible: false
   image: curlimages/curl:8.10.1
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
