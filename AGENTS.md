@@ -1,6 +1,6 @@
 # TasteFit agent guide
 
-TasteFit tells restaurant founders and lenders whether a concept fits a neighborhood. Founders act on its
+TasteFit tells restaurant founders and commercial brokers whether a concept fits a neighborhood. Founders act on its
 GO / ADJUST / NO-GO verdict with real money, so every change must keep the memo correct and honest.
 
 ## Layout
@@ -26,14 +26,27 @@ GO / ADJUST / NO-GO verdict with real money, so every change must keep the memo 
    spot as a vetted address.
 7. The server stays standard-library only. `/run` rejects missing inputs with 400.
 8. Never remove or skip unit tests, SAST, secret detection, container scanning or the smoke test.
+9. Agent-authored branches (`medic/`, `duo/`) may not modify `AGENTS.md`, `.gitlab/duo/**`, `skills/**`
+   or `CODEOWNERS`. Only humans change the rules agents follow. The CI `policy-guard` job enforces this.
 
 ## Duo flows in this project
 
-Definitions live in `.gitlab/duo/flows/`:
+Definitions live in `.gitlab/duo/flows/`. Together they cover Plan to Production, and every step leaves
+a trace (issue, note, merge request or review) in the project:
 
-- **Pipeline Medic** (`pipeline-medic.yml`): runs on any failed pipeline, opens a fix merge request or a
-  diagnosis issue.
-- **Domain Reviewer** (`domain-reviewer.yml`): runs when a merge request is created, or when the bot is
-  assigned as reviewer, and checks the rules above.
-- **Release Scribe** (`release-scribe.yml`): runs on every passed pipeline on `main`, files release notes
-  with deployment proof and a security summary.
+- **Issue Planner** (`issue-planner.yml`, Plan): runs when an issue is created or the planner is
+  mentioned. Rewrites the issue into a spec with acceptance criteria and a test plan, checks it against
+  the rules above, adds `type::`, `priority::` and `size::` labels, and marks small, safe issues
+  "Ready for implementation" for the Developer flow.
+- **Developer flow** (GitLab foundational flow, Create): implements on a `duo/` branch. It can delegate
+  testing to the workspace subagent `.agents/agents/tastefit-tester.md`.
+- **Domain Reviewer** (`domain-reviewer.yml`, Review): runs when a merge request is created or the bot is
+  assigned as reviewer. A deterministic step prefetches the diff, then the reviewer posts inline comments
+  with suggestions and a summary "Verdict for <sha>: GO / ADJUST / NO-GO" against rules 1 to 9.
+- **Pipeline Medic** (`pipeline-medic.yml`, Verify): runs on any failed pipeline. A lead agent delegates
+  to `log_analyst` (classifies CODE, CONFIG, INFRA or SECURITY with evidence) and `fixer` (minimal fix on
+  `medic/<pipeline id>` with a merge request). INFRA failures, such as production down, open an
+  `incident` issue; unfixable High/Critical CVEs from `cve-gate` open a `security` issue. It never merges.
+- **Release Scribe** (`release-scribe.yml`, Release): runs on every passed pipeline on `main`, files
+  release notes with deployment proof and a security summary, then notes "Shipped to production in
+  <sha>" on every issue the shipped commits or merge requests reference.
