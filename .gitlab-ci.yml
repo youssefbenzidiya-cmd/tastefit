@@ -1,11 +1,14 @@
-stages: [test, security, deploy, verify]
+stages: [test, build, security, deploy, verify]
 
 include:
   - template: Jobs/SAST.gitlab-ci.yml
   - template: Jobs/Secret-Detection.gitlab-ci.yml
+  - template: Jobs/Container-Scanning.gitlab-ci.yml
 
 variables:
   LIVE_URL: https://tastefit.onrender.com
+  IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+  CS_IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
 
 unit-tests:
   stage: test
@@ -20,30 +23,42 @@ lint:
     - pip install --quiet ruff
     - ruff check --select E9,F63,F7,F82 .
 
-docker-build:
-  stage: test
+image-build:
+  stage: build
   image: docker:27
   services: [docker:27-dind]
   script:
-    - docker build -t tastefit:$CI_COMMIT_SHORT_SHA .
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - docker build -t "$IMAGE" .
+    - docker push "$IMAGE"
+
+semgrep-sast:
+  stage: security
+
+secret_detection:
+  stage: security
+
+container_scanning:
+  stage: security
+  needs: [image-build]
 
 deploy-render:
   stage: deploy
   image: curlimages/curl:8.10.1
   rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $RENDER_DEPLOY_HOOK
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $RENDER_DEPLOY_KEY
   environment:
     name: production
     url: $LIVE_URL
   script:
-    - curl -fsS -X POST "$RENDER_DEPLOY_HOOK" > /dev/null
+    - curl -fsS -X POST "https://api.render.com/deploy/${RENDER_SERVICE_ID}?key=${RENDER_DEPLOY_KEY}&ref=${CI_COMMIT_SHA}" > /dev/null
 
 smoke-test:
   stage: verify
   image: curlimages/curl:8.10.1
   needs: [deploy-render]
   rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $RENDER_DEPLOY_HOOK
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $RENDER_DEPLOY_KEY
   script:
     - |
       for i in $(seq 1 40); do
