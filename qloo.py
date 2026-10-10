@@ -22,7 +22,10 @@ def exec_workflow(operation, params, timeout=90):
     out = p.stdout.strip()
     if not out:
         raise RuntimeError(p.stderr.strip()[-500:] or f"qloo exec {operation} failed")
-    return json.loads(out)
+    try:
+        return json.loads(out)
+    except ValueError:
+        raise RuntimeError(f"qloo exec {operation} returned non-JSON output") from None
 
 
 def find_tags(query, limit=8):
