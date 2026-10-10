@@ -20,11 +20,16 @@ Method:
 If a tool returns status "needs_input", fix the inputs and retry once.
 Finish with a memo in Markdown:
 ## Verdict: GO / ADJUST / NO-GO (fit score 0-100)
+## Scorecard (exactly these three bullets, format "- Name: NN/100 - one short reason"; the fit score is their rounded mean)
+- Taste match: how strongly the area's audience favors the concept's tags
+- Competition gap: high when few strong places already serve it
+- Location strength: from site_math (opportunity index, distance to competitors)
 ## Evidence (3-5 bullets, each citing a place, tag or number returned by a tool)
 ## Best location within the area (use the site_math numbers in km; describe the suggested point by nearby streets
    or sub-areas you saw in tool results, never invent an address)
 ## Positioning: menu signatures, price tier, vibe (grounded in the tags)
 ## Risks
+## Before you sign (3-5 bullets: what to verify on site, e.g. evening foot traffic at the suggested spot, rent vs. price tier, a named competitor's busiest hours)
 ## Limits: Qloo describes aggregate group affinities, not foot traffic, rents or individual behaviour; say what this memo does not establish.
 Be concise. Never invent places, tags or numbers; separate Qloo results from your interpretation."""
 
