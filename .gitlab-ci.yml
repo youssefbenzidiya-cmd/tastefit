@@ -67,5 +67,5 @@ smoke-test:
         sleep 15
       done
       [ "$live" = "ok $CI_COMMIT_SHA" ] || { echo "live is '$live', expected $CI_COMMIT_SHA"; exit 1; }
-    - curl -fsS "$LIVE_URL/" | grep -q "Will your restaurant fit"
+    - curl -fsS "$LIVE_URL/" | grep "Will your restaurant fit" > /dev/null
     - test "$(curl -s -o /dev/null -w '%{http_code}' "$LIVE_URL/run?concept=x")" = 400
