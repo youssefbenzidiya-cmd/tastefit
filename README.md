@@ -1,3 +1,13 @@
+---
+title: TasteFit
+emoji: 🍜
+colorFrom: yellow
+colorTo: red
+sdk: docker
+app_port: 7860
+license: mit
+---
+
 # TasteFit
 
 A taste-market-fit agent for new restaurants and cafes.
