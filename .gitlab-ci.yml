@@ -1,0 +1,56 @@
+stages: [test, security, deploy, verify]
+
+include:
+  - template: Jobs/SAST.gitlab-ci.yml
+  - template: Jobs/Secret-Detection.gitlab-ci.yml
+
+variables:
+  LIVE_URL: https://tastefit.onrender.com
+
+unit-tests:
+  stage: test
+  image: python:3.12-slim
+  script:
+    - python -m unittest discover -s tests -t . -v
+
+lint:
+  stage: test
+  image: python:3.12-slim
+  script:
+    - pip install --quiet ruff
+    - ruff check --select E9,F63,F7,F82 .
+
+docker-build:
+  stage: test
+  image: docker:27
+  services: [docker:27-dind]
+  script:
+    - docker build -t tastefit:$CI_COMMIT_SHORT_SHA .
+
+deploy-render:
+  stage: deploy
+  image: curlimages/curl:8.10.1
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $RENDER_DEPLOY_HOOK
+  environment:
+    name: production
+    url: $LIVE_URL
+  script:
+    - curl -fsS -X POST "$RENDER_DEPLOY_HOOK" > /dev/null
+
+smoke-test:
+  stage: verify
+  image: curlimages/curl:8.10.1
+  needs: [deploy-render]
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $RENDER_DEPLOY_HOOK
+  script:
+    - |
+      for i in $(seq 1 40); do
+        live=$(curl -fsS "$LIVE_URL/health" || true)
+        if [ "$live" = "ok $CI_COMMIT_SHA" ]; then break; fi
+        sleep 15
+      done
+      [ "$live" = "ok $CI_COMMIT_SHA" ] || { echo "live is '$live', expected $CI_COMMIT_SHA"; exit 1; }
+    - curl -fsS "$LIVE_URL/" | grep -q "Will your restaurant fit"
+    - test "$(curl -s -o /dev/null -w '%{http_code}' "$LIVE_URL/run?concept=x")" = 400

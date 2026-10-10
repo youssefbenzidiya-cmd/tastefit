@@ -22,6 +22,8 @@ class Handler(BaseHTTPRequestHandler):
         url = urllib.parse.urlparse(self.path)
         if url.path == "/":
             self._send(200, "text/html; charset=utf-8", INDEX)
+        elif url.path == "/health":
+            self._send(200, "text/plain", f"ok {os.environ.get('RENDER_GIT_COMMIT', '')}".strip().encode())
         elif url.path == "/run":
             q = urllib.parse.parse_qs(url.query)
             concept, location = q.get("concept", [""])[0][:300], q.get("location", [""])[0][:120]
