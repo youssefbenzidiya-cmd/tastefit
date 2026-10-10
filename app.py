@@ -14,14 +14,23 @@ _CTA = (f'<a href="mailto:{html.escape(_CONTACT)}?subject=TasteFit%20early%20acc
         if _CONTACT else
         'Paid plans are not open yet. Follow the launch on '
         '<a class="plain" href="https://github.com/youssefbenzidiya-cmd/tastefit">GitHub</a>.')
-INDEX = (Path(__file__).parent / "index.html").read_text().replace("{{CTA}}", _CTA).encode()
+_TEMPLATE = (Path(__file__).parent / "index.html").read_text().replace("{{CTA}}", _CTA)
+
+
+def build_label():
+    """Short build id shown in the footer: first 7 chars of RENDER_GIT_COMMIT, or 'dev' when unset."""
+    return os.environ.get("RENDER_GIT_COMMIT", "").strip()[:7] or "dev"
+
+
+def render_index():
+    return _TEMPLATE.replace("{{BUILD}}", html.escape(build_label())).encode()
 
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         url = urllib.parse.urlparse(self.path)
         if url.path == "/":
-            self._send(200, "text/html; charset=utf-8", INDEX)
+            self._send(200, "text/html; charset=utf-8", render_index())
         elif url.path == "/health":
             self._send(200, "text/plain", f"ok {os.environ.get('RENDER_GIT_COMMIT', '')}".strip().encode())
         elif url.path == "/run":
