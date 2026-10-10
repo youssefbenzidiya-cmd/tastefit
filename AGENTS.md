@@ -26,7 +26,7 @@ GO / ADJUST / NO-GO verdict with real money, so every change must keep the memo 
    spot as a vetted address.
 7. The server stays standard-library only. `/run` rejects missing inputs with 400.
 8. Never remove or skip unit tests, SAST, secret detection, container scanning or the smoke test.
-9. Agent-authored branches (`medic/`, `duo/`) may not modify `AGENTS.md`, `.gitlab/duo/**`, `skills/**`
+9. Agent-authored branches (`medic/`, `duo/`) may not modify `AGENTS.md`, `.gitlab/duo/**`, `.agents/**`, `skills/**`
    or `CODEOWNERS`. Only humans change the rules agents follow. The CI `policy-guard` job enforces this.
 
 ## Duo flows in this project
