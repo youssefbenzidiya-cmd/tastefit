@@ -108,7 +108,7 @@
   .dial b { font: 700 44px/1 var(--display); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
   .dial span { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
   .call { font: 700 clamp(30px, 4vw, 44px)/1.05 var(--display); letter-spacing: -0.03em; margin: 0 0 10px; }
-  .call.go { color: var(--go); } .call.adjust { color: var(--adjust); } .call.nogo { color: var(--nogo); }
+  .call.go { color: var(--go); } .call.adjust, .call.incomplete { color: var(--adjust); } .call.nogo { color: var(--nogo); }
   .verdict .why { margin: 0; color: var(--ink); max-width: 62ch; }
   .verdict .ctx { margin-top: 12px; color: var(--muted); font-size: 14px; }
 
@@ -447,9 +447,9 @@ function renderMemo(text) {
   if (!call) { report.innerHTML = demoBanner() + '<div class="sections"><div class="sec-block wide">' + md(text) + '</div></div>'; return; }
   const score = sc ? sc.fit : m.score;
   const rest = m ? m.rest : [];
-  const cls = call === 'GO' ? 'go' : call === 'ADJUST' ? 'adjust' : 'nogo';
-  const color = { go: 'var(--go)', adjust: 'var(--adjust)', nogo: 'var(--nogo)' }[cls];
-  const label = { go: 'Go', adjust: 'Go, with changes', nogo: 'Not here' }[cls];
+  const cls = call === 'GO' ? 'go' : call === 'ADJUST' ? 'adjust' : call === 'INCOMPLETE' ? 'incomplete' : 'nogo';
+  const color = { go: 'var(--go)', adjust: 'var(--adjust)', nogo: 'var(--nogo)', incomplete: 'var(--adjust)' }[cls];
+  const label = { go: 'Go', adjust: 'Go, with changes', nogo: 'Not here', incomplete: 'No call: evidence incomplete' }[cls];
   const why = m && m.verdict.body ? mdi(m.verdict.body.replace(/\n+/g, ' ')) : '';
   const card = rest.find(s => /scorecard/i.test(s.title));
   const bars = scoreBars(sc, card);

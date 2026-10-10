@@ -197,10 +197,12 @@ def build_scorecard(verdict, site_result):
     method = ("Fit score = mean of the sub-scores, computed by TasteFit. Location strength is the site-maths opportunity "
               "index; taste match and competition gap are the analyst's reading of the Qloo results. "
               "GO at 70+, ADJUST at 45-69, NO-GO below 45.")
-    if len(bars) < len(SUBSCORES) + 1:
-        method += " Some sub-scores are missing, so the fit uses only the ones shown."
-    return {"call": next(call for call, floor in THRESHOLDS if fit >= floor), "fit": fit, "bars": bars,
-            "complete": len(bars) == len(SUBSCORES) + 1, "method": method}
+    complete = len(bars) == len(SUBSCORES) + 1
+    if not complete:
+        method += (" Some sub-scores are missing, so TasteFit gives no GO / ADJUST / NO-GO call; "
+                   "the score shown is provisional.")
+    call = next(call for call, floor in THRESHOLDS if fit >= floor) if complete else "INCOMPLETE"
+    return {"call": call, "fit": fit, "bars": bars, "complete": complete, "method": method}
 
 
 def memo_with_scorecard(memo, sc):

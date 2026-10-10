@@ -146,13 +146,18 @@ class Scorecard(unittest.TestCase):
         self.assertIn("0.4 km", sc["bars"][2]["reason"])
         low = agent.build_scorecard(self.verdict, {"recommended": {"opportunity_index": 0}})
         self.assertEqual((low["fit"], low["call"]), (47, "ADJUST"))
-        bad = agent.build_scorecard({"taste_match": {"score": 20, "reason": ""}}, {"recommended": {"opportunity_index": 30}})
-        self.assertEqual((bad["fit"], bad["call"]), (25, "NO-GO"))
+        bad = agent.build_scorecard({"taste_match": {"score": 20, "reason": ""},
+                                     "competition_gap": {"score": 30, "reason": ""}},
+                                    {"recommended": {"opportunity_index": 30}})
+        self.assertEqual((bad["fit"], bad["call"]), (27, "NO-GO"))
 
-    def test_missing_site_gives_partial_scorecard(self):
+    def test_missing_site_gives_partial_scorecard_without_call(self):
         sc = agent.build_scorecard(self.verdict, None)
         self.assertEqual((sc["fit"], sc["complete"], len(sc["bars"])), (70, False, 2))
+        self.assertEqual(sc["call"], "INCOMPLETE")
         self.assertIn("missing", sc["method"])
+        one = agent.build_scorecard({"taste_match": {"score": 90, "reason": ""}}, {"recommended": {"opportunity_index": 90}})
+        self.assertEqual(one["call"], "INCOMPLETE")
         self.assertIsNone(agent.build_scorecard(None, {"recommended": {"opportunity_index": 90}}))
 
     def test_memo_heading_and_scorecard_are_rewritten(self):
