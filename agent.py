@@ -67,8 +67,28 @@ def chat(messages):
         return json.loads(r.read())["choices"][0]["message"]
 
 
+def _names(obj, limit=6):
+    """First entity names found anywhere in a harness result, for the progress view."""
+    found = []
+
+    def walk(o):
+        if len(found) >= limit:
+            return
+        if isinstance(o, dict):
+            if isinstance(o.get("name"), str) and o["name"] not in found:
+                found.append(o["name"])
+            for v in o.values():
+                walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+
+    walk(obj)
+    return found
+
+
 def run(concept, location, max_steps=14):
-    """Yields ('step', text) events while working, then ('memo', markdown)."""
+    """Yields ('step', dict) events while working, then ('memo', markdown)."""
     messages = [{"role": "system", "content": SYSTEM},
                 {"role": "user", "content": f"Concept: {concept}\nLocation: {location}"}]
     for _ in range(max_steps):
@@ -80,7 +100,8 @@ def run(concept, location, max_steps=14):
         for tc in msg["tool_calls"]:
             args = json.loads(tc["function"].get("arguments") or "{}")
             result = call_tool(tc["function"]["name"], args)
-            yield "step", f"{tc['function']['name']}({json.dumps(args, ensure_ascii=False)}) -> {json.dumps(result, ensure_ascii=False)[:400]}"
+            yield "step", {"tool": tc["function"]["name"], "args": args, "names": _names(result),
+                           "error": result.get("error") if isinstance(result, dict) else None}
             messages.append({"role": "tool", "tool_call_id": tc["id"], "content": json.dumps(result, ensure_ascii=False)[:6000]})
     yield "memo", "Stopped: step limit reached."
 
@@ -88,4 +109,4 @@ def run(concept, location, max_steps=14):
 if __name__ == "__main__":
     import sys
     for kind, text in run(sys.argv[1], sys.argv[2]):
-        print(("  -> " if kind == "step" else "\n") + text)
+        print(("  -> " if kind == "step" else "\n") + str(text))

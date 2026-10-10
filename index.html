@@ -3,58 +3,322 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TasteFit: will this restaurant fit the neighborhood?</title>
+<title>TasteFit · Will your restaurant fit the neighborhood?</title>
+<meta name="description" content="Test a restaurant or café concept against the local taste of a neighborhood before you sign a lease.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
-  :root { --ink:#1d1b16; --muted:#6b6457; --paper:#faf6ee; --accent:#c2410c; --line:#e7dfcf; }
-  * { box-sizing:border-box; }
-  body { margin:0; font:16px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--ink); background:var(--paper); }
-  main { max-width:860px; margin:0 auto; padding:48px 20px 80px; }
-  h1 { font:700 40px/1.1 Georgia, serif; margin:0 0 8px; letter-spacing:-0.5px; }
-  .lede { color:var(--muted); margin:0 0 28px; max-width:620px; }
-  form { display:grid; gap:12px; grid-template-columns:1fr 1fr auto; align-items:end; }
-  label { font-size:13px; color:var(--muted); display:grid; gap:4px; }
-  input { font:inherit; padding:11px 12px; border:1px solid var(--line); border-radius:10px; background:#fff; }
-  button { font:600 15px/1 inherit; padding:13px 18px; border:0; border-radius:10px; background:var(--accent); color:#fff; cursor:pointer; }
-  button:disabled { opacity:.5; cursor:wait; }
-  .examples { margin:10px 0 0; font-size:13px; color:var(--muted); }
-  .examples a { color:var(--accent); cursor:pointer; margin-right:10px; }
-  #steps { margin:28px 0 0; padding:0; list-style:none; font:12.5px/1.45 ui-monospace, Menlo, monospace; color:var(--muted); }
-  #steps li { padding:6px 0; border-top:1px dashed var(--line); overflow-wrap:anywhere; }
-  #memo { margin-top:24px; background:#fff; border:1px solid var(--line); border-radius:14px; padding:4px 26px 18px; display:none; }
-  #memo h2 { font:700 20px Georgia, serif; margin:22px 0 6px; }
-  @media (max-width:700px) { form { grid-template-columns:1fr; } }
+  :root {
+    --pine: #13261f;
+    --pine-2: #1c3529;
+    --pine-line: #2d4a3d;
+    --stone: #f3f4ef;
+    --card: #ffffff;
+    --ink: #13261f;
+    --muted: #5d6b63;
+    --rule: #d9ddd5;
+    --saffron: #e3a21a;
+    --go: #2f7d4f;
+    --adjust: #c58a0f;
+    --nogo: #b4432f;
+    --display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+    --body: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; font: 16px/1.6 var(--body); color: var(--ink); background: var(--stone); -webkit-font-smoothing: antialiased; }
+  a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--saffron); outline-offset: 3px; border-radius: 4px; }
+
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 32px; }
+
+  /* Brief */
+  .brief { background: var(--pine); color: #eef2ec; padding: 28px 0 64px; }
+  .bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 72px; }
+  .logo { font: 700 20px/1 var(--display); letter-spacing: -0.02em; display: flex; align-items: center; gap: 10px; }
+  .logo i { width: 12px; height: 12px; border-radius: 50%; background: var(--saffron); display: block; }
+  .bar small { color: #9fb2a7; font-size: 14px; }
+
+  .ask { font: 600 clamp(34px, 5.4vw, 64px)/1.12 var(--display); letter-spacing: -0.03em; margin: 0; max-width: 980px; }
+  .ask .line { display: flex; align-items: baseline; gap: 0.3em; flex-wrap: wrap; }
+  .ask .lead { color: #9fb2a7; flex: none; }
+  .ask input {
+    flex: 1 1 320px; min-width: 0; font: inherit; letter-spacing: inherit; color: #fff;
+    background: transparent; border: 0; border-bottom: 2px solid var(--pine-line); padding: 0 0 4px; border-radius: 0;
+    transition: border-color .15s;
+  }
+  .ask input::placeholder { color: #47685a; }
+  .ask input:hover { border-bottom-color: #47685a; }
+  .ask input:focus { outline: none; border-bottom-color: var(--saffron); }
+
+  .actions { margin-top: 40px; display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
+  .run {
+    font: 600 17px/1 var(--body); padding: 18px 28px; border: 0; border-radius: 999px; cursor: pointer;
+    background: var(--saffron); color: var(--pine); transition: transform .12s, background .15s;
+  }
+  .run:hover { background: #f0b432; }
+  .run:active { transform: scale(.98); }
+  .run:disabled { background: var(--pine-line); color: #9fb2a7; cursor: progress; }
+  .try { color: #9fb2a7; font-size: 15px; display: flex; gap: 6px 18px; flex-wrap: wrap; align-items: center; }
+  .try button { font: inherit; color: #dfe7e1; background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-decoration-color: var(--pine-line); text-underline-offset: 4px; }
+  .try button:hover { text-decoration-color: var(--saffron); }
+
+  /* Below the fold */
+  .stage { padding: 56px 0 96px; }
+
+  .method { display: grid; grid-template-columns: repeat(3, 1fr); gap: 48px; }
+  .method h3 { font: 600 20px/1.3 var(--display); margin: 0 0 8px; letter-spacing: -0.01em; }
+  .method p { margin: 0; color: var(--muted); max-width: 34ch; }
+  .note { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--rule); color: var(--muted); font-size: 14px; max-width: 70ch; }
+
+  .work { display: grid; grid-template-columns: 300px 1fr; gap: 56px; align-items: start; }
+  .progress { position: sticky; top: 24px; }
+  .progress h2, .report h2.sec { font: 600 14px/1 var(--body); color: var(--muted); margin: 0 0 18px; }
+  .clock { font-variant-numeric: tabular-nums; float: right; font-weight: 500; }
+  ol.steps { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+  ol.steps li { counter-increment: s; position: relative; padding: 0 0 22px 40px; }
+  ol.steps li::before {
+    content: counter(s); position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 50%;
+    display: grid; place-items: center; font: 600 13px/1 var(--body); background: var(--pine); color: #fff;
+  }
+  ol.steps li::after { content: ""; position: absolute; left: 12.5px; top: 30px; bottom: 4px; width: 1px; background: var(--rule); }
+  ol.steps li:last-child::after { display: none; }
+  ol.steps li.err::before { background: var(--rule); color: var(--muted); }
+  ol.steps li.live::before { content: ""; background: var(--saffron); animation: pulse 1.2s ease-in-out infinite; }
+  .s-title { font-weight: 600; line-height: 1.4; }
+  .s-sub { color: var(--muted); font-size: 14px; line-height: 1.45; margin-top: 4px; }
+  @keyframes pulse { 50% { opacity: .35; } }
+
+  /* Report */
+  .verdict { display: grid; grid-template-columns: auto 1fr; gap: 36px; align-items: center; padding: 36px; background: var(--card); border: 1px solid var(--rule); border-radius: 20px; }
+  .dial { --v: 0; --c: var(--go); width: 148px; height: 148px; border-radius: 50%; display: grid; place-items: center;
+    background: conic-gradient(var(--c) calc(var(--v) * 1%), #e8ebe5 0); }
+  .dial div { width: 120px; height: 120px; border-radius: 50%; background: var(--card); display: grid; place-items: center; text-align: center; }
+  .dial b { font: 700 44px/1 var(--display); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .dial span { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .call { font: 700 clamp(30px, 4vw, 44px)/1.05 var(--display); letter-spacing: -0.03em; margin: 0 0 10px; }
+  .call.go { color: var(--go); } .call.adjust { color: var(--adjust); } .call.nogo { color: var(--nogo); }
+  .verdict .why { margin: 0; color: var(--ink); max-width: 62ch; }
+  .verdict .ctx { margin-top: 12px; color: var(--muted); font-size: 14px; }
+
+  .sections { display: grid; grid-template-columns: 1fr 1fr; gap: 0 48px; margin-top: 40px; }
+  .sec-block { padding: 28px 0; border-top: 1px solid var(--rule); }
+  .sec-block.wide { grid-column: 1 / -1; }
+  .sec-block h3 { font: 600 22px/1.25 var(--display); letter-spacing: -0.01em; margin: 0 0 12px; }
+  .sec-block p, .sec-block li { max-width: 72ch; }
+  .sec-block ul { padding-left: 20px; margin: 0; }
+  .sec-block li { margin-bottom: 8px; }
+  .sec-block li::marker { color: var(--saffron); }
+  .sec-block.limits { color: var(--muted); font-size: 14px; }
+  .sec-block.limits h3 { font-size: 16px; color: var(--muted); }
+
+  .skeleton { height: 14px; border-radius: 6px; background: #e3e7e0; margin: 14px 0; animation: pulse 1.4s ease-in-out infinite; }
+  .waiting { padding: 36px; border: 1px dashed var(--rule); border-radius: 20px; }
+  .waiting p { margin: 0 0 8px; color: var(--muted); }
+
+  .notice { padding: 28px 32px; background: var(--card); border: 1px solid var(--rule); border-left: 4px solid var(--saffron); border-radius: 12px; }
+  .notice h3 { font: 600 20px/1.3 var(--display); margin: 0 0 6px; }
+  .notice p { margin: 0; color: var(--muted); max-width: 64ch; }
+
+  .again { margin-top: 32px; font: 600 15px/1 var(--body); background: none; border: 1px solid var(--ink); color: var(--ink); padding: 14px 22px; border-radius: 999px; cursor: pointer; }
+  .again:hover { background: var(--ink); color: #fff; }
+
+  footer { border-top: 1px solid var(--rule); padding: 24px 0 40px; color: var(--muted); font-size: 14px; }
+  footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  [hidden] { display: none !important; }
+
+  @media (max-width: 860px) {
+    .wrap { padding: 0 20px; }
+    .bar { margin-bottom: 44px; }
+    .method, .work, .sections { grid-template-columns: 1fr; gap: 28px; }
+    .progress { position: static; }
+    .verdict { grid-template-columns: 1fr; padding: 28px; gap: 24px; }
+    .sec-block.wide { grid-column: auto; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
 </style>
 </head>
 <body>
-<main>
-  <h1>TasteFit</h1>
-  <p class="lede">Most new restaurants fail on fit, not food. Describe your concept and where you want to open:
-    the agent reads the local taste from Qloo's taste graph, maps the competition and the hotspots, and writes a go / no-go memo.</p>
-  <form id="f">
-    <label>Concept<input name="concept" required placeholder="Specialty coffee + Moroccan pastries, mid-price"></label>
-    <label>Location<input name="location" required placeholder="Williamsburg, Brooklyn"></label>
-    <button id="go">Test the fit</button>
-  </form>
-  <p class="examples">Try:
-    <a data-c="Late-night Korean fried chicken, casual, mid-price" data-l="Austin, Texas">Korean chicken in Austin</a>
-    <a data-c="Natural wine bar with small plates" data-l="Silver Lake, Los Angeles">Wine bar in Silver Lake</a>
-    <a data-c="Moroccan tea house with pastries" data-l="Lower East Side, New York">Moroccan tea house in NYC</a>
-  </p>
-  <ol id="steps"></ol>
-  <article id="memo"></article>
+
+<section class="brief">
+  <div class="wrap">
+    <div class="bar">
+      <div class="logo"><i></i>TasteFit</div>
+      <small>Site check for restaurants and cafés, built on Qloo taste data</small>
+    </div>
+
+    <form id="f" autocomplete="off">
+      <h1 class="sr">TasteFit: test a restaurant concept against a neighborhood</h1>
+      <div class="ask">
+        <span class="line"><span class="lead">Will</span>
+          <input name="concept" required maxlength="300" aria-label="Your concept" placeholder="a specialty coffee bar"></span>
+        <span class="line"><span class="lead">work in</span>
+          <input name="location" required maxlength="120" aria-label="Neighborhood and city" placeholder="Williamsburg, Brooklyn"><span class="lead">?</span></span>
+      </div>
+      <div class="actions">
+        <button class="run" id="go" type="submit">Check the fit</button>
+        <div class="try">Try
+          <button type="button" data-c="a late-night Korean fried chicken spot" data-l="East Austin, Texas">Korean chicken in Austin</button>
+          <button type="button" data-c="a natural wine bar with small plates" data-l="Silver Lake, Los Angeles">Wine bar in Silver Lake</button>
+          <button type="button" data-c="a Moroccan tea house with pastries" data-l="Lower East Side, New York">Tea house on the Lower East Side</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</section>
+
+<main class="stage">
+  <div class="wrap">
+
+    <div id="intro">
+      <div class="method">
+        <div>
+          <h3>What the area already loves</h3>
+          <p>The places the local audience over-indexes on, so you see the taste you would be selling into.</p>
+        </div>
+        <div>
+          <h3>Who you would compete with</h3>
+          <p>Nearby places ranked by how closely they match your concept's cuisine, format and vibe.</p>
+        </div>
+        <div>
+          <h3>Which blocks fit best</h3>
+          <p>The sub-areas where your strongest benchmark is most loved, as a starting shortlist for the lease hunt.</p>
+        </div>
+      </div>
+      <p class="note">You get a go, adjust or no-go call with a fit score from 0 to 100, the evidence behind it, positioning advice and the risks.
+        It reads aggregate taste only: it does not know rents, foot traffic or any individual's data. Analyses take one to two minutes.</p>
+    </div>
+
+    <div id="work" class="work" hidden>
+      <aside class="progress" aria-live="polite">
+        <h2>Analysis <span class="clock" id="clock">0:00</span></h2>
+        <ol class="steps" id="steps"></ol>
+      </aside>
+      <section class="report" id="report"></section>
+    </div>
+
+  </div>
 </main>
+
+<footer>
+  <div class="wrap">
+    <span>TasteFit is open source under the MIT license.</span>
+    <a href="https://github.com/youssefbenzidiya-cmd/tastefit">Source on GitHub</a>
+  </div>
+</footer>
+
 <script>
-const f = document.getElementById('f'), steps = document.getElementById('steps'), memo = document.getElementById('memo'), go = document.getElementById('go');
-document.querySelectorAll('.examples a').forEach(a => a.onclick = () => { f.concept.value = a.dataset.c; f.location.value = a.dataset.l; });
+const $ = s => document.querySelector(s);
+const f = $('#f'), go = $('#go'), intro = $('#intro'), work = $('#work'), stepsEl = $('#steps'), report = $('#report'), clock = $('#clock');
+let es, timer, started, live;
+
+document.querySelectorAll('.try button').forEach(b => b.onclick = () => {
+  f.concept.value = b.dataset.c; f.location.value = b.dataset.l; f.requestSubmit();
+});
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const list = names => names.slice(0, 4).join(', ') + (names.length > 4 ? ' and more' : '');
+
+function describe(s) {
+  const a = s.args || {}, n = s.names || [];
+  const found = n.length ? 'Found ' + list(n) : 'No matches returned';
+  switch (s.tool) {
+    case 'find_tags':   return ['Translating "' + a.query + '" into taste tags', found];
+    case 'area_taste':  return ['Reading what ' + a.location + ' already loves', n.length ? 'Top places: ' + list(n) : found];
+    case 'competitors': return ['Ranking places that match your concept', n.length ? 'Closest matches: ' + list(n) : found];
+    case 'hotspots':    return ['Finding where ' + a.place + ' is most loved', n.length ? 'Strongest areas: ' + list(n) : found];
+    default:            return [s.tool, found];
+  }
+}
+
+function addLive() {
+  live = document.createElement('li');
+  live.className = 'live';
+  live.innerHTML = '<div class="s-title">Thinking</div><div class="s-sub">Choosing the next question to ask</div>';
+  stepsEl.appendChild(live);
+}
+
+function addStep(s) {
+  const [title, sub] = describe(s);
+  const li = document.createElement('li');
+  if (s.error) li.className = 'err';
+  li.innerHTML = '<div class="s-title">' + esc(title) + '</div><div class="s-sub">' + esc(s.error ? 'This lookup returned no data, so the agent adapts' : sub) + '</div>';
+  stepsEl.insertBefore(li, live);
+}
+
+function parseMemo(md) {
+  const parts = md.split(/^##\s+/m).map(p => p.trim()).filter(Boolean);
+  const sections = parts.map(p => {
+    const i = p.indexOf('\n');
+    return { title: (i < 0 ? p : p.slice(0, i)).trim(), body: i < 0 ? '' : p.slice(i + 1).trim() };
+  });
+  const v = sections.find(s => /verdict/i.test(s.title));
+  if (!v) return null;
+  const head = v.title + ' ' + v.body;
+  const call = (head.match(/\b(NO[-\s]?GO|ADJUST|GO)\b/i) || [])[1];
+  const score = (head.match(/(\d{1,3})\s*(?:\/\s*100|out of 100)?\)?/) || [])[1];
+  return { call: call ? call.toUpperCase().replace(/\s/, '-') : null, score: score ? Math.min(100, +score) : null, verdict: v,
+           rest: sections.filter(s => s !== v) };
+}
+
+function renderMemo(md) {
+  const m = parseMemo(md);
+  if (!m || !m.call) { report.innerHTML = '<div class="sections"><div class="sec-block wide">' + marked.parse(md) + '</div></div>'; return; }
+  const cls = m.call === 'GO' ? 'go' : m.call === 'ADJUST' ? 'adjust' : 'nogo';
+  const color = { go: 'var(--go)', adjust: 'var(--adjust)', nogo: 'var(--nogo)' }[cls];
+  const label = { go: 'Go', adjust: 'Go, with changes', nogo: 'Not here' }[cls];
+  const why = m.verdict.body ? marked.parseInline(m.verdict.body.replace(/\n+/g, ' ')) : '';
+  const blocks = m.rest.map(s => {
+    const k = /evidence/i.test(s.title) ? 'wide' : /limit/i.test(s.title) ? 'wide limits' : '';
+    return '<div class="sec-block ' + k + '"><h3>' + esc(s.title) + '</h3>' + marked.parse(s.body) + '</div>';
+  }).join('');
+  report.innerHTML =
+    '<div class="verdict">' +
+      (m.score != null ? '<div class="dial" style="--v:' + m.score + ';--c:' + color + '"><div><div><b>' + m.score + '</b><span>fit score</span></div></div></div>' : '<div></div>') +
+      '<div><p class="call ' + cls + '">' + label + '</p>' + (why ? '<p class="why">' + why + '</p>' : '') +
+      '<p class="ctx">' + esc(f.concept.value) + ' in ' + esc(f.location.value) + '</p></div>' +
+    '</div>' +
+    '<div class="sections">' + blocks + '</div>' +
+    '<button class="again" type="button" onclick="window.scrollTo({top:0,behavior:\'smooth\'});f.concept.focus()">Test another concept</button>';
+}
+
+function notice(title, text) {
+  report.innerHTML = '<div class="notice"><h3>' + esc(title) + '</h3><p>' + esc(text) + '</p></div>';
+}
+
+function finish() {
+  if (es) es.close();
+  clearInterval(timer);
+  if (live) live.remove();
+  go.disabled = false; go.textContent = 'Check the fit';
+}
+
 f.onsubmit = e => {
   e.preventDefault();
-  steps.innerHTML = ''; memo.style.display = 'none'; go.disabled = true; go.textContent = 'Analyzing…';
-  const es = new EventSource('/run?' + new URLSearchParams({concept: f.concept.value, location: f.location.value}));
-  const done = () => { es.close(); go.disabled = false; go.textContent = 'Test the fit'; };
-  es.addEventListener('step', ev => { const li = document.createElement('li'); li.textContent = JSON.parse(ev.data); steps.appendChild(li); });
-  es.addEventListener('memo', ev => { memo.innerHTML = marked.parse(JSON.parse(ev.data)); memo.style.display = 'block'; done(); });
-  es.addEventListener('error', ev => { if (ev.data) { memo.textContent = 'Error: ' + JSON.parse(ev.data); memo.style.display = 'block'; } done(); });
+  if (es) es.close();
+  intro.hidden = true; work.hidden = false;
+  stepsEl.innerHTML = ''; addLive();
+  report.innerHTML = '<div class="waiting"><p>Your report will appear here.</p><div class="skeleton" style="width:55%"></div><div class="skeleton" style="width:85%"></div><div class="skeleton" style="width:70%"></div></div>';
+  go.disabled = true; go.textContent = 'Analyzing';
+  started = Date.now(); clearInterval(timer);
+  timer = setInterval(() => { const t = Math.floor((Date.now() - started) / 1000); clock.textContent = Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); }, 1000);
+  work.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+
+  es = new EventSource('/run?' + new URLSearchParams({ concept: f.concept.value, location: f.location.value }));
+  es.addEventListener('step', ev => addStep(JSON.parse(ev.data)));
+  es.addEventListener('memo', ev => { finish(); renderMemo(JSON.parse(ev.data)); });
+  es.addEventListener('error', ev => {
+    finish();
+    const msg = ev.data ? JSON.parse(ev.data) : null;
+    if (msg === 'offline') notice('Live taste data is being connected', 'This demo is waiting for its Qloo data access to go live. Try again shortly.');
+    else notice('The analysis stopped before finishing', msg ? 'Reason: ' + msg + '. Run it again; if it repeats, try a broader location such as the city name.' : 'The connection dropped. Run it again.');
+  });
 };
 </script>
 </body>

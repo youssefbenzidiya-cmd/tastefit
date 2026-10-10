@@ -24,6 +24,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
+            if not os.environ.get("QLOO_API_KEY"):
+                self.wfile.write(b'event: error\ndata: "offline"\n\n')
+                return
             try:
                 for kind, text in agent.run(concept, location):
                     self.wfile.write(f"event: {kind}\ndata: {json.dumps(text)}\n\n".encode())
