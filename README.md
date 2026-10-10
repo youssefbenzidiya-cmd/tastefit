@@ -83,7 +83,7 @@ TasteFit started on GitHub (https://github.com/youssefbenzidiya-cmd/tastefit) wi
 | Tests | none | 9 unit tests on every push |
 | Security | none | SAST, secret detection, container scanning |
 | Deploy | manual | exact commit, verified live by SHA |
-| Broken pipeline | noticed by chance | diagnosed, fix MR opened and reviewed in under 4 minutes |
+| Broken pipeline | noticed by chance | diagnosed, fix MR opened and reviewed in under 4 minutes ([pipeline](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipelines/2934704707) failed 22:16:08 UTC, [fix MR](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/1) opened 22:17:47, review posted 22:19:51) |
 | Review | none | product-rule review on every merge request |
 | Release notes | none | written for owners on every production deploy |
 

@@ -33,6 +33,7 @@ Definitions live in `.gitlab/duo/flows/`:
 
 - **Pipeline Medic** (`pipeline-medic.yml`): runs on any failed pipeline, opens a fix merge request or a
   diagnosis issue.
-- **Domain Reviewer** (`domain-reviewer.yml`): runs on every new merge request and checks the rules above.
+- **Domain Reviewer** (`domain-reviewer.yml`): runs when a merge request is created, or when the bot is
+  assigned as reviewer, and checks the rules above.
 - **Release Scribe** (`release-scribe.yml`): runs on every passed pipeline on `main`, files release notes
   with deployment proof and a security summary.
