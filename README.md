@@ -12,6 +12,8 @@ license: mit
 
 A taste-market-fit agent for new restaurants and cafes.
 
+**Live demo:** https://tastefit.onrender.com (free instance; the first request after idle can take about 50 seconds to wake up).
+
 Before a founder signs a lease, or a lender funds the opening, TasteFit checks whether the planned concept fits the local taste of a specific neighborhood. It uses the Qloo Taste AI API to read what the area's audience likes, who already serves it, and where demand concentrates, then writes an investment-style **GO / ADJUST / NO-GO** memo with a fit score, the best location, a positioning plan and the key risks.
 
 ## How it works
