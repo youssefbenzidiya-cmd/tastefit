@@ -82,6 +82,7 @@ TasteFit started on GitHub (https://github.com/youssefbenzidiya-cmd/tastefit) wi
 |---|---|---|
 | Tests | none | 9 unit tests on every push |
 | Security | none | SAST, secret detection, container scanning |
+| Container CVEs | unknown | 338 (5 Critical, 67 High) found by the first scan, flagged by Release Scribe, fixed by an Alpine rebuild: 0 in production ([#2](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/2), [!3](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/3), [#4](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/4)) |
 | Deploy | manual | exact commit, verified live by SHA |
 | Broken pipeline | noticed by chance | diagnosed, fix MR opened and reviewed in under 4 minutes ([pipeline](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipelines/2934704707) failed 22:16:08 UTC, [fix MR](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/1) opened 22:17:47, review posted 22:19:51) |
 | Review | none | product-rule review on every merge request |
