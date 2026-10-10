@@ -1,70 +1,48 @@
-"""Minimal Qloo client (hackathon environment)."""
+"""Qloo access through the official hackathon harness (`qloo exec`), the event's supported surface.
+
+The harness reads QLOO_API_KEY and QLOO_BASE_URL from the environment and returns normalized JSON.
+"""
 import json
 import os
-import urllib.parse
-import urllib.request
+import shutil
+import subprocess
+from pathlib import Path
 
-BASE = os.environ.get("QLOO_BASE_URL", "https://hackathon.api.qloo.com")
+_LOCAL_BIN = Path(__file__).parent / "node_modules" / ".bin" / "qloo"
+QLOO_BIN = os.environ.get("QLOO_BIN") or (str(_LOCAL_BIN) if _LOCAL_BIN.exists() else shutil.which("qloo") or "qloo")
 
 
-def _get(path, params):
-    key = os.environ.get("QLOO_API_KEY")
-    if not key:
+def exec_workflow(operation, params, timeout=90):
+    if not os.environ.get("QLOO_API_KEY"):
         raise RuntimeError("QLOO_API_KEY is not set")
-    qs = urllib.parse.urlencode({k: v for k, v in params.items() if v not in (None, "")})
-    req = urllib.request.Request(f"{BASE}{path}?{qs}", headers={"X-Api-Key": key, "Accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=40) as r:
-        return json.loads(r.read())
+    env = {**os.environ, "QLOO_BASE_URL": os.environ.get("QLOO_BASE_URL", "https://hackathon.api.qloo.com")}
+    env.setdefault("QLOO_TRUSTED_BASE_URL", env["QLOO_BASE_URL"])
+    p = subprocess.run([QLOO_BIN, "exec", operation, "--input", json.dumps({k: v for k, v in params.items() if v})],
+                       capture_output=True, text=True, timeout=timeout, env=env)
+    out = p.stdout.strip()
+    if not out:
+        raise RuntimeError(p.stderr.strip()[-500:] or f"qloo exec {operation} failed")
+    return json.loads(out)
 
 
-def search_tags(query, tag_type=None, take=8):
-    """Tag ids for a free-text interest, e.g. 'moroccan cuisine' or 'specialty coffee'."""
-    d = _get("/v2/tags", {"filter.query": query, "filter.tag.types": tag_type, "take": take})
-    return [{"id": t.get("id"), "name": t.get("name"), "type": t.get("type")} for t in d.get("results", {}).get("tags", [])]
+def find_tags(query, limit=8):
+    return exec_workflow("find_tags", {"query": query, "limit": limit})
 
 
-def search_entities(query, types="urn:entity:place", take=5):
-    d = _get("/search", {"query": query, "types": types, "take": take})
-    return [{"id": e.get("entity_id"), "name": e.get("name"), "address": (e.get("properties") or {}).get("address")}
-            for e in d.get("results", [])]
+def recommend_places(location, signal_tags=None, demographic=None, include_tags=None, limit=12):
+    """Places in `location` ranked by affinity to the tag/audience profile."""
+    return exec_workflow("recommend", {
+        "target_type": "place", "signal_tags": signal_tags, "include_tags": include_tags,
+        "signal_location": location if demographic else None, "demographic": demographic,
+        "filter_location": location, "limit": limit})
 
 
-def places(location_query, tags=None, age=None, price_min=None, price_max=None, take=15):
-    """Places near a location ranked by affinity to the given taste signals."""
-    d = _get("/v2/insights", {
-        "filter.type": "urn:entity:place",
-        "filter.location.query": location_query,
-        "signal.interests.tags": ",".join(tags or []),
-        "signal.demographics.age": age,
-        "filter.price_level.min": price_min, "filter.price_level.max": price_max,
-        "take": take,
-    })
-    out = []
-    for e in d.get("results", {}).get("entities", []):
-        p = e.get("properties") or {}
-        out.append({"name": e.get("name"), "affinity": round(e.get("query", {}).get("affinity", 0) or 0, 3),
-                    "popularity": round(e.get("popularity", 0) or 0, 3), "price_level": p.get("price_level"),
-                    "rating": p.get("business_rating"), "address": p.get("address"),
-                    "tags": [t.get("name") for t in (e.get("tags") or [])[:8]]})
-    return out
+def area_taste(location, demographic=None, limit=15):
+    """What the local audience over-indexes on: top places when the signal is the area itself."""
+    return exec_workflow("recommend", {"target_type": "place", "signal_location": location,
+                                       "demographic": demographic, "filter_location": location, "limit": limit})
 
 
-def heatmap(location_query, tags, age=None):
-    """Sub-areas of a location scored by affinity to the taste signals."""
-    d = _get("/v2/insights", {"filter.type": "urn:heatmap", "filter.location.query": location_query,
-                              "signal.interests.tags": ",".join(tags), "signal.demographics.age": age})
-    cells = d.get("results", {}).get("heatmap", [])
-    cells = sorted(cells, key=lambda c: -(c.get("query", {}).get("affinity", 0) or 0))
-    return [{"geohash": c.get("location", {}).get("geohash"), "lat": c.get("location", {}).get("latitude"),
-             "lng": c.get("location", {}).get("longitude"),
-             "affinity": round(c.get("query", {}).get("affinity", 0) or 0, 3),
-             "popularity": round(c.get("query", {}).get("popularity", 0) or 0, 3)} for c in cells[:12]]
-
-
-def taste_of_area(location_query, age=None, take=20):
-    """Which tags over-index among places in an area: the local taste profile."""
-    d = _get("/v2/insights", {"filter.type": "urn:tag", "filter.tag.types": "urn:tag:genre:place",
-                              "filter.location.query": location_query, "signal.demographics.age": age, "take": take})
-    return [{"tag": t.get("name"), "id": t.get("tag_id") or t.get("id"),
-             "affinity": round(t.get("query", {}).get("affinity", 0) or 0, 3)}
-            for t in d.get("results", {}).get("tags", [])]
+def where_popular(entity, within, limit=10):
+    """Sub-areas of `within` where one entity (e.g. a benchmark place) has the strongest affinity."""
+    return exec_workflow("where_popular", {"entity": entity, "within": within, "limit": limit})

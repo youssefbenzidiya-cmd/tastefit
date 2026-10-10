@@ -6,28 +6,32 @@ Before a founder signs a lease, or a lender funds the opening, TasteFit checks w
 
 ## How it works
 
-An LLM agent runs a tool loop over Qloo:
+An LLM agent runs a tool loop over the official Qloo hackathon harness (`qloo exec`):
 
-| Tool | Qloo call | Purpose |
+| Agent tool | Qloo workflow | Purpose |
 |---|---|---|
-| `find_tags` | `/v2/tags` | Turn the concept ("Korean fried chicken counter") into Qloo tags |
-| `area_taste` | `/v2/insights`, `filter.type=urn:tag` | What the neighborhood's audience over-indexes on |
-| `competitors` | `/v2/insights`, `filter.type=urn:entity:place` | Existing places with that taste, with affinity, price and rating |
-| `hotspots` | `/v2/insights`, `filter.type=urn:heatmap` | Sub-areas where affinity for the concept is highest |
+| `find_tags` | `find_tags` | Turn the concept ("Korean fried chicken counter") into Qloo tag URNs, choosing the right one among same-name tags |
+| `area_taste` | `recommend` (place, location signal) | Places the area's audience has the highest affinity for |
+| `competitors` | `recommend` (place, concept tags, location filter) | Existing places that match the concept: competition and benchmarks |
+| `hotspots` | `where_popular` | Sub-areas where the strongest benchmark over-indexes |
 
-The agent only states numbers that come from Qloo; if data is missing it says so instead of guessing.
+The memo only cites places, tags and numbers returned by Qloo, keeps Qloo results separate from interpretation, and ends with a **Limits** section: Qloo describes aggregate group affinities, not foot traffic, rents or individual behaviour. No personal data is sent to Qloo; inputs are a concept and a place name.
 
 ## Run locally
 
-Requires Python 3.10+ and no third-party packages.
+Requires Python 3.10+ and Node.js 22.19+ (for the harness).
 
 ```bash
-export QLOO_API_KEY=...            # Qloo hackathon key
-export LLM_BASE_URL=...            # any OpenAI-compatible endpoint
+npm install                        # installs @qloo/qloo-harness locally
+export QLOO_API_KEY=...            # Qloo hackathon key, never commit it
+export QLOO_BASE_URL=https://hackathon.api.qloo.com
+export LLM_BASE_URL=...            # any OpenAI-compatible endpoint with tool calling
 export LLM_API_KEY=...
 export LLM_MODEL=...
 python app.py                      # http://localhost:8000
 ```
+
+The API key stays on the server; the browser only receives the streamed steps and the memo.
 
 CLI: `python agent.py "Korean fried chicken counter" "Austin, TX"`
 

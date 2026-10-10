@@ -1,0 +1,7 @@
+{
+  "name": "tastefit",
+  "private": true,
+  "dependencies": {
+    "@qloo/qloo-harness": "^0.1.26"
+  }
+}
