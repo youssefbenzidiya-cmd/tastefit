@@ -3,6 +3,7 @@ import threading
 import unittest
 import urllib.error
 import urllib.request
+from unittest import mock
 from http.server import ThreadingHTTPServer
 
 os.environ.pop("QLOO_API_KEY", None)
@@ -32,6 +33,21 @@ class Server(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertIn("TasteFit", body)
         self.assertNotIn("{{CTA}}", body)
+
+    def test_footer_build_dev_when_commit_unset(self):
+        with mock.patch.dict(os.environ):
+            os.environ.pop("RENDER_GIT_COMMIT", None)
+            body = self.get("/")[1]
+        self.assertIn("TasteFit build dev", body)
+        self.assertNotIn("{{BUILD}}", body)
+
+    def test_footer_build_uses_first_7_chars_of_commit(self):
+        with mock.patch.dict(os.environ, {"RENDER_GIT_COMMIT": "0123456789abcdef"}):
+            body = self.get("/")[1]
+        self.assertIn("TasteFit build 0123456<", body)
+
+    def test_footer_keeps_osm_attribution(self):
+        self.assertIn("OpenStreetMap", self.get("/")[1])
 
     def test_health(self):
         self.assertEqual(self.get("/health"), (200, "ok"))
