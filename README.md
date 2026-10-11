@@ -192,7 +192,7 @@ The baseline is GitHub commit [`8c465c1`](https://github.com/youssefbenzidiya-cm
 
 - **A person merges.** No flow has a merge tool, and every merged merge request so far was merged by a person after a Domain Reviewer verdict. A fix waits for a human.
 - **Bot-created MRs** do not fire the MR-created trigger, so a person assigns Domain Reviewer on them (as on !1, !9, !10 and !11).
-- **Scanned image vs deployed image.** Render builds its own image from the same Dockerfile at the same commit. We scan and sign the image GitLab builds from that commit, not the bytes Render runs.
+- **Scanned image vs deployed image on Render.** Google Cloud Run runs the exact image GitLab built, scanned and signed (same digest). Render, the second host, builds its own image from the same Dockerfile at the same commit, so its bytes are not the ones we scanned.
 - **`cve-gate` covers container findings only.** Dependency scanning reports 4 High findings (`undici`, `brace-expansion`), tracked in [#12](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/12), and they do not fail the pipeline.
 - **Stale Vulnerability Report records.** The report still lists 72 Critical/High container records for the superseded Debian image `c1605d83` ([#9](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/9)). Current scans of the Alpine image show 0.
 - **Three Medium SAST findings** (SSRF, CWE-918, at `cityscan.py:1418`, `geo.py:87` and `agent.py:110`) appear in every release note and are not yet triaged.
