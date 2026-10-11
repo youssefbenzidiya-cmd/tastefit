@@ -1703,7 +1703,8 @@
   },
   "method": "method of moments (theta exact on 3-year KM, sigma bisected on 1-year KM); cluster bootstrap over 500 m blocks",
   "sources": {
-   "chicago": "City of Chicago business licences (retail food, tavern), new licences issued 2014+ (City of Chicago Data Portal terms); OSM history for covariates"
+   "chicago": "City of Chicago business licences (retail food, tavern), new licences issued 2014+ (City of Chicago Data Portal terms); OSM history for covariates",
+   "paris": "INSEE SIRENE, employer establishments opened 2014+ (Licence Ouverte); OSM history for covariates"
   },
   "rent_shares": {
    "chicago": {
@@ -1712,6 +1713,13 @@
     "mode": 0.06,
     "hi": 0.1,
     "source": "occupancy cost-to-sales of US restaurants: median 6.0% in urban areas, full- and limited-service (National Restaurant Association, Restaurant Operations Data Abstract 2025, 2024 data); 6-10% rule of thumb, 10% excessive (Restaurant Resource Group)"
+   },
+   "paris": {
+    "dist": "tri",
+    "lo": 0.05,
+    "mode": 0.1,
+    "hi": 0.15,
+    "source": "rent-to-revenue of French restaurants: 8-12% typical, 10-15% in Paris, up to 15% for premium sites (L'Hotellerie-Restauration; ProRestauration 2026; Almo); INSEE Esane 2023 aggregate 5.1%"
    }
   }
  },
