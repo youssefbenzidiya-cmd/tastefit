@@ -197,7 +197,7 @@ deploy-gcp:
   stage: deploy
   interruptible: false
   image: gcr.io/google.com/cloudsdktool/google-cloud-cli:alpine
-  needs: [image-build, verify-signature]
+  needs: [image-build, verify-signature, cve-gate, secret_detection, semgrep-sast]
   rules: !reference [.main-only, rules]
   id_tokens:
     GCP_ID_TOKEN:
