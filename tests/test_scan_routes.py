@@ -20,7 +20,10 @@ GRID = {"bbox": [10.0, 20.0, 10.02, 20.02], "rows": 2, "cols": 2, "cell_m": 1000
 QUALITY_OK = {"gate_passed": True, "data_confidence_food": 0.6, "threshold": 0.4, "threshold_note": "synthetic",
               "reason": None}
 TOP = [{"id": k, "neighborhood": f"Synthetic {k}", "opportunity": {"point": 90 - k}} for k in range(30)]
-CEILING = [{"group": "restaurant", "label_en": "restaurants", "rent_max": 8000.0, "ci90": [7000.0, 9000.0]}]
+CEILING = [{"group": "restaurant", "label_en": "restaurants", "rent_max": 8000.0, "ci90": [7000.0, 9000.0],
+            "rent_max_80": 7500.0},
+           {"group": "bar_cafe", "label_en": "bars and cafés", "rent_max": 300.0, "ci90": [-200.0, 900.0],
+            "rent_max_80": -150.0}]
 
 
 def write(dirpath, slug, doc):
@@ -128,8 +131,22 @@ class ScanRoutes(unittest.TestCase):
     def test_negative_ceiling_is_shown_as_not_viable(self):
         d = json.loads(self.get("/scan/unit?city=synthville&lat=10.005&lon=20.005")[2])
         row = d["rent_ceiling"][0]
-        self.assertEqual((row["viable"], row["rent_max"], row["ci90"]), (False, None, None))
+        self.assertEqual((row["viable"], row["rent_max"], row["ci90"], row["rent_max_80"]), (False, None, None, None))
         self.assertIn("Not viable at any rent", row["note"])
+
+    def test_no_negative_euro_figure_reaches_the_client(self):
+        for lat, lon in ((10.005, 20.005), (10.005, 20.015)):
+            d = json.loads(self.get(f"/scan/unit?city=synthville&lat={lat}&lon={lon}")[2])
+            for row in d["rent_ceiling"]:
+                for v in [row["rent_max"], row["rent_max_80"]] + (row["ci90"] or []):
+                    self.assertTrue(v is None or v >= 0, row)
+        cafe = d["rent_ceiling"][1]
+        self.assertEqual((cafe["ci90"], cafe["rent_max_80"]), ([0.0, 900.0], None))
+
+    def test_study_cell_without_rows_says_so(self):
+        d = json.loads(self.get("/scan/unit?city=synthville&lat=10.015&lon=20.005")[2])
+        self.assertIsNone(d["rent_ceiling"])
+        self.assertIn("No rent ceiling", d["note"])
 
     def test_uncalibrated_city_never_borrows_another_citys_ceiling(self):
         d = json.loads(self.get("/scan/unit?city=plainville&lat=10.005&lon=20.005")[2])

@@ -80,8 +80,10 @@ def cell_of(grid, lat, lon):
 def viable(row):
     """A ceiling at or below zero means no rent reaches the survival target here: say so, never show a negative rent."""
     if row["rent_max"] > 0:
-        return row | {"viable": True}
-    return row | {"viable": False, "rent_max": None, "ci90": None,
+        r80, ci = row.get("rent_max_80"), row.get("ci90")
+        return row | {"viable": True, "ci90": ci and [max(ci[0], 0.0), ci[1]],
+                      "rent_max_80": r80 if r80 is not None and r80 > 0 else None}
+    return row | {"viable": False, "rent_max": None, "ci90": None, "rent_max_80": None,
                   "note": "Not viable at any rent here: below the city's 3-year survival rate even rent-free."}
 
 
@@ -109,6 +111,9 @@ def unit(city, lat, lon):
         return 200, out | {"calibrated": False, "rent_ceiling": None,
                            "note": "Rent ceiling not calibrated for this city yet."}
     rows = [viable(r) for r in units["cells"].get(str(j), [])]
+    if not rows:
+        return 200, out | {"calibrated": True, "rent_ceiling": None,
+                           "note": "No rent ceiling was computed for this cell."}
     return 200, out | {"calibrated": True, "currency": units["currency"], "rent_ceiling": rows,
                        "note": ("Highest monthly rent at which each tenant type still reaches its city's official "
                                 "3-year survival rate (Paris: SIRENE). A model, not a forecast.")}

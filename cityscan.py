@@ -29,13 +29,9 @@ from datetime import datetime, timezone
 
 import cityscan_math as cm
 
-try:
-    import geo
-    _last_call = getattr(geo, "_last_call", [0.0])  # one Nominatim throttle for the whole process
-except ImportError:  # pragma: no cover
-    _last_call = [0.0]
+import geo  # geo._throttle: one Nominatim limit for the whole process
 
-USER_AGENT = "TasteFit-CityScan/0.2 (https://github.com/youssefbenzidiya-cmd/tastefit)"
+USER_AGENT = "TasteFit-CityScan/0.2 (https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit)"
 ATTRIBUTION = "\u00a9 OpenStreetMap contributors"
 OVERPASS_URLS = [u for u in os.environ.get("OVERPASS_URL", "").split(",") if u] or [
     "https://overpass-api.de/api/interpreter",
@@ -1426,10 +1422,7 @@ def _get_json(url, data=None, timeout=30):
 def city_bbox(city):
     """Nominatim lookup: (display name, center, bbox). At most one request per second."""
     def fetch():
-        wait = 1.1 - (time.time() - _last_call[0])
-        if wait > 0:
-            time.sleep(wait)
-        _last_call[0] = time.time()
+        geo._throttle()
         url = "https://nominatim.openstreetmap.org/search?" + urllib.parse.urlencode(
             {"q": city, "format": "jsonv2", "limit": 1, "accept-language": "en"})
         return parse_nominatim(_get_json(url, timeout=15), city)
