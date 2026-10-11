@@ -1,0 +1,114 @@
+"""City Scan lookups for the app: reads prebuilt packs (packs/<slug>.json.gz), never runs the model or the network.
+
+Each function returns (status, payload). A payload with an "error" key is a plain-text message for the client.
+"""
+import functools
+import gzip
+import json
+import re
+from pathlib import Path
+
+PACKS = Path(__file__).parent / "packs"
+SLUG = re.compile(r"[a-z0-9-]{1,40}")
+TOP_DEFAULT, TOP_MAX = 10, 25
+
+
+def slugify(city):
+    return re.sub(r"[^a-z0-9]+", "-", city.strip().lower()).strip("-")
+
+
+def available():
+    return sorted(p.name[:-len(".json.gz")] for p in PACKS.glob("*.json.gz"))
+
+
+@functools.lru_cache(maxsize=8)
+def _load(slug):
+    with gzip.open(PACKS / f"{slug}.json.gz", "rt", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def pack(city):
+    """The pack for a user-typed city name, or None. Only slugs of files that exist are ever opened."""
+    slug = slugify(city)
+    return _load(slug) if SLUG.fullmatch(slug) and slug in available() else None
+
+
+def _no_pack(city):
+    return 404, {"error": f"No city scan is available for {city!r}. Available: {', '.join(available())}."}
+
+
+def _thin(p):
+    q = p["quality"]
+    return {"city": p["city"]["name"], "data_thin": True, "reason": q["reason"],
+            "data_confidence_food": q["data_confidence_food"], "threshold": q["threshold"],
+            "threshold_note": q["threshold_note"], "attribution": p["attribution"]}
+
+
+def scan(city, concept, top=None):
+    if not city or not concept:
+        return 400, {"error": "city and concept are required"}
+    p = pack(city[:120])
+    if p is None:
+        return _no_pack(city[:120])
+    if not p["quality"]["gate_passed"]:
+        return 200, _thin(p)
+    try:
+        top = TOP_DEFAULT if top in (None, "") else max(1, min(TOP_MAX, int(top)))
+    except ValueError:
+        return 400, {"error": "top must be a whole number"}
+    want = concept[:300].strip().lower()
+    s = next((s for s in p["scans"] if want in (s["concept"].lower(), s["label"].lower())), None)
+    if s is None:
+        names = ", ".join(s["concept"] for s in p["scans"])
+        return 404, {"error": f"{concept[:300]!r} is not scanned for {p['city']['name']} yet. Scanned: {names}."}
+    return 200, {"city": p["city"]["name"], "data_thin": False, "concept": s["concept"], "label": s["label"],
+                 "model": {k: s[k] for k in ("fitted", "n_presences", "auc_cv", "auc_ci95", "ranking")
+                           if s.get(k) is not None},
+                 "top": s["top"][:top], "limits": s["limits"], "built_at": p["built_at"],
+                 "attribution": p["attribution"]}
+
+
+def cell_of(grid, lat, lon):
+    s, w, n, e = grid["bbox"]
+    if not (s <= lat <= n and w <= lon <= e):
+        return None
+    r = min(int((lat - s) / grid["dlat"]), grid["rows"] - 1)
+    c = min(int((lon - w) / grid["dlon"]), grid["cols"] - 1)
+    return r * grid["cols"] + c
+
+
+def viable(row):
+    """A ceiling at or below zero means no rent reaches the survival target here: say so, never show a negative rent."""
+    if row["rent_max"] > 0:
+        return row | {"viable": True}
+    return row | {"viable": False, "rent_max": None, "ci90": None,
+                  "note": "Not viable at any rent here: below the city's 3-year survival rate even rent-free."}
+
+
+def unit(city, lat, lon):
+    if not city or lat in (None, "") or lon in (None, ""):
+        return 400, {"error": "city, lat and lon are required"}
+    try:
+        lat, lon = float(lat), float(lon)
+    except ValueError:
+        return 400, {"error": "lat and lon must be numbers"}
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        return 400, {"error": "lat or lon out of range"}
+    p = pack(city[:120])
+    if p is None:
+        return _no_pack(city[:120])
+    if not p["quality"]["gate_passed"]:
+        return 200, _thin(p)
+    j = cell_of(p["grid"], lat, lon)
+    if j is None or j not in p["study"]:
+        return 400, {"error": f"That point is outside the scanned area of {p['city']['name']}."}
+    out = {"city": p["city"]["name"], "data_thin": False, "point": {"lat": lat, "lon": lon}, "cell": j,
+           "built_at": p["built_at"], "attribution": p["attribution"]}
+    units = p.get("units")
+    if not units:
+        return 200, out | {"calibrated": False, "rent_ceiling": None,
+                           "note": "Rent ceiling not calibrated for this city yet."}
+    rows = [viable(r) for r in units["cells"].get(str(j), [])]
+    return 200, out | {"calibrated": True, "currency": units["currency"], "rent_ceiling": rows,
+                       "note": ("Highest monthly rent at which each tenant type still reaches its city's official "
+                                "3-year survival rate (Paris: SIRENE). A model, not a forecast.")}

@@ -42,6 +42,14 @@ The map uses Leaflet with OpenStreetMap tiles, and the suggested spot links to G
 
 The memo only cites places, tags and numbers returned by Qloo, keeps Qloo results separate from interpretation, and ends with a **Limits** section: Qloo describes aggregate group affinities, not foot traffic, rents or individual behaviour. No personal data is sent to Qloo; inputs are a concept and a place name.
 
+### City Scan and rent ceiling (`/scan`, `/scan/unit`)
+
+Two read-only JSON endpoints serve prebuilt city packs (`packs/`, built offline by `cityscan_publish.py`; method in `METHOD.md`). The server never runs the model and makes no network call for them.
+
+- `GET /scan?city=paris&concept=specialty%20coffee&top=10`: the cells of the city where the concept fits best, with reasons, nearest competitors and a 90% Monte Carlo interval on each score.
+- `GET /scan/unit?city=paris&lat=48.865&lon=2.377`: for one unit, the highest monthly rent each tenant type (restaurant, fast food, bar/café) can pay and still reach the city's official 3-year survival rate, or "not viable at any rent" where even rent-free falls short. This is calibrated on SIRENE for Paris only; other cities say "not calibrated" rather than borrow Paris numbers.
+- A city whose map data is too incomplete (food places confirmed by two sources below 40%, a provisional threshold) gets the reason and no numbers. Casablanca is shipped as that case.
+
 ## Run locally
 
 Requires Python 3.10+ and Node.js 22.19+ (for the harness).
