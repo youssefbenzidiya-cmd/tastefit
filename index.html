@@ -465,7 +465,7 @@ function renderMemo(text) {
   }).join('');
   if (!demo) {
     checks = checks.filter(c => !(c.concept === f.concept.value && c.location === f.location.value));
-    checks.push({ concept: f.concept.value, location: f.location.value, label, cls, score,
+    checks.push({ concept: f.concept.value, location: f.location.value, label, cls, score: cls === 'incomplete' ? null : score,
                   bars: bars.map(b => [b.name, b.score]),
                   opp: geoData ? geoData.recommended.opportunity_index : null });
     checks = checks.slice(-4);
