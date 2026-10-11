@@ -74,6 +74,21 @@ class Calibrated(unittest.TestCase):
                 self.assertTrue(0 < c["official"]["s3"] < c["official"]["s1"] < 1)
                 self.assertEqual(len(c["boot"]), 100)
 
+    def test_each_city_was_fitted_under_the_rent_share_it_documents(self):
+        be.calibration("paris", "restaurant")
+        prov = be._calibration["_provenance"]
+        self.assertEqual(prov["rent_share"], be.RENT_SHARE)
+        self.assertEqual(prov["rent_shares"]["chicago"], be.rent_share("chicago"))
+        self.assertNotEqual(be.rent_share("chicago"), be.rent_share("paris"))
+
+    def test_location_term_only_where_it_ranks_held_out_venues(self):
+        for city, applied in (("paris", True), ("chicago", False)):
+            c = be.calibration(city, "restaurant")
+            self.assertEqual(c["location_hr"], c["location_c_min"] > 0.5)
+            self.assertEqual(c["location_hr"], applied)
+            busy = be.rent_ceiling_card(1.0, c, z_same=2.0, z_poi=2.0, n=200)
+            self.assertEqual(busy["location_hr"] != 1.0, applied)
+
     def test_data_thin_and_unknown_cities_are_not_calibrated(self):
         for city in ("casablanca", "philadelphia", "atlantis"):
             self.assertIsNone(be.calibration(city, "restaurant"))

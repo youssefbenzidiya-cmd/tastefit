@@ -416,24 +416,28 @@ study's loader. Of 11,577 openings, 7,592 fall in the pack's study cells. The di
 
 | Group (Chicago, licences) | n | $\hat S(1)$ | $\hat S(3)$ | $\theta$ covers/day (90%) | $\sigma$ (90%) | $\kappa$ (90%) |
 |---|---|---|---|---|---|---|
-| restaurant | 5,692 | 0.918 | 0.664 | 77 (76–80) | 0.40 (0.38–0.43) | 0 (0–0.03) |
-| fast food | 1,237 | 0.891 | 0.573 | 121 (116–127) | 0.40 (0.37–0.44) | 0 (0–0.05) |
-| bar / café | 663 | 0.920 | 0.707 | 164 (154–175) | 0.47 (0.41–0.55) | 0 (0–0) |
+| restaurant | 5,692 | 0.918 | 0.664 | 73 (73–76) | 0.43 (0.42–0.49) | 0 (0–0.03) |
+| fast food | 1,237 | 0.891 | 0.573 | 114 (109–120) | 0.44 (0.41–0.48) | 0 (0–0.05) |
+| bar / café | 663 | 0.920 | 0.707 | 157 (145–166) | 0.53 (0.46–0.62) | 0 (0–0) |
 
 | Fold (3-year IPCW Brier) | city baseline | Huff as is ($\kappa=1$) | calibrated model | model × Cox | Cox only |
 |---|---|---|---|---|---|
-| train west → test east (n=4,777) | 0.2218 | 0.3126 | **0.2217** | 0.2231 | 0.2232 |
-| train east → test west (n=2,815) | **0.2351** | 0.3130 | 0.2389 | 0.2377 | 0.2342 |
-| forward 2014–18 → 2019+ (n=4,170) | **0.2193** | 0.2866 | 0.2194 | 0.2194 | 0.2193 |
+| train west → test east (n=4,777) | **0.2218** | 0.3118 | 0.2219 | 0.2233 | 0.2232 |
+| train east → test west (n=2,815) | 0.2351 | 0.3125 | 0.2388 | 0.2376 | **0.2342** |
+| forward 2014–18 → 2019+ (n=4,170) | **0.2193** | 0.2861 | 0.2194 | 0.2194 | 0.2193 |
 
 What replicates and what does not:
 
 - $\kappa = 0$ again in every group. Higher-demand cells survive slightly *less*: restaurant −1.6 pp, fast food
   −3.5 pp, bar/café −8.6 pp at 3 years. Cox HR per SD of $\log r$ is 1.02 (0.99–1.06). So the finding that measured
   location demand carries no survival signal holds on a second continent and a different kind of register.
-- Taking Huff at face value is 31–41% worse than the city average, worse than in Paris.
-- The location Cox term does not rank Chicago units out of sample (C 0.47–0.54 per group). Chicago rent ceilings
-  should therefore be read as city-level figures for each tenant type, not as a location signal.
+- Taking Huff at face value is 30–41% worse than the city average, worse than in Paris.
+- The location Cox term does not rank Chicago units out of sample (C 0.47–0.54 per group).
+- Rule: the calibrator applies the location HR only if the held-out C of model × Cox exceeds 0.5 in every spatial
+  fold and group. Paris passes (lowest 0.535); Chicago fails (lowest 0.471), so Chicago ceilings use $HR_{loc} = 1$.
+  They are city-level figures per tenant type, not a location signal.
+- A typical-demand Chicago restaurant can pay \$3,230/month (90%: \$2,860–4,090) at the city's 3-year survival
+  rate; fast food \$2,790, bar/café \$1,700.
 - Chicago 3-year survival (0.57–0.71) is far below Paris (0.79–0.83), so the target the ceiling protects is lower.
 
 **Data-thin cities (Casablanca): conditional card.**

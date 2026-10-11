@@ -196,6 +196,7 @@ def main():
     a = ap.parse_args()
     t0 = time.perf_counter()
     source, short, currency, licence = SOURCES[a.city]
+    share = be.rent_share(a.city)
     units, end = units_official(a.city)
     print(f"official units: {len(units)} ({time.perf_counter() - t0:.1f}s)", file=sys.stderr)
     history_covariates(units, a.city)
@@ -209,13 +210,13 @@ def main():
     print(f"units in study cells: {len(with_r)}/{len(units)} ({time.perf_counter() - t0:.1f}s)", file=sys.stderr)
 
     res = {"city": a.city, "source": source, "censor_end_days": end, "buffer_months": be.BUFFER_MONTHS,
-           "rent_share": be.rent_share(a.city), "n_units": len(units), "n_units_with_r": len(with_r), "groups": {},
+           "rent_share": share, "n_units": len(units), "n_units_with_r": len(with_r), "groups": {},
            "method": "method of moments (theta exact on 3-year KM, sigma bisected on 1-year KM); cluster bootstrap "
                      "over 500 m blocks"}
     for g in GROUPS:
         us = [u for u in with_r if u["group"] == g]
         inputs = be.defaults(a.city, be.GROUP_PROFILE[g])["inputs"]
-        draws = be.survival_draws(inputs, N_DRAWS)
+        draws = be.survival_draws(inputs, N_DRAWS, rent_share=share)
         f = fit_group(us, draws)
         boot = bootstrap(us, draws, a.boot, seed=GROUPS.index(g) + 1)
         th, sg, kp = [b[0] for b in boot], [b[1] for b in boot], [b[2] for b in boot]
@@ -269,16 +270,20 @@ def main():
                              ("train east, test west", set(east), set(west))):
         tr = [u for u in with_r if u["sub"] in tr_s]
         te = [u for u in with_r if u["sub"] in te_s]
-        draws_by = {g: be.survival_draws(be.defaults(a.city, be.GROUP_PROFILE[g])["inputs"], N_DRAWS)
+        draws_by = {g: be.survival_draws(be.defaults(a.city, be.GROUP_PROFILE[g])["inputs"], N_DRAWS, rent_share=share)
                     for g in GROUPS}
         sc = score_by_group(tr, te, draws_by)
         folds.append({"fold": name, ("train_arrondissements" if a.city == "paris" else "train_strips_1500m"): sorted(tr_s), **sc})
         print(f"{name}: {sc['brier_all_groups']}", file=sys.stderr)
     res["validation_spatial"] = folds
+    c_min = min(d["c_model_cox"] for f in folds for d in f["groups"].values())
+    for gr in res["groups"].values():
+        gr["location_hr"], gr["location_c_min"] = c_min > 0.5, c_min
+    print(f"location HR applied: {c_min > 0.5} (min held-out C {c_min})", file=sys.stderr)
 
     fw_tr = [u for u in with_r if u["year"] <= 2018]
     fw_te = [u for u in with_r if u["year"] >= 2019]
-    draws_by = {g: be.survival_draws(be.defaults(a.city, be.GROUP_PROFILE[g])["inputs"], N_DRAWS) for g in GROUPS}
+    draws_by = {g: be.survival_draws(be.defaults(a.city, be.GROUP_PROFILE[g])["inputs"], N_DRAWS, rent_share=share) for g in GROUPS}
     res["validation_forward"] = {"train": "openings 2014-2018", "test": "openings 2019+ (3-year IPCW Brier)",
                                  **score_by_group(fw_tr, fw_te, draws_by)}
     print(f"forward: {res['validation_forward']['brier_all_groups']}", file=sys.stderr)
@@ -288,7 +293,7 @@ def main():
     if a.embed:
         keep = ("group", "profile", "concept_for_demand", "currency", "official", "theta", "sigma", "kappa",
                 "bound", "kappa_bound", "theta_ci90", "sigma_ci90", "kappa_ci90", "boot", "pack_z",
-                "buffer_sensitivity")
+                "buffer_sensitivity", "location_hr", "location_c_min")
         try:
             emb = json.load(open(a.embed, encoding="utf-8"))
         except OSError:
@@ -297,7 +302,7 @@ def main():
         prov = emb.setdefault("_provenance", {"builder": "cityscan_calibrate.py", "buffer_months": be.BUFFER_MONTHS,
                                               "method": res["method"]})
         prov.setdefault("sources", {})[a.city] = f"{source} ({licence}); OSM history for covariates"
-        prov.setdefault("rent_shares", {})[a.city] = be.rent_share(a.city)
+        prov.setdefault("rent_shares", {})[a.city] = share
         with open(a.embed, "w") as fh:
             json.dump(emb, fh, indent=1, ensure_ascii=False)
     print(f"done in {res['elapsed_s']}s -> {a.out}", file=sys.stderr)

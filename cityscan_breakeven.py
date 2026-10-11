@@ -405,6 +405,7 @@ def calibrated_card(rel_demand, rents, calib, z_same=0.0, z_poi=0.0, n=1000, see
     90% interval from the bootstrap of (theta, sigma) and the HR confidence intervals; a risk badge only when the
     interval excludes the official city baseline."""
     inputs = calib["inputs"]
+    use_cox = use_cox and calib.get("location_hr", True)
     draws = survival_draws(inputs, n, seed)
     rng = random.Random(seed + 1)
     nd = NormalDist()
@@ -524,7 +525,8 @@ def rent_ceiling_card(rel_demand, calib, z_same=0.0, z_poi=0.0, target=None, ask
     draws = survival_draws(calib["inputs"], n, seed)
     rng, nd = random.Random(seed + 2), NormalDist()
     se = {k: (math.log(v[2]) - math.log(v[1])) / (2 * 1.96) for k, v in HR_PER_SD.items()}
-    hr = location_hr(z_same, z_poi)
+    use_loc = calib.get("location_hr", True)
+    hr = location_hr(z_same, z_poi) if use_loc else 1.0
     b, k0 = calib["buffer_months"], calib.get("kappa", 1.0)
     base3 = calib["official"]["s3"]
     caps = rent_capacity(calib["theta"], calib["sigma"], k0, rel_demand, draws, 36, b)
@@ -532,7 +534,7 @@ def rent_ceiling_card(rel_demand, calib, z_same=0.0, z_poi=0.0, target=None, ask
     for bt in calib["boot"]:
         th, sg, kp = (list(bt) + [k0])[:3]
         boots.append((sorted(rent_capacity(th, sg, kp, rel_demand, draws, 36, b)),
-                      _boot_hr(rng, nd, se, z_same, z_poi, hr)))
+                      _boot_hr(rng, nd, se, z_same, z_poi, hr) if use_loc else 1.0))
     targets = {"city": base3, **{f"{round(100 * t)}": t for t in RENT_TARGETS}}
     ceilings = {}
     for key, t in targets.items():
