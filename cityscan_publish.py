@@ -19,22 +19,36 @@ import cityscan_breakeven as be
 # Food-place data confidence (OSM vs Overture capture-recapture). Set from two cities, Paris 0.556 and Casablanca
 # 0.181, so it is provisional.
 GATE_MIN = 0.40
+GT_MIN = 0.70
 DEFAULT_CONCEPTS = ["specialty coffee", "burger", "pizza", "French bistro", "sushi", "brunch"]
 TOP_KEYS = ("id", "centroid", "bounds", "neighborhood", "opportunity", "confidence_width", "suitability",
             "reasons_en", "reasons_fr", "watch_out_en", "watch_out_fr", "market_en", "market_fr",
             "nearest_competitors", "data_completeness")
 
 
-def quality(city):
+def quality(city, ground_truth=None, gt_source=None):
+    """Gate on an official register when one exists (chance-corrected recall, cityscan_groundtruth.py); otherwise
+    on agreement between OSM and Overture. Agreement under-rates cities where one source is weak but the union is
+    complete (Chicago: agreement 0.333, kappa against business licences 0.884), so it is only the fallback."""
     cov = (city["coverage"] or {}).get("city") or {}
     conf = cov.get("data_confidence_food")
-    passed = conf is not None and conf >= GATE_MIN
-    reason = None if passed else (
-        "Map data for this city is too incomplete (about {:.0%} of food places confirmed by two sources) "
-        "to rank areas or price rent.".format(conf or 0))
-    return {"gate_passed": passed, "data_confidence_food": conf, "threshold": GATE_MIN,
-            "threshold_note": "provisional: set from two cities (Paris 0.556, Casablanca 0.181)",
-            "reason": reason, "coverage": cov}
+    if ground_truth:
+        k = ground_truth["kappa"]
+        passed = k >= GT_MIN
+        reason = None if passed else (
+            "Map data for this city misses too many officially registered food businesses (chance-corrected "
+            "recall {:.2f}) to rank areas or price rent.".format(k))
+        basis = {"basis": "official register", "source": gt_source, "ground_truth": ground_truth,
+                 "threshold": GT_MIN,
+                 "threshold_note": "chance-corrected recall vs official register; Paris 0.841, Chicago 0.884"}
+    else:
+        passed = conf is not None and conf >= GATE_MIN
+        reason = None if passed else (
+            "Map data for this city is too incomplete (about {:.0%} of food places confirmed by two sources) "
+            "to rank areas or price rent.".format(conf or 0))
+        basis = {"basis": "two-source agreement", "threshold": GATE_MIN,
+                 "threshold_note": "provisional fallback when no official register: Paris 0.556, Casablanca 0.181"}
+    return {"gate_passed": passed, "data_confidence_food": conf, "reason": reason, "coverage": cov} | basis
 
 
 def scan_summary(res):
@@ -52,9 +66,9 @@ def landlord_rows(rows):
              "location_hr": r["location_hr"], "relative_demand": r["relative_demand"]} for r in rows]
 
 
-def publish(pack, slug, concepts, top):
+def publish(pack, slug, concepts, top, ground_truth=None, gt_source=None):
     city = cs.build_city(pack["info"], pack["elements"], overture=pack.get("overture"))
-    q = quality(city)
+    q = quality(city, ground_truth, gt_source)
     g = city["grid"]
     out = {"slug": slug, "city": {k: pack["info"][k] for k in ("name", "display_name", "center", "bbox")},
            "grid": {k: g[k] for k in ("bbox", "rows", "cols", "cell_m", "dlat", "dlon")}, "study": sorted(city["study"]),
@@ -81,10 +95,13 @@ if __name__ == "__main__":
     ap.add_argument("--slug", required=True)
     ap.add_argument("--concept", action="append")
     ap.add_argument("--top", type=int, default=25)
+    ap.add_argument("--ground-truth", help="JSON line from cityscan_groundtruth.py")
+    ap.add_argument("--ground-truth-source", help="name of the official register, shown to users")
     a = ap.parse_args()
     t0 = time.perf_counter()
     with open(a.pack) as f:
-        doc = publish(json.load(f), a.slug, a.concept or DEFAULT_CONCEPTS, a.top)
+        doc = publish(json.load(f), a.slug, a.concept or DEFAULT_CONCEPTS, a.top,
+                      json.loads(a.ground_truth) if a.ground_truth else None, a.ground_truth_source)
     path = f"packs/{a.slug}.json.gz"
     with gzip.open(path, "wt", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"))

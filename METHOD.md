@@ -277,6 +277,26 @@ survival**. Two definitions:
 - "official-calibrated" means an official register exists and the map data pass the survival study's quality gate.
   Paris (INSEE SIRENE) qualifies; Casablanca does not.
 
+**Publishing gate: chance-corrected recall against an official register** (`cityscan_groundtruth.py`).
+Two-source agreement measures whether OSM and Overture agree. It does not measure whether they miss businesses
+that both lack. Where an official register with coordinates exists, the gate measures that directly:
+
+- recall $R$: the share of registered food businesses with an OSM or Overture food place within 50 m;
+- placebo $P$: the same share after shifting every register point 300 m in a random direction (fixed seed), i.e.
+  the matches expected from map density alone;
+- $\kappa_R = (R - P)/(1 - P)$, publish if $\kappa_R \ge 0.70$.
+
+| City | Register | $n$ | $R$ | $P$ | $\kappa_R$ | Two-source agreement | Published |
+|---|---|---|---|---|---|---|---|
+| Paris | INSEE SIRENE (restaurants, cafés, bars) | 31,827 | 0.952 | 0.700 | 0.841 | 0.556 | yes |
+| Chicago | business licences, food classes | 4,410 | 0.923 | 0.338 | 0.884 | 0.333 | yes |
+| Philadelphia | L&I commercial activity licences | 5,793 | 0.704 | 0.257 | 0.602 | 0.214 | no, data-thin |
+
+Chicago would fail the two-source gate (0.33) yet has the best register recall, so agreement is a weak proxy for
+completeness, and it stays only as the fallback where no register exists (Casablanca, 0.181). By class,
+Philadelphia restaurants score 0.62 and fast food 0.59, so the shortfall is not one category.
+Registers are read in `/tmp` and never committed; only the five numbers per city go into the pack.
+
 **Runway model.** Expected covers/day at a location are $\theta\, r^{\kappa}$, with $r$ the Huff relative demand of
 section 10. A venue's own covers are $\theta\, r^{\kappa} e^{\sigma z}$, with $z \sim N(0,1)$. With margin per
 daily cover $m = t\,d\,(1-c_m-c_v)$ and fixed costs $K = S + F$:
