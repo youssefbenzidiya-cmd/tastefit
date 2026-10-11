@@ -306,7 +306,8 @@ $$\pi = \theta r^{\kappa}e^{\sigma z} m - \text{rent} - K,\qquad
 \text{open at month } \tau \iff \pi \ge -bK/\tau,$$
 
 where the cash buffer is $b = 6$ months of fixed costs (assumption; $b = 3$ and $9$ reported). In calibration, rent
-is $\rho \times$ the location's *expected* revenue ($\rho \sim$ tri(5%, 10%, 15%)). The venue's own shock $z$ does
+is $\rho \times$ the location's *expected* revenue, with a per-city triangle for $\rho$: Paris tri(5%, 10%, 15%),
+Chicago tri(4%, 6%, 10%) (see the Chicago replication below). The venue's own shock $z$ does
 not change its rent. No open dataset gives Paris commercial rents by arrondissement: OLAP covers housing only, and
 broker figures are ranges, not open data. The $\rho$ range is cited instead:
 
@@ -357,7 +358,8 @@ recovers known $(\theta, \sigma)$ and $\kappa$ from simulated venue outcomes.
 
 $$P(\text{open at 3 y}) = \Big[\tfrac1N\sum_k \mathbf 1\{\theta r^{\kappa}e^{\sigma z_k} m_k \ge \text{rent} + K_k(1-b/36)\}\Big]^{HR_{loc}},$$
 
-with $HR_{loc} = 0.932^{z_{same}}\cdot 0.917^{z_{poi}}$. These are the pooled city-stratified Cox HRs of the survival
+with $HR_{loc} = 0.932^{z_{same}}\cdot 0.917^{z_{poi}}$ where the location term passes the held-out ranking rule
+(Paris), and $HR_{loc} = 1$ where it does not (Chicago). These are the pooled city-stratified Cox HRs of the survival
 study, per SD of log(1+count):
 
 - same-group venues within 150 m;
@@ -456,6 +458,9 @@ landowner. In Alonso's (1964) bid-rent model, each land use bids up to the rent 
 Competition between tenants then pushes the rent to the highest bid. Once location advantage is priced into rent,
 survival net of rent no longer depends on location. The variable a founder controls is the rent they agree to.
 
+Chicago ceilings are in USD and use $HR_{loc} = 1$ (section 11, Chicago replication). So within a tenant type they
+are the same in every cell: a city-level figure, not a location signal.
+
 **Founder view.** For a spot, a concept group and a target survival $s^*$:
 
 - Each common-random-number draw $k$ ($N = 2000$, fixed seed) has a rent capacity
@@ -463,7 +468,7 @@ survival net of rent no longer depends on location. The variable a founder contr
   is still open at 36 months.
 - $P(\text{open at 3 y} \mid \text{rent}) = \big[\#\{A_k \ge \text{rent}\}/N\big]^{HR_{loc}}$. This is non-increasing
   in rent.
-- $R^* = \max\{\text{rent} : P \ge s^*\}$, found by bisection to €1. It equals the $\lceil N s^{*1/HR}\rceil$-th
+- $R^* = \max\{\text{rent} : P \ge s^*\}$, found by bisection to 1 unit of the city's currency. It equals the $\lceil N s^{*1/HR}\rceil$-th
   largest $A_k$, so common random numbers make $R^*$ move smoothly with the parameters.
 - The default $s^*$ is the group's official city 3-year survival; 70%, 80% and 90% are also reported.
 - The 90% interval re-solves $R^*$ for each of the 100 bootstrap $(\theta, \sigma, \kappa)$, with $HR_{loc}$ drawn

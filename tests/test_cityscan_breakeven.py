@@ -1,3 +1,4 @@
+import math
 import unittest
 
 import cityscan_breakeven as be
@@ -75,11 +76,19 @@ class Calibrated(unittest.TestCase):
                 self.assertEqual(len(c["boot"]), 100)
 
     def test_each_city_was_fitted_under_the_rent_share_it_documents(self):
-        be.calibration("paris", "restaurant")
-        prov = be._calibration["_provenance"]
-        self.assertEqual(prov["rent_share"], be.RENT_SHARE)
-        self.assertEqual(prov["rent_shares"]["chicago"], be.rent_share("chicago"))
-        self.assertNotEqual(be.rent_share("chicago"), be.rent_share("paris"))
+        # kappa = 0, so the model's 3-year survival does not depend on location: the embedded theta and sigma must
+        # reproduce the official rate under the city's own rent share, and miss it under the other city's.
+        def s3(c, share):
+            f = be.runway_factor(36, c["buffer_months"])
+            d = be.survival_draws(c["inputs"], 400, rent_share=share)
+            return sum(1 for m, fx, rp, z in d if c["theta"] * (math.exp(c["sigma"] * z) * m - rp) >= fx * f) / 400
+
+        for city, other in (("paris", "chicago"), ("chicago", "paris")):
+            for profile in ("restaurant", "fast_casual", "cafe"):
+                c = be.calibration(city, profile)
+                self.assertEqual(c["kappa"], 0.0)
+                self.assertAlmostEqual(s3(c, be.rent_share(city)), c["official"]["s3"], delta=0.01)
+                self.assertGreater(abs(s3(c, be.rent_share(other)) - c["official"]["s3"]), 0.03)
 
     def test_location_term_only_where_it_ranks_held_out_venues(self):
         for city, applied in (("paris", True), ("chicago", False)):

@@ -4,7 +4,7 @@ business licences).
 Not part of the app. Reads the survival study's loaders read-only (no bytecode written to that folder), the raw
 official-register/OSM-history files in /tmp/survival_raw and the city pack; writes aggregates only.
 
-  python3 cityscan_calibrate.py --pack /tmp/cityscan-pack-paris.json --out /tmp/cityscan-calib-paris.json \
+  TASTEFIT_SURVIVAL_DIR=/path/to/survival python3 cityscan_calibrate.py --pack /tmp/cityscan-pack-paris.json --out /tmp/cityscan-calib-paris.json \
       [--embed cityscan_calibration.json] [--boot 100] [--city chicago]
 
 Steps
@@ -28,7 +28,8 @@ import time
 from collections import defaultdict
 
 sys.dont_write_bytecode = True
-SURVIVAL_DIR = os.environ.get("TASTEFIT_SURVIVAL_DIR", os.path.expanduser("~/tf-wt/survival"))
+SURVIVAL_DIR = os.environ.get("TASTEFIT_SURVIVAL_DIR") or sys.exit(
+    "set TASTEFIT_SURVIVAL_DIR to the survival study folder (official.py, pooled.py, compare.py, survival.py)")
 sys.path.insert(0, SURVIVAL_DIR)
 import official  # noqa: E402
 import pooled  # noqa: E402
