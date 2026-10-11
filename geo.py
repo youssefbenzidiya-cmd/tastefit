@@ -5,13 +5,18 @@ OpenStreetMap Nominatim (free, keyless; their policy allows at most one request 
 """
 import json
 import math
+import threading
 import time
 import urllib.parse
 import urllib.request
 
 KM_PER_DEG_LAT = 110.57
-_cache = {}
-_last_call = [0.0]
+USER_AGENT = "TasteFit/1.0 (https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit)"
+MIN_INTERVAL = 1.1  # seconds between Nominatim requests, process-wide (policy: at most 1 per second)
+_rate_lock = threading.Lock()
+_last_call = [-MIN_INTERVAL]
+_clock = time.monotonic
+_sleep = time.sleep
 
 
 def _num(v):
@@ -61,33 +66,44 @@ def extract(result):
     return out
 
 
-def geocode(query):
-    if query in _cache:
-        return _cache[query]
-    wait = 1.1 - (time.time() - _last_call[0])
-    if wait > 0:
-        time.sleep(wait)
-    _last_call[0] = time.time()
+def _throttle():
+    """Blocks until a Nominatim request may start; shared by every thread of the process."""
+    with _rate_lock:
+        wait = MIN_INTERVAL - (_clock() - _last_call[0])
+        if wait > 0:
+            _sleep(wait)
+        _last_call[0] = _clock()
+
+
+def geocode(query, cache=None):
+    """(lat, lon) for a free-text address, or None. `cache` is a per-run dict: addresses come from Qloo results,
+    so nothing is kept across requests."""
+    if cache is not None and query in cache:
+        return cache[query]
+    _throttle()
     url = "https://nominatim.openstreetmap.org/search?" + urllib.parse.urlencode({"q": query, "format": "json", "limit": 1})
-    req = urllib.request.Request(url, headers={"User-Agent": "TasteFit/1.0 (https://github.com/youssefbenzidiya-cmd/tastefit)"})
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     try:
         with urllib.request.urlopen(req, timeout=10) as r:
             hits = json.loads(r.read())
-        _cache[query] = (float(hits[0]["lat"]), float(hits[0]["lon"])) if hits else None
+        found = (float(hits[0]["lat"]), float(hits[0]["lon"])) if hits else None
     except Exception:  # noqa: BLE001  a missing point only shrinks the sample
-        _cache[query] = None
-    return _cache[query]
+        found = None
+    if cache is not None:
+        cache[query] = found
+    return found
 
 
-def locate(points, area, limit=10):
+def locate(points, area, limit=10, cache=None):
     """Fill missing coordinates by geocoding addresses; drops points that cannot be placed."""
+    cache = {} if cache is None else cache
     placed = []
     for p in points:
         if p["lat"] is None:
             if limit <= 0 or not p.get("address"):
                 continue
             limit -= 1
-            c = geocode(p["address"] if area.lower() in p["address"].lower() else f"{p['address']}, {area}")
+            c = geocode(p["address"] if area.lower() in p["address"].lower() else f"{p['address']}, {area}", cache)
             if not c:
                 continue
             p = {**p, "lat": c[0], "lon": c[1]}

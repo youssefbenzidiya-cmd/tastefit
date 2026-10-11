@@ -10,7 +10,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@18.1.0/lib/marked.umd.js" integrity="sha384-IvVdUXkhyoD0shbjhiiOnuiTbervTaB0VJcnEcg3shUAMVOOF6lKj4ozJrCwvz6s" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.16/dist/purify.min.js" integrity="sha384-a7SzOxErzJ3ZpQz0zJ32d67dSitNzPcbfybc/ykU9KJhMgZkwqfSxlhhdJRS+XGL" crossorigin="anonymous"></script>
 <style>
   :root {
     --pine: #13261f;
@@ -66,6 +67,9 @@
   .try { color: #9fb2a7; font-size: 15px; display: flex; gap: 6px 18px; flex-wrap: wrap; align-items: center; }
   .try button { font: inherit; color: #dfe7e1; background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-decoration-color: var(--pine-line); text-underline-offset: 4px; }
   .try button:hover { text-decoration-color: var(--saffron); }
+  .sample-btn { font: 600 17px/1 var(--body); padding: 17px 24px; border-radius: 999px; cursor: pointer; background: none; color: #eef2ec; border: 1px solid #47685a; transition: border-color .15s; }
+  .sample-btn:hover { border-color: var(--saffron); }
+  .hint { margin: 18px 0 0; color: #9fb2a7; font-size: 15px; }
 
   /* Below the fold */
   .stage { padding: 56px 0 96px; }
@@ -89,6 +93,9 @@
   ol.steps li:last-child::after { display: none; }
   ol.steps li.err::before { background: var(--rule); color: var(--muted); }
   ol.steps li.live::before { content: ""; background: var(--saffron); animation: pulse 1.2s ease-in-out infinite; }
+  ol.steps li.fail::before { content: "!"; background: var(--nogo); color: #fff; }
+  .tag-sample { font: 600 11px/1 var(--body); letter-spacing: .04em; text-transform: uppercase; color: var(--pine); background: #f6e7bf; padding: 4px 8px; border-radius: 999px; margin-left: 6px; vertical-align: 1px; }
+  .demo-banner { margin: 0 0 24px; padding: 14px 18px; background: #fbf3dd; border: 1px solid #ecd9a4; border-radius: 12px; font-size: 14px; color: var(--ink); }
   .s-title { font-weight: 600; line-height: 1.4; }
   .s-sub { color: var(--muted); font-size: 14px; line-height: 1.45; margin-top: 4px; }
   @keyframes pulse { 50% { opacity: .35; } }
@@ -101,7 +108,7 @@
   .dial b { font: 700 44px/1 var(--display); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
   .dial span { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
   .call { font: 700 clamp(30px, 4vw, 44px)/1.05 var(--display); letter-spacing: -0.03em; margin: 0 0 10px; }
-  .call.go { color: var(--go); } .call.adjust { color: var(--adjust); } .call.nogo { color: var(--nogo); }
+  .call.go { color: var(--go); } .call.adjust, .call.incomplete { color: var(--adjust); } .call.nogo { color: var(--nogo); }
   .verdict .why { margin: 0; color: var(--ink); max-width: 62ch; }
   .verdict .ctx { margin-top: 12px; color: var(--muted); font-size: 14px; }
 
@@ -138,6 +145,8 @@
   .bar-track { height: 6px; background: #e3e7e0; border-radius: 3px; overflow: hidden; }
   .bar-fill { height: 100%; background: var(--pine); border-radius: 3px; }
   .bar-row p { margin: 10px 0 0; font-size: 14px; color: var(--muted); }
+  .bar-row .src { display: block; font: 500 12px/1.3 var(--body); color: var(--muted); margin-top: 4px; }
+  .score-method { margin: 16px 0 0; font-size: 13px; color: var(--muted); max-width: 90ch; }
   .sec-block.checklist ul { list-style: none; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 32px; }
   .sec-block.checklist li { position: relative; padding-left: 30px; }
   .sec-block.checklist li::before { content: ""; position: absolute; left: 0; top: 4px; width: 16px; height: 16px; border: 1.5px solid var(--ink); border-radius: 4px; }
@@ -162,6 +171,7 @@
   .notice { padding: 28px 32px; background: var(--card); border: 1px solid var(--rule); border-left: 4px solid var(--saffron); border-radius: 12px; }
   .notice h3 { font: 600 20px/1.3 var(--display); margin: 0 0 6px; }
   .notice p { margin: 0; color: var(--muted); max-width: 64ch; }
+  .notice .again { margin-top: 20px; }
 
   .again { margin-top: 32px; font: 600 15px/1 var(--body); background: none; border: 1px solid var(--ink); color: var(--ink); padding: 14px 22px; border-radius: 999px; cursor: pointer; }
   .again:hover { background: var(--ink); color: #fff; }
@@ -254,12 +264,14 @@
       </div>
       <div class="actions">
         <button class="run" id="go" type="submit">Check the fit</button>
+        <button class="sample-btn" type="button" data-action="sample">See a sample report</button>
         <div class="try">Try
           <button type="button" data-c="a late-night Korean fried chicken spot" data-l="East Austin, Texas">Korean chicken in Austin</button>
           <button type="button" data-c="a natural wine bar with small plates" data-l="Silver Lake, Los Angeles">Wine bar in Silver Lake</button>
           <button type="button" data-c="a Moroccan tea house with pastries" data-l="Lower East Side, New York">Tea house on the Lower East Side</button>
         </div>
       </div>
+      <p class="hint" id="prefill-hint" hidden>Shared check loaded. Press "Check the fit" to run it.</p>
     </form>
   </div>
 </section>
@@ -283,12 +295,13 @@
         </div>
       </div>
       <p class="note">You get a go, adjust or no-go call with a fit score from 0 to 100, the evidence behind it, positioning advice and the risks.
-        It reads aggregate taste only: it does not know rents, foot traffic or any individual's data. Analyses take one to two minutes.</p>
+        It reads aggregate taste only: it does not know rents, foot traffic or any individual's data. Analyses take one to two minutes.
+        Want to see the output first? <a href="#" data-action="sample">Open a sample report</a> built from synthetic data.</p>
     </div>
 
     <div id="work" class="work" hidden>
       <aside class="progress" aria-live="polite">
-        <h2>Analysis <span class="clock" id="clock">0:00</span></h2>
+        <h2>Analysis<span class="tag-sample" id="sample-tag" hidden>Sample</span> <span class="clock" id="clock">0:00</span></h2>
         <ol class="steps" id="steps"></ol>
       </aside>
       <section class="report" id="report"></section>
@@ -301,8 +314,8 @@
   <div class="wrap">
     <div class="plans-head">
       <h2>Plans</h2>
-      <p>Free while the Qloo hackathon runs. Paid plans open after judging in November.</p>
-      <p class="compare">A traditional restaurant feasibility study costs $3,500 to $10,000 and takes 10 to 15 days. A TasteFit check takes two minutes.</p>
+      <p>Planned pricing. TasteFit is a prototype and is not selling reports yet.</p>
+      <p class="compare">A professional feasibility study can cost thousands. A TasteFit check takes about two minutes and is a first screen before you pay for one, not a replacement.</p>
     </div>
     <div class="tiers">
       <div class="tier">
@@ -331,21 +344,23 @@
 <footer>
   <div class="wrap">
     <span>TasteFit is open source under the MIT license.</span>
-    <a href="https://github.com/youssefbenzidiya-cmd/tastefit">Source on GitHub</a>
+    <a href="{{SOURCE}}">Source on GitLab</a>
     <p class="build">TasteFit build {{BUILD}}</p>
   </div>
 </footer>
 
-<script>
+<script nonce="{{NONCE}}">
 const $ = s => document.querySelector(s);
 const f = $('#f'), go = $('#go'), intro = $('#intro'), work = $('#work'), stepsEl = $('#steps'), report = $('#report'), clock = $('#clock');
-let es, timer, started, live, geoData = null, map;
+let ctrl, timer, started, live, geoData = null, scoreData = null, demo = null, map, doneSteps = 0, lastStep = '';
 
 document.querySelectorAll('.try button').forEach(b => b.onclick = () => {
   f.concept.value = b.dataset.c; f.location.value = b.dataset.l; f.requestSubmit();
 });
 
-const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const md = s => DOMPurify.sanitize(marked.parse(s || ''));
+const mdi = s => DOMPurify.sanitize(marked.parseInline(s || ''));
 const list = names => names.slice(0, 4).join(', ') + (names.length > 4 ? ' and more' : '');
 
 function describe(s) {
@@ -374,6 +389,14 @@ function addStep(s) {
   if (s.error) li.className = 'err';
   li.innerHTML = '<div class="s-title">' + esc(title) + '</div><div class="s-sub">' + esc(s.error ? 'This lookup returned no data, so the agent adapts' : sub) + '</div>';
   stepsEl.insertBefore(li, live);
+  doneSteps++; lastStep = title;
+}
+
+function addFailStep(title, sub) {
+  const li = document.createElement('li');
+  li.className = 'err fail';
+  li.innerHTML = '<div class="s-title">' + esc(title) + '</div><div class="s-sub">' + esc(sub) + '</div>';
+  stepsEl.appendChild(li);
 }
 
 function parseMemo(md) {
@@ -408,44 +431,62 @@ function compareHTML() {
     '</table><p class="cmp-note">Highest fit score is highlighted. Checks are kept in this browser tab only.</p></div>';
 }
 
-function renderMemo(md) {
-  const m = parseMemo(md);
-  if (!m || !m.call) { report.innerHTML = '<div class="sections"><div class="sec-block wide">' + marked.parse(md) + '</div></div>'; return; }
-  const cls = m.call === 'GO' ? 'go' : m.call === 'ADJUST' ? 'adjust' : 'nogo';
-  const color = { go: 'var(--go)', adjust: 'var(--adjust)', nogo: 'var(--nogo)' }[cls];
-  const label = { go: 'Go', adjust: 'Go, with changes', nogo: 'Not here' }[cls];
-  const why = m.verdict.body ? marked.parseInline(m.verdict.body.replace(/\n+/g, ' ')) : '';
-  const card = m.rest.find(s => /scorecard/i.test(s.title));
-  const bars = card ? card.body.split('\n').map(l => l.match(/^\s*[-*]\s*\**([^:*]+?)\**\s*:\s*(\d{1,3})\s*\/\s*100\s*[-—–:]*\s*(.*)$/)).filter(Boolean) : [];
+const demoBanner = () => demo ? '<div class="demo-banner" role="note"><b>Sample report — synthetic data, not live Qloo output.</b> ' +
+  'Place names, affinities and scores are invented to show what a TasteFit report looks like.</div>' : '';
+
+function scoreBars(sc, card) {
+  if (sc) return sc.bars.map(b => ({ name: b.name, score: b.score, reason: b.reason, computed: b.source === 'site_math' }));
+  if (!card) return [];
+  return card.body.split('\n').map(l => l.match(/^\s*[-*]\s*\**([^:*]+?)\**\s*:\s*(\d{1,3})\s*\/\s*100\s*[-—–:]*\s*(.*)$/)).filter(Boolean)
+    .map(b => ({ name: b[1].trim(), score: Math.min(100, +b[2]), reason: b[3], computed: false }));
+}
+
+function renderMemo(text) {
+  const m = parseMemo(text), sc = scoreData;
+  const call = sc && sc.call;
+  if (!call) { report.innerHTML = demoBanner() + '<div class="demo-banner" role="note"><b>No verdict: scoring unavailable.</b></div><div class="sections"><div class="sec-block wide">' + md(text) + '</div></div>'; return; }
+  const score = sc.fit;
+  const rest = m ? m.rest : [];
+  const cls = call === 'GO' ? 'go' : call === 'ADJUST' ? 'adjust' : call === 'INCOMPLETE' ? 'incomplete' : 'nogo';
+  const color = { go: 'var(--go)', adjust: 'var(--adjust)', nogo: 'var(--nogo)', incomplete: 'var(--adjust)' }[cls];
+  const label = { go: 'Go', adjust: 'Go, with changes', nogo: 'Not here', incomplete: 'No call: evidence incomplete' }[cls];
+  const why = m && m.verdict.body ? mdi(m.verdict.body.replace(/\n+/g, ' ')) : '';
+  const card = rest.find(s => /scorecard/i.test(s.title));
+  const bars = scoreBars(sc, card);
   const scoreHTML = bars.length ? '<div class="scorecard">' + bars.map(b =>
-    '<div class="bar-row"><div class="bar-label"><span>' + esc(b[1]) + '</span><b>' + Math.min(100, +b[2]) + '</b></div>' +
-    '<div class="bar-track"><div class="bar-fill" style="width:' + Math.min(100, +b[2]) + '%"></div></div>' +
-    (b[3] ? '<p>' + marked.parseInline(b[3]) + '</p>' : '') + '</div>').join('') + '</div>' : '';
-  const blocks = m.rest.filter(s => !(bars.length && s === card)).map(s => {
+    '<div class="bar-row"><div class="bar-label"><span>' + esc(b.name) + '</span><b>' + b.score + '</b></div>' +
+    '<div class="bar-track"><div class="bar-fill" style="width:' + b.score + '%"></div></div>' +
+    (b.reason ? '<p>' + mdi(b.reason) + '</p>' : '') +
+    (b.computed ? '<span class="src">Computed from the site maths</span>' : '') + '</div>').join('') + '</div>' +
+    (sc ? '<p class="score-method">' + esc(sc.method) + '</p>' : '') : '';
+  const blocks = rest.filter(s => !(bars.length && s === card)).map(s => {
     const k = /evidence/i.test(s.title) ? 'wide' : /limit/i.test(s.title) ? 'wide limits' : /before you sign/i.test(s.title) ? 'wide checklist' : '';
-    return '<div class="sec-block ' + k + '"><h3>' + esc(s.title) + '</h3>' + marked.parse(s.body) + '</div>';
+    return '<div class="sec-block ' + k + '"><h3>' + esc(s.title) + '</h3>' + md(s.body) + '</div>';
   }).join('');
-  checks = checks.filter(c => !(c.concept === f.concept.value && c.location === f.location.value));
-  checks.push({ concept: f.concept.value, location: f.location.value, label, cls, score: m.score,
-                bars: bars.map(b => [b[1].trim(), Math.min(100, +b[2])]),
-                opp: geoData ? geoData.recommended.opportunity_index : null });
-  checks = checks.slice(-4);
-  try { sessionStorage.setItem('tf-checks', JSON.stringify(checks)); } catch (e) {}
+  if (!demo) {
+    checks = checks.filter(c => !(c.concept === f.concept.value && c.location === f.location.value));
+    checks.push({ concept: f.concept.value, location: f.location.value, label, cls, score: cls === 'incomplete' ? null : score,
+                  bars: bars.map(b => [b.name, b.score]),
+                  opp: geoData ? geoData.recommended.opportunity_index : null });
+    checks = checks.slice(-4);
+    try { sessionStorage.setItem('tf-checks', JSON.stringify(checks)); } catch (e) {}
+  }
   report.innerHTML =
     '<p class="print-head">TasteFit: ' + esc(f.concept.value) + ' in ' + esc(f.location.value) + '</p>' +
+    demoBanner() +
     '<div class="verdict">' +
-      (m.score != null ? '<div class="dial" style="--v:' + m.score + ';--c:' + color + '"><div><div><b>' + m.score + '</b><span>fit score</span></div></div></div>' : '<div></div>') +
+      (score != null ? '<div class="dial" style="--v:' + score + ';--c:' + color + '"><div><div><b>' + score + '</b><span>' + (cls === 'incomplete' ? 'partial score' : 'fit score') + '</span></div></div></div>' : '<div></div>') +
       '<div><p class="call ' + cls + '">' + label + '</p>' + (why ? '<p class="why">' + why + '</p>' : '') +
       '<p class="ctx">' + esc(f.concept.value) + ' in ' + esc(f.location.value) + '</p></div>' +
     '</div>' +
     scoreHTML +
-    compareHTML() +
+    (demo ? '' : compareHTML()) +
     (geoData ? siteHTML(geoData) : '') +
     '<div class="sections">' + blocks + '</div>' +
-    '<div class="tools"><button class="primary" type="button" onclick="window.print()">Save as PDF</button>' +
-    '<button type="button" id="share">Copy link to this check</button>' +
-    '<button type="button" onclick="f.location.value=\'\';window.scrollTo({top:0,behavior:\'smooth\'});f.location.focus()">Compare another neighborhood</button>' +
-    '<button type="button" onclick="window.scrollTo({top:0,behavior:\'smooth\'});f.concept.focus()">Test another concept</button></div>';
+    '<div class="tools"><button class="primary" type="button" data-action="print">Save as PDF</button>' +
+    '<button type="button" data-action="share">Copy link to this check</button>' +
+    '<button type="button" data-action="new-location">Compare another neighborhood</button>' +
+    '<button type="button" data-action="new-concept">Test another concept</button></div>';
 }
 
 const gmaps = (lat, lon) => 'https://www.google.com/maps/search/?api=1&query=' + lat + ',' + lon;
@@ -482,7 +523,7 @@ function drawMap(g) {
   const dot = (p, color) => {
     all.push([p.lat, p.lon]);
     L.circleMarker([p.lat, p.lon], { radius: 4 + 6 * Math.min(1, p.w), color: '#fff', weight: 1.5, fillColor: color, fillOpacity: .85 })
-      .addTo(map).bindTooltip(p.name || 'Hotspot area');
+      .addTo(map).bindTooltip(esc(p.name || 'Hotspot area'));
   };
   g.demand.forEach(p => dot(p, c('--pine')));
   g.competition.forEach(p => dot(p, c('--nogo')));
@@ -498,47 +539,128 @@ function drawMap(g) {
 }
 
 const shareURL = () => location.origin + location.pathname + '?' + new URLSearchParams({ c: f.concept.value, l: f.location.value });
+const toTop = field => { window.scrollTo({ top: 0, behavior: 'smooth' }); field.focus(); };
+
 document.addEventListener('click', e => {
-  if (e.target.id !== 'share') return;
-  navigator.clipboard.writeText(shareURL()).then(() => { e.target.textContent = 'Link copied'; setTimeout(() => e.target.textContent = 'Copy link to this check', 2000); });
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  e.preventDefault();
+  const action = el.dataset.action;
+  if (action === 'sample') startSample();
+  else if (action === 'print') window.print();
+  else if (action === 'new-location') { f.location.value = ''; toTop(f.location); }
+  else if (action === 'new-concept') toTop(f.concept);
+  else if (action === 'share') navigator.clipboard.writeText(shareURL()).then(() => {
+    el.textContent = 'Link copied'; setTimeout(() => el.textContent = 'Copy link to this check', 2000);
+  });
 });
 
-function notice(title, text) {
-  report.innerHTML = '<div class="notice"><h3>' + esc(title) + '</h3><p>' + esc(text) + '</p></div>';
+function notice(title, text, offerSample) {
+  report.innerHTML = '<div class="notice"><h3>' + esc(title) + '</h3><p>' + esc(text) + '</p>' +
+    (offerSample ? '<button type="button" class="again" data-action="sample">See a sample report</button>' : '') + '</div>';
+}
+
+const FAILURES = {
+  offline: ['Live taste data is not connected yet', 'This instance is waiting for its Qloo data access, so no analysis can run right now. You can still explore a full sample report built from synthetic data.',
+            'Live data not connected', 'No Qloo lookups were run'],
+  step_limit: ['The analysis ran out of steps', 'The agent kept asking questions without reaching a verdict. Run it again, or try a broader location such as the city name.',
+               'Stopped: step limit reached', 'No verdict after the maximum number of steps'],
+  internal: ['The analysis stopped before finishing', 'Something went wrong on our side. Run it again; if it repeats, try a broader location such as the city name.',
+             'Stopped: server error', 'The details were logged on the server'],
+  busy: ['TasteFit is busy', '', 'Not started', 'Too many analyses running'],
+  dropped: ['The connection dropped', 'The stream ended before the report arrived. Run it again.', 'Stopped: connection lost', 'The stream ended early'],
+};
+
+function fail(code, serverText) {
+  const [title, text, stepTitle, stepSub] = FAILURES[code] || FAILURES.internal;
+  addFailStep(stepTitle, doneSteps ? stepSub + '. Last completed: ' + lastStep : stepSub);
+  notice(title, serverText || text, true);
 }
 
 function finish() {
-  if (es) es.close();
   clearInterval(timer);
   if (live) live.remove();
   go.disabled = false; go.textContent = 'Check the fit';
 }
 
-f.onsubmit = e => {
-  e.preventDefault();
-  if (es) es.close();
+function parseEvent(block) {
+  let event = 'message', data = '';
+  for (const line of block.split('\n')) {
+    if (line.startsWith('event:')) event = line.slice(6).trim();
+    else if (line.startsWith('data:')) data += line.slice(5).trimStart();
+  }
+  return [event, data ? JSON.parse(data) : null];
+}
+
+const handlers = {
+  demo: d => { demo = d; f.concept.value = d.concept; f.location.value = d.location; $('#sample-tag').hidden = false; },
+  step: s => addStep(s),
+  geo: g => { geoData = g; },
+  scorecard: s => { scoreData = s; },
+  memo: text => { finish(); renderMemo(text); if (geoData) drawMap(geoData); },
+  error: code => { finish(); fail(code); },
+};
+
+async function stream(url) {
+  if (ctrl) ctrl.abort();
+  const mine = ctrl = new AbortController();
+  let ended = false;
+  try {
+    const res = await fetch(url, { signal: mine.signal, headers: { Accept: 'text/event-stream' } });
+    if (!res.ok) {
+      const text = (await res.text()).trim();
+      ended = true; finish(); fail(res.status === 429 ? 'busy' : 'internal', res.status === 429 ? text : '');
+      return;
+    }
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = '';
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done || ctrl !== mine) break;
+      buf += dec.decode(value, { stream: true });
+      let i;
+      while ((i = buf.indexOf('\n\n')) >= 0 && !ended) {
+        const [event, data] = parseEvent(buf.slice(0, i));
+        buf = buf.slice(i + 2);
+        if (event === 'memo' || event === 'error') ended = true;
+        if (handlers[event]) handlers[event](data);
+      }
+    }
+  } catch (e) {
+    if (e.name === 'AbortError') return;
+  }
+  if (!ended && ctrl === mine) { finish(); fail('dropped'); }
+}
+
+function begin() {
   intro.hidden = true; work.hidden = false;
-  stepsEl.innerHTML = ''; addLive(); geoData = null;
+  stepsEl.innerHTML = ''; addLive();
+  geoData = null; scoreData = null; demo = null; doneSteps = 0; lastStep = '';
+  $('#sample-tag').hidden = true; $('#prefill-hint').hidden = true;
   report.innerHTML = '<div class="waiting"><p>Your report will appear here.</p><div class="skeleton" style="width:55%"></div><div class="skeleton" style="width:85%"></div><div class="skeleton" style="width:70%"></div></div>';
   go.disabled = true; go.textContent = 'Analyzing';
-  started = Date.now(); clearInterval(timer);
+  started = Date.now(); clock.textContent = '0:00'; clearInterval(timer);
   timer = setInterval(() => { const t = Math.floor((Date.now() - started) / 1000); clock.textContent = Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); }, 1000);
   work.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+}
 
-  es = new EventSource('/run?' + new URLSearchParams({ concept: f.concept.value, location: f.location.value }));
-  es.addEventListener('step', ev => addStep(JSON.parse(ev.data)));
-  es.addEventListener('geo', ev => { geoData = JSON.parse(ev.data); });
-  es.addEventListener('memo', ev => { finish(); renderMemo(JSON.parse(ev.data)); if (geoData) drawMap(geoData); });
-  es.addEventListener('error', ev => {
-    finish();
-    const msg = ev.data ? JSON.parse(ev.data) : null;
-    if (msg === 'offline') notice('Live taste data is being connected', 'This demo is waiting for its Qloo data access to go live. Try again shortly.');
-    else notice('The analysis stopped before finishing', msg ? 'Reason: ' + msg + '. Run it again; if it repeats, try a broader location such as the city name.' : 'The connection dropped. Run it again.');
-  });
+f.onsubmit = e => {
+  e.preventDefault();
+  begin();
+  stream('/run?' + new URLSearchParams({ concept: f.concept.value, location: f.location.value }));
 };
+
+function startSample() {
+  begin();
+  stream('/demo');
+}
+
 {
   const q = new URLSearchParams(location.search);
-  if (q.get('c') && q.get('l')) { f.concept.value = q.get('c'); f.location.value = q.get('l'); f.requestSubmit(); }
+  if (q.get('c') && q.get('l')) {
+    f.concept.value = q.get('c').slice(0, 300); f.location.value = q.get('l').slice(0, 120);
+    $('#prefill-hint').hidden = false; go.focus();
+  }
 }
 </script>
 </body>
