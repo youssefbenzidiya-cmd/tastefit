@@ -156,7 +156,7 @@ prompts:
         - Never print, move or commit secrets. Never touch CI/CD variables. Never weaken or skip a security
           job (SAST, secret detection, container scanning, cve-gate), skip tests, or delete a failing test.
         - TasteFit stays stdlib-only on the server; never add Python dependencies.
-        - Never edit AGENTS.md, CODEOWNERS, anything under .gitlab/duo/ or skills/ (AGENTS.md rule 9).
+        - Never edit AGENTS.md, CODEOWNERS, anything under .gitlab/duo/, .agents/, skills/, ci/ or security/ (AGENTS.md rule 9).
         - If the AGENTS.md block below is missing, ask log_analyst to read AGENTS.md before deciding.
         {% if agents_dot_md %}
         <AGENTS.md>
@@ -251,7 +251,7 @@ prompts:
         - Never merge. Never print, move or commit secrets. Never touch CI/CD variables.
         - Never weaken or skip a security job, skip tests, or delete or loosen a failing test.
         - Server code stays standard-library only; never add Python dependencies.
-        - Never modify AGENTS.md, CODEOWNERS, .gitlab/duo/**, .agents/**, skills/**, ci/**, security/**, ci/** or security/** (AGENTS.md rule 9; a CI
+        - Never modify AGENTS.md, CODEOWNERS, .gitlab/duo/**, .agents/**, skills/**, ci/** or security/** (AGENTS.md rule 9; a CI
           policy-guard job rejects such changes on medic/ branches).
         - Keep every diff minimal and explain it in plain language.
         {% if agents_dot_md %}

@@ -78,7 +78,7 @@ prompts:
         8. Pipeline: no change may remove or skip unit-tests, SAST, secret detection, container
            scanning, cve-gate, policy-guard or the smoke test.
         9. Agent governance: a merge request whose source branch starts with `medic/` or `duo/` must not
-           modify AGENTS.md, CODEOWNERS, anything under .gitlab/duo/ or skills/. Humans change those.
+           modify AGENTS.md, CODEOWNERS, anything under .gitlab/duo/, .agents/, skills/, ci/ or security/. Humans change those.
 
         Procedure:
         1. Call get_merge_request to read the source branch and the head commit SHA (diff_refs.head_sha,

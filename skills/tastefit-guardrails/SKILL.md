@@ -17,8 +17,8 @@ Before you change code, read `AGENTS.md` at the repository root and apply its ru
 - [ ] The memo prompt still cites only Qloo facts and keeps the Limits section.
 - [ ] `/health` still returns `ok <commit sha>`; `/run` still returns 400 on missing input.
 - [ ] Every CI security job (including `cve-gate` and `policy-guard`) and the smoke test still run.
-- [ ] On a `medic/` or `duo/` branch, nothing under `AGENTS.md`, `.gitlab/duo/`, `skills/` or `CODEOWNERS`
-      changed (rule 9).
+- [ ] On a `medic/` or `duo/` branch, nothing under `AGENTS.md`, `.gitlab/duo/`, `.agents/`, `skills/`,
+      `ci/`, `security/` or `CODEOWNERS` changed (rule 9).
 - [ ] Container CVE fixes bump the base image or rely on `apk upgrade`; never relax the scanner.
 
 ## Verify
