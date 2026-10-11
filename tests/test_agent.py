@@ -101,9 +101,13 @@ class AgentLoop(unittest.TestCase):
         self.assertIn("internal detail", chat.seen[-1][-1]["content"])
 
     def test_no_scorecard_without_valid_subscores(self):
-        chat = FakeChat(final("## Verdict\nNot enough data.\n\n## Limits\nNone."))
+        chat = FakeChat(final("## Verdict: GO (fit score 2)\nNot a good place to go with 2 rivals.\n\n## Limits\nNone."))
         events = list(agent.run("wine bar", "Brooklyn", chat_fn=chat))
         self.assertEqual([k for k, _ in events], ["memo"])
+        memo = events[0][1]
+        self.assertTrue(memo.startswith("## Verdict: NO CALL (scoring unavailable)\nNot a good place"))
+        self.assertNotIn("GO (fit score", memo)
+        self.assertIn("## Limits", memo)
 
 
 class Verdict(unittest.TestCase):

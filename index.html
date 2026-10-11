@@ -443,9 +443,9 @@ function scoreBars(sc, card) {
 
 function renderMemo(text) {
   const m = parseMemo(text), sc = scoreData;
-  const call = sc ? sc.call : m && m.call;
-  if (!call) { report.innerHTML = demoBanner() + '<div class="sections"><div class="sec-block wide">' + md(text) + '</div></div>'; return; }
-  const score = sc ? sc.fit : m.score;
+  const call = sc && sc.call;
+  if (!call) { report.innerHTML = demoBanner() + '<div class="demo-banner" role="note"><b>No verdict: scoring unavailable.</b></div><div class="sections"><div class="sec-block wide">' + md(text) + '</div></div>'; return; }
+  const score = sc.fit;
   const rest = m ? m.rest : [];
   const cls = call === 'GO' ? 'go' : call === 'ADJUST' ? 'adjust' : call === 'INCOMPLETE' ? 'incomplete' : 'nogo';
   const color = { go: 'var(--go)', adjust: 'var(--adjust)', nogo: 'var(--nogo)', incomplete: 'var(--adjust)' }[cls];

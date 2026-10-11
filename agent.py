@@ -226,6 +226,20 @@ def memo_with_scorecard(memo, sc):
     return "".join(out).strip()
 
 
+NO_CALL = "## Verdict: NO CALL (scoring unavailable)"
+
+
+def memo_without_call(memo):
+    """Replaces any model-written Verdict heading with a fixed no-call line, so prose never reads as a verdict."""
+    parts = re.split(r"(?m)^(?=##\s)", memo)
+    for i, part in enumerate(parts):
+        if re.match(r"##\s*Verdict\b", part, re.I):
+            body = part.split("\n", 1)[1] if "\n" in part else ""
+            parts[i] = NO_CALL + "\n" + body
+            return "".join(parts).strip()
+    return (NO_CALL + "\n\n" + memo).strip()
+
+
 def _arguments(raw):
     """(args dict, problem) for a tool call; malformed JSON becomes a problem the model can fix."""
     if isinstance(raw, dict):
@@ -260,6 +274,8 @@ def run(concept, location, max_steps=14, chat_fn=None):
             if sc:
                 yield "scorecard", sc
                 memo = memo_with_scorecard(memo, sc)
+            else:
+                memo = memo_without_call(memo)
             yield "memo", memo
             return
         for tc in msg["tool_calls"]:
