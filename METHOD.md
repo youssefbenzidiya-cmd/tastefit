@@ -295,7 +295,8 @@ that both lack. Where an official register with coordinates exists, the gate mea
 Chicago would fail the two-source gate (0.33) yet has the best register recall, so agreement is a weak proxy for
 completeness, and it stays only as the fallback where no register exists (Casablanca, 0.181). By class,
 Philadelphia restaurants score 0.62 and fast food 0.59, so the shortfall is not one category.
-Registers are read in `/tmp` and never committed; only the five numbers per city go into the pack.
+Registers are read in `/tmp` and never committed. The pack stores only $n$, $R$, $P$, $\kappa_R$, the radius, the
+shift and the register's name.
 
 **Runway model.** Expected covers/day at a location are $\theta\, r^{\kappa}$, with $r$ the Huff relative demand of
 section 10. A venue's own covers are $\theta\, r^{\kappa} e^{\sigma z}$, with $z \sim N(0,1)$. With margin per
@@ -305,7 +306,8 @@ $$\pi = \theta r^{\kappa}e^{\sigma z} m - \text{rent} - K,\qquad
 \text{open at month } \tau \iff \pi \ge -bK/\tau,$$
 
 where the cash buffer is $b = 6$ months of fixed costs (assumption; $b = 3$ and $9$ reported). In calibration, rent
-is $\rho \times$ the location's *expected* revenue ($\rho \sim$ tri(5%, 10%, 15%)). The venue's own shock $z$ does
+is $\rho \times$ the location's *expected* revenue, with a per-city triangle for $\rho$: Paris tri(5%, 10%, 15%),
+Chicago tri(4%, 6%, 10%) (see the Chicago replication below). The venue's own shock $z$ does
 not change its rent. No open dataset gives Paris commercial rents by arrondissement: OLAP covers housing only, and
 broker figures are ranges, not open data. The $\rho$ range is cited instead:
 
@@ -356,7 +358,8 @@ recovers known $(\theta, \sigma)$ and $\kappa$ from simulated venue outcomes.
 
 $$P(\text{open at 3 y}) = \Big[\tfrac1N\sum_k \mathbf 1\{\theta r^{\kappa}e^{\sigma z_k} m_k \ge \text{rent} + K_k(1-b/36)\}\Big]^{HR_{loc}},$$
 
-with $HR_{loc} = 0.932^{z_{same}}\cdot 0.917^{z_{poi}}$. These are the pooled city-stratified Cox HRs of the survival
+with $HR_{loc} = 0.932^{z_{same}}\cdot 0.917^{z_{poi}}$ where the location term passes the held-out ranking rule
+(Paris), and $HR_{loc} = 1$ where it does not (Chicago). These are the pooled city-stratified Cox HRs of the survival
 study, per SD of log(1+count):
 
 - same-group venues within 150 m;
@@ -402,6 +405,43 @@ pooled model's definitions). This avoids survivor leakage from the 2026 snapshot
 - On the forward fold, 2019+ cohorts survived better than 2014–18 (restaurant 0.852 vs 0.779 train). Every method is
   6–7 pp too pessimistic there, a period effect that no location model sees.
 
+**Replication: Chicago (City of Chicago business licences).**
+
+The same script (`cityscan_calibrate.py --city chicago`) runs on new retail-food and tavern licences issued 2014+.
+Closure is a revoked or cancelled status, a lapsed licence, or an out-of-business inspection, as in the survival
+study's loader. Of 11,577 openings, 7,592 fall in the pack's study cells. The differences from Paris:
+
+- costs are in USD (`DEFAULTS[("chicago", ...)]`), with staff sized at the Chicago minimum wage;
+- the rent share is a US triangle, 4–6–10% of sales. The mode is the National Restaurant Association's 2024 urban
+  median occupancy cost of 6.0%;
+- with no arrondissements, the spatial folds are 1.5 km longitude strips.
+
+| Group (Chicago, licences) | n | $\hat S(1)$ | $\hat S(3)$ | $\theta$ covers/day (90%) | $\sigma$ (90%) | $\kappa$ (90%) |
+|---|---|---|---|---|---|---|
+| restaurant | 5,692 | 0.918 | 0.664 | 73 (73–76) | 0.43 (0.42–0.49) | 0 (0–0.03) |
+| fast food | 1,237 | 0.891 | 0.573 | 114 (109–120) | 0.44 (0.41–0.48) | 0 (0–0.05) |
+| bar / café | 663 | 0.920 | 0.707 | 157 (145–166) | 0.53 (0.46–0.62) | 0 (0–0) |
+
+| Fold (3-year IPCW Brier) | city baseline | Huff as is ($\kappa=1$) | calibrated model | model × Cox | Cox only |
+|---|---|---|---|---|---|
+| train west → test east (n=4,777) | **0.2218** | 0.3118 | 0.2219 | 0.2233 | 0.2232 |
+| train east → test west (n=2,815) | 0.2351 | 0.3125 | 0.2388 | 0.2376 | **0.2342** |
+| forward 2014–18 → 2019+ (n=4,170) | **0.2193** | 0.2861 | 0.2194 | 0.2194 | 0.2193 |
+
+What replicates and what does not:
+
+- $\kappa = 0$ again in every group. Higher-demand cells survive slightly *less*: restaurant −1.6 pp, fast food
+  −3.5 pp, bar/café −8.6 pp at 3 years. Cox HR per SD of $\log r$ is 1.02 (0.99–1.06). So the finding that measured
+  location demand carries no survival signal holds on a second continent and a different kind of register.
+- Taking Huff at face value is 30–41% worse than the city average, worse than in Paris.
+- The location Cox term does not rank Chicago units out of sample (C 0.47–0.54 per group).
+- Rule: the calibrator applies the location HR only if the held-out C of model × Cox exceeds 0.5 in every spatial
+  fold and group. Paris passes (lowest 0.535); Chicago fails (lowest 0.471), so Chicago ceilings use $HR_{loc} = 1$.
+  They are city-level figures per tenant type, not a location signal.
+- A typical-demand Chicago restaurant can pay \$3,230/month (90%: \$2,860–4,090) at the city's 3-year survival
+  rate; fast food \$2,790, bar/café \$1,700.
+- Chicago 3-year survival (0.57–0.71) is far below Paris (0.79–0.83), so the target the ceiling protects is lower.
+
 **Data-thin cities (Casablanca): conditional card.**
 
 - No probability is shown.
@@ -418,6 +458,9 @@ landowner. In Alonso's (1964) bid-rent model, each land use bids up to the rent 
 Competition between tenants then pushes the rent to the highest bid. Once location advantage is priced into rent,
 survival net of rent no longer depends on location. The variable a founder controls is the rent they agree to.
 
+Chicago ceilings are in USD and use $HR_{loc} = 1$ (section 11, Chicago replication). So within a tenant type they
+are the same in every cell: a city-level figure, not a location signal.
+
 **Founder view.** For a spot, a concept group and a target survival $s^*$:
 
 - Each common-random-number draw $k$ ($N = 2000$, fixed seed) has a rent capacity
@@ -425,7 +468,7 @@ survival net of rent no longer depends on location. The variable a founder contr
   is still open at 36 months.
 - $P(\text{open at 3 y} \mid \text{rent}) = \big[\#\{A_k \ge \text{rent}\}/N\big]^{HR_{loc}}$. This is non-increasing
   in rent.
-- $R^* = \max\{\text{rent} : P \ge s^*\}$, found by bisection to €1. It equals the $\lceil N s^{*1/HR}\rceil$-th
+- $R^* = \max\{\text{rent} : P \ge s^*\}$, found by bisection to 1 unit of the city's currency. It equals the $\lceil N s^{*1/HR}\rceil$-th
   largest $A_k$, so common random numbers make $R^*$ move smoothly with the parameters.
 - The default $s^*$ is the group's official city 3-year survival; 70%, 80% and 90% are also reported.
 - The 90% interval re-solves $R^*$ for each of the 100 bootstrap $(\theta, \sigma, \kappa)$, with $HR_{loc}$ drawn

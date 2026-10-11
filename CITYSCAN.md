@@ -13,7 +13,7 @@ and friends are being edited in parallel; this file is the plan.
 | `cityscan_overture.py` | **offline builder only** (DuckDB in a throwaway venv): adds Overture Places to a pack; never imported by the app |
 | `cityscan_breakeven.py` | break-even **scenario model** (Huff captured demand → covers → revenue → margin vs rent and fixed costs; Monte Carlo, Sobol, tornado); editable city × profile defaults with sources |
 | `cityscan_ablation.py` | **offline**: baselines, ablations and the forward-in-time test behind `ABLATION.md` |
-| `cityscan_calibrate.py` | **offline**: calibrates the break-even runway model on official survival (Paris SIRENE via the survival study's loaders, read-only), bootstrap CIs, spatial and forward validation; `--embed` writes the aggregates |
+| `cityscan_calibrate.py` | **offline**: calibrates the break-even runway model on official survival (Paris SIRENE, Chicago business licences via `--city chicago`; the survival study's loaders, read-only), bootstrap CIs, spatial and forward validation; `--embed` writes the aggregates |
 | `cityscan_dvf.py` | **offline**: capitalisation test. Streams DVF Paris (about 2 MB per year, cached in `/tmp/cityscan-dvf`) and correlates commercial €/m² with cell demand measures. Writes `/tmp/cityscan-dvf-paris.json` |
 | `cityscan_calibration.json` | calibrated aggregates only (θ, σ, κ, bootstrap draws, official 1-/3-year survival per group, covariate scaling); no venue-level data. The app reads it with `json` (stdlib) |
 | `tests/test_cityscan_calibration.py` | calibration recovers known θ, σ and κ on simulated outcomes; conditional break-even covers formula; calibrated card and badge logic |

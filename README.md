@@ -47,13 +47,13 @@ The memo only cites places, tags and numbers returned by Qloo, keeps Qloo result
 Two read-only JSON endpoints serve prebuilt city packs (`packs/`, built offline by `cityscan_publish.py`; method in `METHOD.md`). The server never runs the model and makes no network call for them.
 
 - `GET /scan?city=paris&concept=specialty%20coffee&top=10`: the cells of the city where the concept fits best, with reasons, nearest competitors and a 90% Monte Carlo interval on each score.
-- `GET /scan/unit?city=paris&lat=48.865&lon=2.377`: for one unit, the highest monthly rent each tenant type (restaurant, fast food, bar/café) can pay and still reach the city's official 3-year survival rate, or "not viable at any rent" where even rent-free falls short. This is calibrated on SIRENE for Paris only; other cities say "not calibrated" rather than borrow Paris numbers.
+- `GET /scan/unit?city=paris&lat=48.865&lon=2.377`: for one unit, the highest monthly rent each tenant type (restaurant, fast food, bar/café) can pay and still reach the city's official 3-year survival rate, or "not viable at any rent" where even rent-free falls short. This is calibrated on official survival for Paris (SIRENE, EUR) and Chicago (business licences, USD). Other cities say "not calibrated" rather than borrow these numbers.
 - Each city's map data is first checked against an official business register where one exists: the share of registered food businesses that have a mapped place within 50 m, corrected for matches expected by chance (the same test after shifting the register 300 m). Cities below 0.70 get the reason and no numbers.
   - Paris scores 0.84 (INSEE SIRENE).
   - Chicago scores 0.88 (City of Chicago business licences).
   - Philadelphia scores 0.60 (L&I commercial activity licences), so it is shipped as data-thin.
 - Without a register, the check falls back to the share of food places confirmed by two map sources (below 40% fails, a provisional threshold). Casablanca (18%) is shipped as that case.
-- Chicago scans are live; its rent ceiling is not calibrated yet, so `/scan/unit` says so instead of borrowing Paris numbers.
+- The Chicago calibration replicates the Paris finding: measured location demand does not predict 3-year survival in either city. So the ceiling mostly reflects each tenant type's calibrated revenue against its costs, and Chicago figures are city-level per tenant type rather than a location signal (`METHOD.md`, section 11).
 
 ## Run locally
 

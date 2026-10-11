@@ -1,3 +1,4 @@
+import math
 import unittest
 
 import cityscan_breakeven as be
@@ -61,6 +62,55 @@ class Uncertain(unittest.TestCase):
         card = be.breakeven_card(1.0, [15000, 30000], "casablanca", "cafe", draws=200)
         self.assertEqual(card["label"], "SCENARIO MODEL - not a forecast")
         self.assertEqual([r["rent"] for r in card["by_rent"]], [15000, 30000])
+
+
+class Calibrated(unittest.TestCase):
+    def test_each_city_uses_its_own_currency_register_and_rent_share(self):
+        for city, cur, src, share in (("paris", "EUR", "SIRENE", 0.10), ("chicago", "USD", "Chicago", 0.06)):
+            for profile in ("restaurant", "fast_casual", "cafe"):
+                c = be.calibration(city, profile)
+                self.assertEqual(c["currency"], cur)
+                self.assertIn(src, c["official"]["source"])
+                self.assertEqual(c["rent_share"]["mode"], share)
+                self.assertTrue(0 < c["official"]["s3"] < c["official"]["s1"] < 1)
+                self.assertEqual(len(c["boot"]), 100)
+
+    def test_each_city_was_fitted_under_the_rent_share_it_documents(self):
+        # kappa = 0, so the model's 3-year survival does not depend on location: the embedded theta and sigma must
+        # reproduce the official rate under the city's own rent share, and miss it under the other city's.
+        def s3(c, share):
+            f = be.runway_factor(36, c["buffer_months"])
+            d = be.survival_draws(c["inputs"], 400, rent_share=share)
+            return sum(1 for m, fx, rp, z in d if c["theta"] * (math.exp(c["sigma"] * z) * m - rp) >= fx * f) / 400
+
+        for city, other in (("paris", "chicago"), ("chicago", "paris")):
+            for profile in ("restaurant", "fast_casual", "cafe"):
+                c = be.calibration(city, profile)
+                self.assertEqual(c["kappa"], 0.0)
+                self.assertAlmostEqual(s3(c, be.rent_share(city)), c["official"]["s3"], delta=0.01)
+                self.assertGreater(abs(s3(c, be.rent_share(other)) - c["official"]["s3"]), 0.03)
+
+    def test_location_term_only_where_it_ranks_held_out_venues(self):
+        for city, applied in (("paris", True), ("chicago", False)):
+            c = be.calibration(city, "restaurant")
+            self.assertEqual(c["location_hr"], c["location_c_min"] > 0.5)
+            self.assertEqual(c["location_hr"], applied)
+            busy = be.rent_ceiling_card(1.0, c, z_same=2.0, z_poi=2.0, n=200)
+            self.assertEqual(busy["location_hr"] != 1.0, applied)
+
+    def test_data_thin_and_unknown_cities_are_not_calibrated(self):
+        for city in ("casablanca", "philadelphia", "atlantis"):
+            self.assertIsNone(be.calibration(city, "restaurant"))
+
+    def test_chicago_ceiling_is_a_usd_figure_below_typical_revenue(self):
+        c = be.calibration("chicago", "restaurant")
+        card = be.rent_ceiling_card(1.0, c, n=400)
+        self.assertEqual(card["currency"], "USD")
+        modes = {k: c["inputs"][k]["mode"] for k in ("ticket", "days")}
+        revenue = c["theta"] * modes["ticket"] * modes["days"]
+        city = card["ceilings"]["city"]
+        self.assertEqual(city["target"], c["official"]["s3"])
+        self.assertTrue(0 < city["ci90"][0] <= city["rent_max"] <= city["ci90"][1] < 0.25 * revenue)
 
 
 if __name__ == "__main__":

@@ -114,6 +114,10 @@ def unit(city, lat, lon):
     if not rows:
         return 200, out | {"calibrated": True, "rent_ceiling": None,
                            "note": "No rent ceiling was computed for this cell."}
-    return 200, out | {"calibrated": True, "currency": units["currency"], "rent_ceiling": rows,
-                       "note": ("Highest monthly rent at which each tenant type still reaches its city's official "
-                                "3-year survival rate (Paris: SIRENE). A model, not a forecast.")}
+    src = units.get("survival_source")
+    note = ("Highest monthly rent at which each tenant type still reaches its city's official 3-year survival rate"
+            + (f" ({src})." if src else ".")
+            + ("" if units.get("location_specific", True) else
+               " Same figure in every cell of this city: location did not predict survival in held-out data here.")
+            + " A model, not a forecast.")
+    return 200, out | {"calibrated": True, "currency": units["currency"], "rent_ceiling": rows, "note": note}

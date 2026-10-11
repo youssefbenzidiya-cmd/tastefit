@@ -14,6 +14,7 @@ from unittest import mock
 
 os.environ.pop("QLOO_API_KEY", None)
 import app  # noqa: E402
+import cityscan_breakeven as be  # noqa: E402
 import scan  # noqa: E402
 
 GRID = {"bbox": [10.0, 20.0, 10.02, 20.02], "rows": 2, "cols": 2, "cell_m": 1000, "dlat": 0.01, "dlon": 0.01}
@@ -181,6 +182,26 @@ class ShippedPacks(unittest.TestCase):
             self.assertIn("OpenStreetMap", p["attribution"])
             if not p["quality"]["gate_passed"]:
                 self.assertEqual((p["scans"], p["units"]), ([], None))
+
+    def test_shipped_rent_ceilings_carry_their_calibration_currency(self):
+        scan._load.cache_clear()
+        shipped = {s: scan._load(s)["units"] for s in scan.available()}
+        self.assertEqual({s for s, u in shipped.items() if u}, {"paris", "chicago"})
+        for slug in ("paris", "chicago"):
+            self.assertEqual(shipped[slug]["currency"], be.calibration(slug, "restaurant")["currency"])
+            for row in next(iter(shipped[slug]["cells"].values())):
+                calib = be.calibration(slug, be.GROUP_PROFILE[row["group"]])
+                self.assertEqual(row["target_s3"], calib["official"]["s3"])
+
+    def test_unit_note_cites_the_citys_own_register(self):
+        scan._load.cache_clear()
+        for slug, lat, lon, cites, same_everywhere in (("paris", "48.865", "2.377", "SIRENE", False),
+                                                      ("chicago", "41.884", "-87.632", "Chicago business licences", True)):
+            code, d = scan.unit(slug, lat, lon)
+            self.assertEqual(code, 200)
+            self.assertIn(cites, d["note"])
+            self.assertEqual("Same figure in every cell" in d["note"], same_everywhere)
+        self.assertNotIn("SIRENE", scan.unit("chicago", "41.884", "-87.632")[1]["note"])
 
 
 if __name__ == "__main__":
