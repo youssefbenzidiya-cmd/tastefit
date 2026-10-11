@@ -12,6 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import agent
+import scan
 
 log = logging.getLogger("tastefit")
 ROOT = Path(__file__).parent
@@ -66,6 +67,7 @@ MAX_RUNS = int(os.environ.get("MAX_CONCURRENT_RUNS", "2"))
 run_slots = threading.BoundedSemaphore(MAX_RUNS)
 run_limiter = RateLimiter(int(os.environ.get("RUNS_PER_IP", "6")), 600)
 demo_limiter = RateLimiter(30, 600)
+scan_limiter = RateLimiter(60, 600)
 
 
 def build_label():
@@ -111,6 +113,8 @@ class Handler(BaseHTTPRequestHandler):
             self._run(urllib.parse.parse_qs(url.query))
         elif url.path == "/demo":
             self._demo()
+        elif url.path in ("/scan", "/scan/unit"):
+            self._scan(url.path, urllib.parse.parse_qs(url.query))
         else:
             self._send(*self._page(url.path))
 
@@ -202,6 +206,20 @@ class Handler(BaseHTTPRequestHandler):
             if hasattr(events, "close"):
                 events.close()
             run_slots.release()
+
+    def _scan(self, path, q):
+        if not scan_limiter.allow(self.client_ip()):
+            return self._too_many(RATE_MSG, 600)
+        arg = lambda k: q.get(k, [""])[0]  # noqa: E731
+        try:
+            code, body = (scan.scan(arg("city"), arg("concept"), arg("top")) if path == "/scan"
+                          else scan.unit(arg("city"), arg("lat"), arg("lon")))
+        except Exception:  # noqa: BLE001  details go to the server log, never to the browser
+            log.exception("scan failed")
+            return self._send(500, "text/plain; charset=utf-8", b"internal")
+        if "error" in body:
+            return self._send(code, "text/plain; charset=utf-8", body["error"].encode())
+        self._send(code, "application/json", json.dumps(body, ensure_ascii=False).encode())
 
     def _demo(self):
         if not demo_limiter.allow(self.client_ip()):
