@@ -73,7 +73,7 @@ The API key stays on the server; the browser only receives the streamed steps an
 
 CLI: `python agent.py "Korean fried chicken counter" "Austin, TX"`
 
-Tests: `python -m unittest discover -s tests -t . -v` (159 tests).
+Tests: `python -m unittest discover -s tests -t . -v` (164 tests).
 
 ## Deploy
 
@@ -91,7 +91,7 @@ TasteFit started on GitHub (https://github.com/youssefbenzidiya-cmd/tastefit) wi
 |---|---|---|
 | **Plan** | Issue Planner turns a new issue into a scoped plan with labels and open questions. Issues assigned to GitLab's Duo Developer flow become MRs. | [#15](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/15) (planner), [#5](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/5) (Duo Developer) |
 | **Create** | Duo Developer opens feature MRs; Pipeline Medic opens fix MRs | [!4](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/4), [!1](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/1), [!9](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/9), [!11](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/11) |
-| **Verify** | 159 unit tests with a JUnit report and coverage (74%), `ruff` lint, `flows-lint` of the Duo flow files; Medic checks its fixes with the CI linter | [pipeline 2935652252](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipelines/2935652252) (159 of 159 passed) |
+| **Verify** | Unit tests with a JUnit report and coverage (74%), `ruff` lint, `flows-lint` of the Duo flow files; Medic checks its fixes with the CI linter | [pipeline 2935652252](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipelines/2935652252) (159 of 159 passed) |
 | **Package** | Docker image built, started and health-checked, then pushed to the GitLab container registry; CycloneDX SBOM; cosign keyless signature, verified in CI | [container registry](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/container_registry), jobs [`sbom`](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/jobs/17092440239), [`sign-image`](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/jobs/17092440240), [`verify-signature`](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/jobs/17092440241) |
 | **Secure** | SAST, secret detection, container scanning, dependency scanning, and `cve-gate` (fails on Critical or High container findings that are not in `security/cve-allowlist.txt`); Release Scribe triages findings | [#1](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/1), [#2](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/2), [!3](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/3), [#4](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/4), [`cve-gate` job](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/jobs/17092440238) |
 | **Release** | Render deploy pinned to the commit SHA as the GitLab `production` environment; GitLab Releases with the image digest and SBOM; Release Scribe notes for owners | [environment](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/environments/41337937), [releases](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/releases), [#19](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/19) |
@@ -175,7 +175,7 @@ The baseline is GitHub commit [`8c465c1`](https://github.com/youssefbenzidiya-cm
 
 | | Before (GitHub `8c465c1`) | After (GitLab `main`) |
 |---|---|---|
-| Tests | none | 159 unit tests with JUnit and coverage, plus lint, on every push |
+| Tests | none | 164 unit tests with JUnit and coverage, plus lint, on every push |
 | CI/CD | none | 7-stage pipeline: test, build, security, package, deploy, verify, release |
 | Image | `node:22-slim` (Debian 12), built by the host, never scanned | `node:22-alpine`, built in CI, started and health-checked, signed, with an SBOM |
 | Container findings | not measured (the same Dockerfile later scanned at 338: 5 Critical, 67 High) | 0 on the image GitLab builds from the deployed commit |
