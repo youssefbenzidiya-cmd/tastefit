@@ -1,8 +1,13 @@
-stages: [test, build, security, deploy, verify]
+stages: [test, build, security, package, deploy, verify, release]
 
 workflow:
   auto_cancel:
     on_new_commit: interruptible
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
 
 default:
   interruptible: true
@@ -11,24 +16,70 @@ include:
   - template: Jobs/SAST.gitlab-ci.yml
   - template: Jobs/Secret-Detection.gitlab-ci.yml
   - template: Jobs/Container-Scanning.gitlab-ci.yml
+  - template: Jobs/Dependency-Scanning.v2.gitlab-ci.yml
+    inputs:
+      stage: security
 
 variables:
   LIVE_URL: https://tastefit.onrender.com
   IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
   CS_IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+  # Run the security templates inside merge request pipelines too.
+  AST_ENABLE_MR_PIPELINES: "true"
+  MAX_RESPONSE_SECONDS: "5"
+
+.main-only:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+.production:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $RENDER_DEPLOY_KEY
 
 unit-tests:
   stage: test
   image: python:3.12-slim
   script:
     - python -m unittest discover -s tests -t . -v
+    - pip install --quiet pytest pytest-cov
+    - python -m pytest tests -o 'python_files=test*.py' --junitxml=report.xml --cov=. --cov-report=term --cov-report=xml:coverage.xml
+  coverage: '/TOTAL.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  artifacts:
+    when: always
+    reports:
+      junit: report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
 
 lint:
   stage: test
   image: python:3.12-slim
   script:
     - pip install --quiet ruff
-    - ruff check --select E9,F63,F7,F82 .
+    - ruff check --select E9,F63,F7,F82,F401,F811,B006,B008 .
+
+flows-lint:
+  stage: test
+  image: python:3.12-slim
+  script:
+    - pip install --quiet pyyaml
+    - python ci/flows_lint.py
+
+policy-guard:
+  stage: test
+  image: alpine:3.22
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  variables:
+    GIT_DEPTH: "0"
+  script:
+    - apk add --no-cache git
+    - sh ci/policy_guard.sh
 
 image-build:
   stage: build
@@ -38,10 +89,15 @@ image-build:
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
     - docker build -t "$IMAGE" .
     - docker run --rm "$IMAGE" node node_modules/.bin/qloo --help > /dev/null
+    - docker inspect --format '{{json .Config.Healthcheck}}' "$IMAGE" | grep -q /health
     - docker run -d --name app -p 7860:7860 "$IMAGE"
     - for i in $(seq 1 20); do wget -qO- http://docker:7860/health | grep -q "^ok" && break; sleep 1; done
     - wget -qO- http://docker:7860/health | grep "^ok"
     - docker push "$IMAGE"
+    - echo "IMAGE_DIGEST=$(docker inspect --format '{{index .RepoDigests 0}}' "$IMAGE")" | tee image.env
+  artifacts:
+    reports:
+      dotenv: image.env
 
 semgrep-sast:
   stage: security
@@ -52,6 +108,64 @@ secret_detection:
 container_scanning:
   stage: security
   needs: [image-build]
+
+cve-gate:
+  stage: security
+  image: python:3.12-slim
+  needs:
+    - job: container_scanning
+      artifacts: true
+  script:
+    - python ci/cve_gate.py gl-container-scanning-report.json
+  artifacts:
+    when: always
+    reports:
+      metrics: cve-metrics.txt
+
+sbom:
+  stage: package
+  image:
+    name: aquasec/trivy:0.58.1
+    entrypoint: [""]
+  needs: [image-build]
+  rules: !reference [.main-only, rules]
+  variables:
+    TRIVY_USERNAME: $CI_REGISTRY_USER
+    TRIVY_PASSWORD: $CI_REGISTRY_PASSWORD
+    TRIVY_NO_PROGRESS: "true"
+  script:
+    - trivy image --format cyclonedx --output gl-sbom-image.cdx.json "$IMAGE_DIGEST"
+    - echo "SBOM_JOB_ID=$CI_JOB_ID" > sbom.env
+  artifacts:
+    expire_in: 1 year
+    paths: [gl-sbom-image.cdx.json]
+    reports:
+      cyclonedx: gl-sbom-image.cdx.json
+      dotenv: sbom.env
+
+sign-image:
+  stage: package
+  image: alpine:3.22
+  needs: [image-build]
+  rules: !reference [.main-only, rules]
+  interruptible: false
+  id_tokens:
+    SIGSTORE_ID_TOKEN:
+      aud: sigstore
+  script:
+    - apk add --no-cache cosign
+    - echo "$CI_REGISTRY_PASSWORD" | cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+    - cosign sign --yes -a "com.gitlab.ci.pipeline.url=$CI_PIPELINE_URL" -a "com.gitlab.ci.commit.sha=$CI_COMMIT_SHA" "$IMAGE_DIGEST"
+
+verify-signature:
+  stage: package
+  image: alpine:3.22
+  needs: [image-build, sign-image]
+  rules: !reference [.main-only, rules]
+  script:
+    - apk add --no-cache cosign
+    - echo "$CI_REGISTRY_PASSWORD" | cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+    - cosign verify "$IMAGE_DIGEST" --certificate-identity "${CI_PROJECT_URL}//.gitlab-ci.yml@refs/heads/${CI_COMMIT_REF_NAME}" --certificate-oidc-issuer "$CI_SERVER_URL" > /dev/null
 
 deploy-render:
   stage: deploy
@@ -64,6 +178,7 @@ deploy-render:
   environment:
     name: production
     url: $LIVE_URL
+    deployment_tier: production
   script:
     - curl -fsS -X POST "https://api.render.com/deploy/${RENDER_SERVICE_ID}?key=${RENDER_DEPLOY_KEY}&ref=${CI_COMMIT_SHA}" > /dev/null
 
@@ -75,6 +190,10 @@ smoke-test:
     - if: $CI_PIPELINE_SOURCE == "schedule"
       when: never
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $RENDER_DEPLOY_KEY
+  environment:
+    name: production
+    url: $LIVE_URL
+    action: verify
   script:
     - |
       for i in $(seq 1 40); do
@@ -85,6 +204,14 @@ smoke-test:
       [ "$live" = "ok $CI_COMMIT_SHA" ] || { echo "live is '$live', expected $CI_COMMIT_SHA"; exit 1; }
     - curl -fsS "$LIVE_URL/" | grep "Will your restaurant fit" > /dev/null
     - test "$(curl -s -o /dev/null -w '%{http_code}' "$LIVE_URL/run?concept=x")" = 400
+    - |
+      t_health=$(curl -fsS -o /dev/null -m 30 -w '%{time_total}' "$LIVE_URL/health")
+      t_home=$(curl -fsS -o /dev/null -m 30 -w '%{time_total}' "$LIVE_URL/")
+      printf 'health_response_seconds %s\nhome_response_seconds %s\n' "$t_health" "$t_home" | tee metrics.txt
+  artifacts:
+    when: always
+    reports:
+      metrics: metrics.txt
 
 uptime-check:
   stage: verify
@@ -101,3 +228,41 @@ uptime-check:
       echo "live: $live"
       case "$live" in ok*) ;; *) echo "production is down"; exit 1;; esac
     - test "$(curl -s -o /dev/null -w '%{http_code}' "$LIVE_URL/run?concept=x")" = 400
+    - |
+      t_health=$(curl -fsS -o /dev/null -m 30 -w '%{time_total}' "$LIVE_URL/health")
+      t_home=$(curl -fsS -o /dev/null -m 30 -w '%{time_total}' "$LIVE_URL/")
+      printf 'uptime_up 1\nhealth_response_seconds %s\nhome_response_seconds %s\n' "$t_health" "$t_home" | tee metrics.txt
+      [ "${t_health%%.*}" -lt "$MAX_RESPONSE_SECONDS" ] || { echo "/health took ${t_health}s (limit ${MAX_RESPONSE_SECONDS}s)"; exit 1; }
+  artifacts:
+    when: always
+    reports:
+      metrics: metrics.txt
+
+release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs: [smoke-test, image-build, sbom, verify-signature]
+  interruptible: false
+  rules: !reference [.production, rules]
+  script:
+    - echo "Releasing $CI_COMMIT_SHA ($IMAGE_DIGEST) as v1.$CI_PIPELINE_IID"
+  release:
+    tag_name: v1.$CI_PIPELINE_IID
+    name: TasteFit v1.$CI_PIPELINE_IID
+    ref: $CI_COMMIT_SHA
+    description: |
+      Production release of $CI_COMMIT_SHORT_SHA, live at $LIVE_URL.
+
+      - Pipeline: $CI_PIPELINE_URL (smoke test passed: /health returned "ok $CI_COMMIT_SHA")
+      - Container image (signed with Sigstore keyless, verified in CI): `$IMAGE_DIGEST`
+      - SBOM (CycloneDX): $CI_PROJECT_URL/-/jobs/$SBOM_JOB_ID/artifacts/raw/gl-sbom-image.cdx.json
+
+      Render builds its own image from the same Dockerfile and commit; the signed registry image is the CI-tested build.
+    assets:
+      links:
+        - name: SBOM (CycloneDX JSON)
+          url: $CI_PROJECT_URL/-/jobs/$SBOM_JOB_ID/artifacts/raw/gl-sbom-image.cdx.json
+          link_type: other
+        - name: Pipeline and smoke test
+          url: $CI_PIPELINE_URL
+          link_type: runbook

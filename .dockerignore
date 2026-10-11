@@ -6,4 +6,8 @@ __pycache__
 tests
 skills
 node_modules
+ci
+security
+CODEOWNERS
+.coveragerc
 *.md
