@@ -94,8 +94,9 @@ prompts:
            - summary: starts with the line "Verdict for <sha>: GO", "Verdict for <sha>: ADJUST" or
              "Verdict for <sha>: NO-GO", then a short table of rules 1 to 9 with status
              (pass / finding / not affected) and one line on what to do next.
-             GO = no findings. ADJUST = only non-blocking findings. NO-GO = any rule 1, 2, 3, 8 or 9
-             violation, or wrong maths.
+             GO = no findings. ADJUST = only non-blocking findings. NO-GO = any rule 1, 2, 3, 6, 8 or 9
+             violation, or wrong maths. Rule 6 blocks: founders act on the memo with real money,
+             so an invented address or a dropped Limits section is never non-blocking.
            - verdict: "requested_changes" only for NO-GO, otherwise "reviewed".
            Do not repeat feedback already present in the notes.
            If submit_mr_review fails, post the same summary with create_merge_request_note and list the
