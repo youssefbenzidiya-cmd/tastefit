@@ -213,8 +213,35 @@
   .tools button:hover { background: var(--ink); color: #fff; }
   .tools button.primary { background: var(--ink); color: #fff; }
 
+  /* City Scan */
+  .scan { padding: 72px 0 88px; border-top: 1px solid var(--rule); }
+  .scan-form { display: flex; gap: 16px 20px; align-items: end; flex-wrap: wrap; }
+  .scan-form label { display: grid; gap: 6px; font-size: 14px; font-weight: 600; color: var(--muted); }
+  .scan-form select { font: 500 16px/1.2 var(--body); color: var(--ink); background: var(--card); border: 1px solid var(--rule); border-radius: 12px; padding: 12px 14px; min-width: 200px; }
+  .scan-form .again { margin-top: 0; }
+  .scan-form .again:disabled { opacity: .5; cursor: progress; }
+  #scan-out { margin-top: 32px; }
+  .scan-head { font: 600 14px/1.4 var(--body); color: var(--muted); margin: 0 0 14px; }
+  .cells { list-style: none; margin: 0; padding: 0; border: 1px solid var(--rule); border-radius: 20px; background: var(--card); overflow: hidden; }
+  .cell { padding: 20px 24px; }
+  .cell + .cell { border-top: 1px solid var(--rule); }
+  .cell-head { display: flex; justify-content: space-between; align-items: baseline; gap: 6px 16px; flex-wrap: wrap; }
+  .cell-head h3 { font: 600 20px/1.25 var(--display); margin: 0; letter-spacing: -0.01em; }
+  .cell-head span { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .cell-head b { font: 700 22px/1 var(--display); color: var(--ink); margin-right: 6px; }
+  .cell p { margin: 6px 0 0; font-size: 14px; color: var(--muted); max-width: 72ch; }
+  .cell p.watch { color: var(--nogo); }
+  .cell .again { margin-top: 14px; padding: 10px 16px; font-size: 14px; }
+  .cell .again:disabled { opacity: .5; cursor: progress; }
+  .rent-table { margin-top: 16px; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .rent-table th, .rent-table td { text-align: left; padding: 8px 24px 8px 0; border-bottom: 1px solid var(--rule); vertical-align: baseline; }
+  .rent-table tr:first-child th { color: var(--muted); font-weight: 600; }
+  .rent-table th[scope=row] { font-weight: 500; }
+  .rent-table b { font: 700 18px/1 var(--display); }
+  .scan-attr { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
+
   @media print {
-    .brief, .progress, .plans, footer, .tools, .leaflet-control-zoom, .gm { display: none !important; }
+    .brief, .progress, .plans, .scan, footer, .tools, .leaflet-control-zoom, .gm { display: none !important; }
     body { background: #fff; }
     .stage { padding: 0; }
     .work { display: block; }
@@ -251,7 +278,7 @@
   <div class="wrap">
     <div class="bar">
       <div class="logo"><i></i>TasteFit</div>
-      <nav class="nav"><span>Site check for restaurants and cafés, built on Qloo taste data</span><a href="#plans">Plans</a></nav>
+      <nav class="nav"><span>Site check for restaurants and cafés, built on Qloo taste data</span><a href="#scan">City Scan</a><a href="#plans">Plans</a></nav>
     </div>
 
     <form id="f" autocomplete="off">
@@ -295,7 +322,7 @@
         </div>
       </div>
       <p class="note">You get a go, adjust or no-go call with a fit score from 0 to 100, the evidence behind it, positioning advice and the risks.
-        It reads aggregate taste only: it does not know rents, foot traffic or any individual's data. Analyses take one to two minutes.
+        The taste check reads aggregate taste only: it does not know foot traffic or any individual's data (rent ceilings are in the City Scan below). Analyses take one to two minutes.
         Want to see the output first? <a href="#" data-action="sample">Open a sample report</a> built from synthetic data.</p>
     </div>
 
@@ -309,6 +336,35 @@
 
   </div>
 </main>
+
+<section class="scan" id="scan">
+  <div class="wrap">
+    <div class="plans-head">
+      <h2>City Scan and rent ceiling</h2>
+      <p>Prebuilt from open map data, separate from the taste check above. A model, not a forecast.</p>
+    </div>
+    <form class="scan-form" id="scan-form" autocomplete="off">
+      <label>City
+        <select name="city">
+          <option value="paris">Paris</option>
+          <option value="chicago">Chicago</option>
+          <option value="philadelphia">Philadelphia</option>
+          <option value="casablanca">Casablanca</option>
+        </select></label>
+      <label>Concept
+        <select name="concept">
+          <option>specialty coffee</option>
+          <option>burger</option>
+          <option>pizza</option>
+          <option>French bistro</option>
+          <option>sushi</option>
+          <option>brunch</option>
+        </select></label>
+      <button class="again" type="submit">Scan the city</button>
+    </form>
+    <div id="scan-out" aria-live="polite"></div>
+  </div>
+</section>
 
 <section class="plans" id="plans">
   <div class="wrap">
@@ -547,6 +603,7 @@ document.addEventListener('click', e => {
   e.preventDefault();
   const action = el.dataset.action;
   if (action === 'sample') startSample();
+  else if (action === 'rent') rentCeiling(el);
   else if (action === 'print') window.print();
   else if (action === 'new-location') { f.location.value = ''; toTop(f.location); }
   else if (action === 'new-concept') toTop(f.concept);
@@ -654,6 +711,74 @@ function startSample() {
   begin();
   stream('/demo');
 }
+
+const scanForm = $('#scan-form'), scanOut = $('#scan-out');
+let scanData = null, scanSeq = 0;
+
+async function getJSON(url) {
+  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (res.ok) return res.json();
+  const text = (await res.text()).trim();
+  throw new Error(res.status === 429 ? 'Too many scans from this connection. Try again in a few minutes.'
+    : res.status < 500 && text ? text : 'The scan failed on our side. Try again.');
+}
+
+const scanError = e => e instanceof TypeError ? 'Could not reach TasteFit. Check your connection and try again.' : e.message;
+const scanAttr = d => d.attribution ? '<p class="scan-attr">' + esc(d.attribution) + '</p>' : '';
+
+function scanHTML(d) {
+  if (d.data_thin) return '<div class="notice"><h3>Not enough map data for ' + esc(d.city) + '</h3><p>' + esc(d.reason) + '</p></div>' + scanAttr(d);
+  const cells = d.top.map((t, i) => {
+    const plain = s => s && s.replace(/^[+-]?\d+(\.\d+)?:\s*/, "");
+    const o = t.opportunity || {}, why = plain((t.reasons_en || [])[0]), watch = plain((t.watch_out_en || [])[0]);
+    return '<li class="cell"><div class="cell-head"><h3>' + esc(t.neighborhood || 'Cell ' + t.id) + '</h3>' +
+      '<span><b>' + esc(o.point) + '</b>opportunity' + (o.lcb != null ? ', 90% interval ' + esc(o.lcb) + ' to ' + esc(o.ucb) : '') + '</span></div>' +
+      (why ? '<p>' + esc(why) + '</p>' : '') + (watch ? '<p class="watch">Watch out: ' + esc(watch) + '</p>' : '') +
+      '<button type="button" class="again" data-action="rent" data-i="' + i + '">Rent ceiling here</button><div class="rent" hidden></div></li>';
+  }).join('');
+  return '<p class="scan-head">Top ' + d.top.length + ' areas for ' + esc(d.label) + ' in ' + esc(d.city) + ', opportunity out of 100</p>' +
+    '<ol class="cells">' + cells + '</ol>' + scanAttr(d);
+}
+
+function rentHTML(u) {
+  if (u.data_thin) return '<p class="scan-attr">' + esc(u.reason) + '</p>';
+  if (!u.rent_ceiling) return '<p class="scan-attr">' + esc(u.note) + '</p>';
+  const money = new Intl.NumberFormat('en', { style: 'currency', currency: u.currency, maximumFractionDigits: 0 });
+  return '<table class="rent-table"><tr><th>Tenant type</th><th>Max monthly rent</th><th>90% interval</th></tr>' +
+    u.rent_ceiling.map(r => '<tr><th scope="row">' + esc(r.label_en) + '</th>' + (r.rent_max == null
+      ? '<td colspan="2">' + esc(r.note || 'Not viable at any rent here.') + '</td>'
+      : '<td><b>' + esc(money.format(r.rent_max)) + '</b></td><td>' + (r.ci90 ? esc(money.format(r.ci90[0])) + ' to ' + esc(money.format(r.ci90[1])) : '–') + '</td>') + '</tr>').join('') +
+    '</table><p class="scan-attr">' + esc(u.note) + '</p>';
+}
+
+async function rentCeiling(btn) {
+  const t = scanData.top[+btn.dataset.i], box = btn.nextElementSibling;
+  btn.disabled = true; box.hidden = false;
+  box.innerHTML = '<div class="skeleton" style="width:60%"></div>';
+  try {
+    box.innerHTML = rentHTML(await getJSON('/scan/unit?' + new URLSearchParams({ city: scanData.slug, lat: t.centroid.lat, lon: t.centroid.lon })));
+  } catch (e) {
+    box.innerHTML = '<p class="scan-attr">' + esc(scanError(e)) + '</p>';
+  }
+  btn.disabled = false;
+}
+
+scanForm.onsubmit = async e => {
+  e.preventDefault();
+  const city = scanForm.city.value, mine = ++scanSeq, btn = scanForm.querySelector('button');
+  btn.disabled = true;
+  scanOut.innerHTML = '<div class="skeleton" style="width:55%"></div><div class="skeleton" style="width:85%"></div>';
+  try {
+    const d = await getJSON('/scan?' + new URLSearchParams({ city, concept: scanForm.concept.value, top: 5 }));
+    if (mine !== scanSeq) return;
+    scanData = { ...d, slug: city };
+    scanOut.innerHTML = scanHTML(d);
+  } catch (err) {
+    if (mine === scanSeq) scanOut.innerHTML = '<div class="notice"><h3>The scan did not load</h3><p>' + esc(scanError(err)) + '</p></div>';
+  } finally {
+    if (mine === scanSeq) btn.disabled = false;
+  }
+};
 
 {
   const q = new URLSearchParams(location.search);

@@ -73,37 +73,105 @@ The API key stays on the server; the browser only receives the streamed steps an
 
 CLI: `python agent.py "Korean fried chicken counter" "Austin, TX"`
 
+Tests: `python -m unittest discover -s tests -t . -v` (159 tests).
+
 ## Deploy
 
-Deployed on Render (free Docker web service) from the `Dockerfile`; set the environment variables above in the Render dashboard.
+Deployed on Render (free Docker web service) from the `Dockerfile`; set the environment variables above in the Render dashboard. On GitLab, CI triggers the deploy with the exact commit SHA (see below).
 
 ## Agentic DevSecOps on GitLab
 
-TasteFit started on GitHub (https://github.com/youssefbenzidiya-cmd/tastefit) with no CI, no tests and manual deploys. On GitLab, every commit goes through a pipeline and three GitLab Duo Agent Platform flows look after the project without being asked.
+TasteFit started on GitHub (https://github.com/youssefbenzidiya-cmd/tastefit) with no CI, no tests and no post-deploy check. On GitLab, every commit goes through a 7-stage pipeline, and four custom GitLab Duo Agent Platform flows plan, fix, review and release the project when events happen, without being asked. A person merges every change.
 
-**Pipeline** (`.gitlab-ci.yml`): `test` (unit tests, lint) → `build` (Docker image pushed to the GitLab container registry) → `security` (SAST, secret detection, container scanning of that image) → `deploy` (Render deploy hook pinned to the exact commit) → `verify` (smoke test polls `/health` until it returns `ok <commit sha>`, then checks the page and the input validation). A daily scheduled pipeline rebuilds and rescans the image for newly published CVEs and runs an uptime check on production, so an outage or a new vulnerability also wakes Pipeline Medic.
+**Pipeline** ([`.gitlab-ci.yml`](.gitlab-ci.yml)): `test` → `build` → `security` → `package` → `deploy` → `verify` → `release`. On the latest `main` pipeline ([2935652252](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipelines/2935652252)) all 15 jobs passed: `unit-tests`, `lint`, `flows-lint`, `image-build`, `semgrep-sast`, `secret_detection`, `dependency-scanning`, `container_scanning`, `cve-gate`, `sbom`, `sign-image`, `verify-signature`, `deploy-render`, `smoke-test`, `release`. A daily schedule (06:00 UTC) rebuilds and rescans the image and checks that production is up.
 
-**Flows** (definitions in `.gitlab/duo/flows/`, rules in `AGENTS.md` and `skills/tastefit-guardrails/`):
+### GitLab stages covered
+
+| Stage | What automates it | Evidence |
+|---|---|---|
+| **Plan** | Issue Planner turns a new issue into a scoped plan with labels and open questions. Issues assigned to GitLab's Duo Developer flow become MRs. | [#15](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/15) (planner), [#5](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/5) (Duo Developer) |
+| **Create** | Duo Developer opens feature MRs; Pipeline Medic opens fix MRs | [!4](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/4), [!1](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/1), [!9](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/9), [!11](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/11) |
+| **Verify** | 159 unit tests with a JUnit report and coverage (74%), `ruff` lint, `flows-lint` of the Duo flow files; Medic checks its fixes with the CI linter | [pipeline 2935652252](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipelines/2935652252) (159 of 159 passed) |
+| **Package** | Docker image built, started and health-checked, then pushed to the GitLab container registry; CycloneDX SBOM; cosign keyless signature, verified in CI | [container registry](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/container_registry), jobs [`sbom`](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/jobs/17092440239), [`sign-image`](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/jobs/17092440240), [`verify-signature`](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/jobs/17092440241) |
+| **Secure** | SAST, secret detection, container scanning, dependency scanning, and `cve-gate` (fails on Critical or High container findings that are not in `security/cve-allowlist.txt`); Release Scribe triages findings | [#1](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/1), [#2](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/2), [!3](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/3), [#4](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/4), [`cve-gate` job](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/jobs/17092440238) |
+| **Release** | Render deploy pinned to the commit SHA as the GitLab `production` environment; GitLab Releases with the image digest and SBOM; Release Scribe notes for owners | [environment](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/environments/41337937), [releases](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/releases), [#19](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/19) |
+| **Configure** | Environment-based config (no secrets in code), CI/CD variables for deploy credentials, Dockerfile `HEALTHCHECK` checked by `image-build` | [`.gitlab-ci.yml`](.gitlab-ci.yml), [`Dockerfile`](Dockerfile) |
+| **Monitor** | Smoke test waits until `/health` returns the deployed SHA; daily uptime check with response-time metrics | [pipeline 2934713922](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipelines/2934713922), [scheduled pipeline 2935294308](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipelines/2935294308) |
+| **Govern** | 9 rules in [`AGENTS.md`](AGENTS.md) enforced by Domain Reviewer; `CODEOWNERS`; `policy-guard` job fails an agent branch (`medic/`, `duo/`) that edits agent policy, CI scripts or the CVE allowlist | [!5](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/5) (NO-GO under rule 8); `policy-guard` passed on the MR pipelines of [!8](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/8), [!12](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/12) and [!14](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/14) |
+
+### Flows
+
+Definitions are in [`.gitlab/duo/flows/`](.gitlab/duo/flows); rules are in [`AGENTS.md`](AGENTS.md) and `skills/tastefit-guardrails/`. Each flow runs as its own service account with an explicit toolset. No flow has a merge tool.
 
 | Flow | Runs when | What it does |
 |---|---|---|
-| Pipeline Medic | any pipeline fails | Reads the failing job logs, classifies the failure (code, config, infra), and opens a minimal fix merge request validated with the CI linter, or a diagnosis issue. It never touches its own `medic/` branches twice, so it cannot loop. |
-| Domain Reviewer | a merge request is created, or the bot is assigned as reviewer | Checks the rules a generic reviewer cannot know: secrets, Qloo data terms, privacy, Nominatim policy, site-maths tests, memo honesty, protected security jobs. Answers GO / ADJUST / NO-GO, like TasteFit itself. |
-| Release Scribe | a pipeline on `main` passes | Writes release notes for restaurant owners, with deployment proof (the smoke-tested commit SHA) and a security summary across all three scanners; opens issues for High or Critical findings. |
+| Issue Planner | an issue is created | Rewrites the issue as a scoped plan with acceptance criteria, sets labels, and lists the questions a person must answer before work starts. |
+| Duo Developer (GitLab foundational flow) | an issue is assigned to it | Implements the issue and opens a merge request. |
+| Pipeline Medic | any pipeline fails | Reads the failing job logs, classifies the failure, and opens a minimal fix MR on `medic/<pipeline id>`, checked with the CI linter. It looks for an existing MR first and adds a note instead of a duplicate. On `medic/` and `duo/` refs it never opens a fix, so it cannot loop. The definition splits the work between a `log_analyst` and a `fixer` subagent. |
+| Domain Reviewer | a merge request is created, or the bot is assigned as reviewer | Checks the 9 product rules a generic reviewer cannot know (secrets, Qloo data terms, privacy, Nominatim policy, site-maths tests, memo honesty, stdlib-only server, protected security jobs, agent governance), posts inline suggestions, and answers GO / ADJUST / NO-GO, like TasteFit itself. |
+| Release Scribe | a pipeline on `main` passes | Writes release notes for restaurant owners with deployment proof (deployed SHA, smoke-test job) and a security summary across all scanners. Opens a grouped issue for High or Critical findings, and posts a note on issues the release shipped. |
 
-| | Before (GitHub) | After (GitLab) |
+### Live proof
+
+Every row links to a public page in this project.
+
+| Claim | Evidence |
+|---|---|
+| The smoke test went red after a good deploy at 22:16:08 UTC. It was a false negative: `curl` exit 23, caused by `grep -q` closing the pipe under `pipefail`. | [pipeline 2934704707](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipelines/2934704707), [failed job 17087586018](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/jobs/17087586018) |
+| Pipeline Medic opened a one-line fix MR at 22:17:47, without being asked, and validated it with the CI linter | [!1](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/1), commit [`4d905e3e`](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/commit/4d905e3efa648353e79fd1fdbfd727aac47cac05) |
+| A second Medic run found that MR and added a note instead of a duplicate | [!1](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/1) (note at 22:18:15) |
+| Domain Reviewer posted GO with its rule table at 22:19:51; a person merged at 22:20:38; the next pipeline deployed and passed | [!1](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/1), [pipeline 2934713922](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipelines/2934713922) |
+| Medic fixed a failed `release` job (shell-evaluated backticks in the release description) | [pipeline 2934914083](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipelines/2934914083), [!9](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/9) |
+| Medic fixed a `lint` failure on `main`; the next pipeline passed all 15 jobs and published release v1.86 | [pipeline 2935452861](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipelines/2935452861), [!11](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/11), [pipeline 2935462422](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipelines/2935462422), [v1.86](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/releases/v1.86) |
+| Medic also fixed a `lint` failure on a research branch | [!10](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/10) |
+| Domain Reviewer answered NO-GO to our own change that skipped security jobs on docs-only commits (rule 8), then GO after rework | [!5](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/5) |
+| Domain Reviewer answered NO-GO on a real bug: the Chicago rent ceiling was fitted under the Paris rent share (5-10-15%) instead of Chicago's (4-6-10%). After the fix the restaurant ceiling went from $5,970 to $3,230. Two ADJUST rounds followed (a test that only checked metadata, then docs), then GO. | [!14](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/14) |
+| Plan to production: Issue Planner planned [#15](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/15) within 90 seconds of its creation (acceptance criteria, test plan, AGENTS.md check) and asked for decisions; a person answered and implemented it in [!12](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/12); Domain Reviewer answered ADJUST (5 findings), then GO after the fix; merged, deployed, released as v1.96, and Release Scribe noted the shipment on #15 | [#15](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/15), [!12](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/12), [pipeline 2935534874](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipelines/2935534874), [v1.96](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/releases/v1.96) |
+| Issue assigned to Duo Developer became an MR with three new tests, got GO, and the live footer showed the new build | [#5](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/5), [!4](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/4), release notes [#8](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/8) |
+| Release Scribe's first notes reported 338 container findings (5 Critical, 67 High) and it filed a grouped security issue | [#1](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/1), [#2](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/2) |
+| Alpine rebuild: 0 container findings on the image GitLab builds from the deployed commit, still 0 today | [!3](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/3), [#4](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/4), [#19](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/19) |
+| Image 141 MB → 100 MB compressed (−29%) | [container registry](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/container_registry) (tags `c1605d83` vs `ac836f36`) |
+| Six GitLab Releases so far (v1.58 to v1.120), each with the deployed commit, the signed image digest and an SBOM link | [releases](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/releases), e.g. [v1.120](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/releases/v1.120) |
+| Daily scheduled rescan and uptime check | [schedules](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipeline_schedules), [scheduled pipeline 2935294308](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipelines/2935294308) |
+| Production environment with per-commit deployments | [environment `production`](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/environments/41337937) |
+
+**The loop, measured.** Time from the failed job to the Medic fix MR, on every real failure so far:
+
+| Failure | Job failed (UTC) | Fix MR opened | Delay | Review | Merged by a person |
+|---|---|---|---|---|---|
+| smoke-test on `main` | 22:16:08 | [!1](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/1) 22:17:47 | 1 min 39 s | GO 22:19:51 | 22:20:38 |
+| release on `main` | 01:08:07 | [!9](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/9) 01:10:03 | 1 min 56 s | GO 01:12:46 | 01:12:51 |
+| lint on a research branch | 08:20:41 | [!10](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/10) 08:22:29 | 1 min 48 s | GO 08:35:15 | 08:37:10 |
+| lint on `main` | 08:29:29 | [!11](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/11) 08:30:39 | 1 min 10 s | GO 08:35:13 | 08:37:06 |
+
+Review times depend on when a person assigned the reviewer (see Limits).
+
+### Before and after
+
+The baseline is GitHub commit [`8c465c1`](https://github.com/youssefbenzidiya-cmd/tastefit/commit/8c465c1) (2026-10-10, 19:08 UTC), the last commit before any GitLab work. The next commit, [`fda392a`](https://github.com/youssefbenzidiya-cmd/tastefit/commit/fda392a) (19:22 UTC), added the first tests, `/health` and a first `.gitlab-ci.yml`.
+
+| | Before (GitHub `8c465c1`) | After (GitLab `main`) |
 |---|---|---|
-| Tests | none | 9 unit tests on every push |
-| Security | none | SAST, secret detection, container scanning |
-| Container CVEs | unknown | 338 (5 Critical, 67 High) found by the first scan, flagged by Release Scribe, fixed by an Alpine rebuild: 0 in production ([#2](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/2), [!3](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/3), [#4](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/4)) |
-| Deploy | manual | exact commit, verified live by SHA |
-| Broken pipeline | noticed by chance | diagnosed, fix MR opened and reviewed in under 4 minutes ([pipeline](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipelines/2934704707) smoke test failed 22:16:08 UTC, [fix MR](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/1) opened 22:17:47, review posted 22:19:51) |
-| Review | none | product-rule review on every merge request |
-| Release notes | none | written for owners on every production deploy |
+| Tests | none | 159 unit tests with JUnit and coverage, plus lint, on every push |
+| CI/CD | none | 7-stage pipeline: test, build, security, package, deploy, verify, release |
+| Image | `node:22-slim` (Debian 12), built by the host, never scanned | `node:22-alpine`, built in CI, started and health-checked, signed, with an SBOM |
+| Container findings | not measured (the same Dockerfile later scanned at 338: 5 Critical, 67 High) | 0 on the image GitLab builds from the deployed commit |
+| Image size | 141 MB compressed (same Dockerfile, measured in the GitLab registry) | 100 MB (−29%) |
+| Deploy | Render web service, no post-deploy check | exact commit, verified live by `/health` returning that SHA |
+| Releases | none | GitLab Releases with image digest and SBOM, plus owner-facing notes from Release Scribe |
+| Broken pipeline | noticed by chance | fix MR opened by Pipeline Medic in under 2 minutes, 4 times so far |
+| Review | none | Domain Reviewer on every MR, 9 product rules |
+| Agents | none | Issue Planner, Pipeline Medic, Domain Reviewer, Release Scribe, plus GitLab's Duo Developer |
 
-Features start as issues assigned to GitLab's foundational Duo Developer flow. For example, [#5](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/5) became [!4](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/4), and the build id is now in the live page footer.
+### Limits
 
-The human stays the supervisor: agents open merge requests and issues, a person merges.
+- **A person merges.** No flow has a merge tool, and all 15 merge requests so far were merged by a person after a Domain Reviewer verdict. A fix waits for a human.
+- **Bot-created MRs** do not fire the MR-created trigger, so a person assigns Domain Reviewer on them (as on !1, !9, !10 and !11).
+- **Scanned image vs deployed image.** Render builds its own image from the same Dockerfile at the same commit. We scan and sign the image GitLab builds from that commit, not the bytes Render runs.
+- **`cve-gate` covers container findings only.** Dependency scanning reports 4 High findings (`undici`, `brace-expansion`), tracked in [#12](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/12), and they do not fail the pipeline.
+- **Stale Vulnerability Report records.** The report still lists 72 Critical/High container records for the superseded Debian image `c1605d83` ([#9](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/9)). Current scans of the Alpine image show 0.
+- **Three Medium SAST findings** (SSRF, CWE-918, at `cityscan.py:1418`, `geo.py:87` and `agent.py:110`) appear in every release note and are not yet triaged.
+- **Tool gaps.** `create_vulnerability_issue` rejected our calls, so Release Scribe groups findings in one issue.
 
 ## License
 
