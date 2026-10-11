@@ -1,0 +1,16 @@
+# Ownership of the agent policy and the delivery pipeline.
+# Required Code Owner approval is a GitLab Premium feature; on Free this file records ownership
+# and the policy-guard CI job blocks agent branches (medic/*, duo/*) from editing these paths.
+
+[Agent policy]
+/AGENTS.md @youssefbenzidiya-cmd
+/.gitlab/duo/ @youssefbenzidiya-cmd
+/.agents/ @youssefbenzidiya-cmd
+/skills/ @youssefbenzidiya-cmd
+/CODEOWNERS @youssefbenzidiya-cmd
+
+[Delivery pipeline]
+/.gitlab-ci.yml @youssefbenzidiya-cmd
+/Dockerfile @youssefbenzidiya-cmd
+/ci/ @youssefbenzidiya-cmd
+/security/ @youssefbenzidiya-cmd
