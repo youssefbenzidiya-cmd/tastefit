@@ -79,6 +79,8 @@ Tests: `python -m unittest discover -s tests -t . -v` (164 tests).
 
 Deployed on Render (free Docker web service) from the `Dockerfile`; set the environment variables above in the Render dashboard. On GitLab, CI triggers the deploy with the exact commit SHA (see below).
 
+**Google Cloud:** also live on Cloud Run at https://tastefit-776637567140.us-central1.run.app (us-central1, 0 to 1 instances, free tier). The `deploy-gcp` job copies the signed, scanned CI image by digest to Artifact Registry and deploys that digest, authenticated by Workload Identity Federation (no stored key); `smoke-gcp` checks that `/health` returns the commit SHA.
+
 ## Agentic DevSecOps on GitLab
 
 TasteFit started on GitHub (https://github.com/youssefbenzidiya-cmd/tastefit) with no CI, no tests and no post-deploy check. On GitLab, every commit goes through a 7-stage pipeline, and four custom GitLab Duo Agent Platform flows plan, fix, review and release the project when events happen, without being asked. A person merges every change.
