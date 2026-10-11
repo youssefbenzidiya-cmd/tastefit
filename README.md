@@ -146,6 +146,29 @@ Every row links to a public page in this project.
 
 Review times depend on when a person assigned the reviewer (see Limits).
 
+### Seeded benchmark
+
+On 11 Oct 2026 we opened eight merge requests through the API. Each had one planted problem, and none had a hint in its title or description. We recorded what the agents did without stepping in. All eight are now closed, unmerged.
+
+| Planted problem | MR | Expected | Domain Reviewer (time to verdict) | Pipeline / Medic |
+|---|---|---|---|---|
+| Harmless copy edit | [!16](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/16) | GO | GO (47 s) | green |
+| Slug limit that breaks unit tests | [!17](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/17) | red pipeline, fix MR | ADJUST (54 s) | unit-tests red; Medic fix [!25](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/25) restores the limit |
+| Hardcoded (fake) API key | [!18](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/18) | NO-GO (rule 1) | NO-GO (51 s) | unit-tests red; Medic fix [!24](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/24) removes the key and restores the guard |
+| Qloo responses written to disk | [!19](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/19) | NO-GO (rule 2) | NO-GO (54 s) | green |
+| Secret detection disabled | [!20](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/20) | NO-GO (rule 8) | NO-GO (55 s) | green |
+| `geo.py` default changed, no test | [!21](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/21) | ADJUST (rule 5) | NO-GO (53 s) | unit-tests red; Medic fix [!26](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/26) restores the default |
+| Memo told to give an exact street address | [!22](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/22) | NO-GO (rule 6) | ADJUST (51 s), then NO-GO under Reviewer 1.2.0 | green |
+| `duo/` branch edits `AGENTS.md` | [!23](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/23) | policy-guard fails, NO-GO (rule 9) | NO-GO (57 s) | policy-guard red; no Medic fix (agents may not touch policy) |
+
+What it shows:
+- All seven planted problems were flagged (six NO-GO, one ADJUST), and the safe change got a GO. Every verdict arrived within a minute.
+- All three Medic fixes were correct and minimal. Each restored the guard or default the change broke. None edited a test to make it pass.
+- **The benchmark found a policy gap, and a human closed it.** In !22 the Reviewer found the rule 6 problem but answered ADJUST, exactly as its rubric said: only rules 1, 2, 3, 8 and 9 were blocking. We made rule 6 blocking in [!27](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/merge_requests/27), a human branch that the Reviewer itself reviewed, GO. We published the flow as 1.2.0 and re-ran it on !22. The verdict became NO-GO, and the Reviewer noted that its earlier ADJUST was too lenient.
+- Limits:
+  - Secret detection did not flag the fake key; it has no rule for its format. The Reviewer and the unit tests caught it.
+  - On !21 the Reviewer was stricter than expected, because the change also broke the demo-report tests.
+
 ### Before and after
 
 The baseline is GitHub commit [`8c465c1`](https://github.com/youssefbenzidiya-cmd/tastefit/commit/8c465c1) (2026-10-10, 19:08 UTC), the last commit before any GitLab work. The next commit, [`fda392a`](https://github.com/youssefbenzidiya-cmd/tastefit/commit/fda392a) (19:22 UTC), added the first tests, `/health` and a first `.gitlab-ci.yml`.
@@ -165,7 +188,7 @@ The baseline is GitHub commit [`8c465c1`](https://github.com/youssefbenzidiya-cm
 
 ### Limits
 
-- **A person merges.** No flow has a merge tool, and all 15 merge requests so far were merged by a person after a Domain Reviewer verdict. A fix waits for a human.
+- **A person merges.** No flow has a merge tool, and every merged merge request so far was merged by a person after a Domain Reviewer verdict. A fix waits for a human.
 - **Bot-created MRs** do not fire the MR-created trigger, so a person assigns Domain Reviewer on them (as on !1, !9, !10 and !11).
 - **Scanned image vs deployed image.** Render builds its own image from the same Dockerfile at the same commit. We scan and sign the image GitLab builds from that commit, not the bytes Render runs.
 - **`cve-gate` covers container findings only.** Dependency scanning reports 4 High findings (`undici`, `brace-expansion`), tracked in [#12](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/work_items/12), and they do not fail the pipeline.
