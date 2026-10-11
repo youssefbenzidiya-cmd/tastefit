@@ -37,6 +37,8 @@ ASSUME = "TasteFit assumption, replace with local data"
 _SMIG = ("staff at 1-2x the Moroccan minimum wage (SMIG, roughly 3,000-3,500 MAD/month gross in 2024-25) "
          "plus employer charges; " + ASSUME)
 _SMIC = "staff at about the French SMIC (~1,800 EUR/month gross in 2025) plus ~45% employer charges; " + ASSUME
+_CHI_MW = ("staff paid around the Chicago minimum wage ($17.05/h from 1 July 2026, tipped $12.96; City of Chicago "
+           "Office of Labor Standards) plus ~10% employer payroll taxes, sized at ~30% of sales; " + ASSUME)
 _COGS = "rule of thumb in restaurant cost accounting: food and drink cost 25-35% of sales; " + ASSUME
 
 
@@ -64,7 +66,7 @@ def _profile(currency, covers, ticket, days, cogs, other_var, staff, other_fixed
                        "capex": tri(*capex, "fit-out and equipment; " + ASSUME)}}
 
 
-_CASA_DAYS, _PARIS_DAYS = (26, 28, 30), (24, 26, 29)
+_CASA_DAYS, _PARIS_DAYS, _US_DAYS = (26, 28, 30), (24, 26, 29), (26, 29, 30)
 DEFAULTS = {
     ("casablanca", "cafe"): _profile("MAD", (50, 100, 200), (30, 37, 45), _CASA_DAYS, (.25, .30, .38),
                                      (.02, .04, .07), (15000, 22000, 32000), (4000, 7000, 12000),
@@ -94,6 +96,15 @@ DEFAULTS = {
     ("paris", "fast_casual"): _profile("EUR", (100, 180, 300), (10, 13, 17), _PARIS_DAYS, (.28, .32, .38),
                                        (.03, .08, .15), (12000, 18000, 26000), (3000, 4500, 7000),
                                        (120000, 220000, 380000), staff_src=_SMIC),
+    ("chicago", "cafe"): _profile("USD", (100, 180, 320), (5, 7, 10), _US_DAYS, (.25, .30, .35),
+                                  (.03, .04, .06), (8000, 12000, 18000), (2000, 3500, 6000),
+                                  (90000, 180000, 320000), staff_src=_CHI_MW),
+    ("chicago", "restaurant"): _profile("USD", (50, 90, 150), (20, 30, 45), (25, 27, 30), (.28, .32, .36),
+                                        (.03, .05, .09), (18000, 26000, 38000), (4000, 6500, 10000),
+                                        (250000, 450000, 800000), staff_src=_CHI_MW),
+    ("chicago", "fast_casual"): _profile("USD", (100, 180, 300), (11, 14, 18), _US_DAYS, (.28, .31, .36),
+                                         (.04, .09, .16), (14000, 20000, 29000), (3000, 5000, 8000),
+                                         (150000, 280000, 450000), staff_src=_CHI_MW),
 }
 
 
@@ -192,6 +203,14 @@ BUFFER_MONTHS = 6
 RENT_SHARE = tri(0.05, 0.10, 0.15, "rent-to-revenue of French restaurants: 8-12% typical, 10-15% in Paris, up to "
                                    "15% for premium sites (L'Hotellerie-Restauration; ProRestauration 2026; Almo); "
                                    "INSEE Esane 2023 aggregate 5.1%")
+RENT_SHARES = {"chicago": tri(0.04, 0.06, 0.10, "occupancy cost-to-sales of US restaurants: median 6.0% in urban "
+                                                "areas, full- and limited-service (National Restaurant Association, "
+                                                "Restaurant Operations Data Abstract 2025, 2024 data); 6-10% rule "
+                                                "of thumb, 10% excessive (Restaurant Resource Group)")}
+
+
+def rent_share(city_key):
+    return RENT_SHARES.get(city_key, RENT_SHARE)
 SURVIVAL_GROUP = {"restaurant": "restaurant", "fine_dining": "restaurant", "healthy": "restaurant",
                   "fast_casual": "fast_food", "cafe": "bar_cafe", "bar": "bar_cafe"}
 GROUP_PROFILE = {"restaurant": "restaurant", "fast_food": "fast_casual", "bar_cafe": "cafe"}
@@ -223,7 +242,7 @@ def calibration(city_key, profile):
     d = defaults(city_key, GROUP_PROFILE.get(group, ""))
     if not c or d is None:
         return None
-    return dict(c, inputs=d["inputs"], currency=d["currency"],
+    return dict(c, inputs=d["inputs"], currency=d["currency"], rent_share=rent_share(city_key),
                 buffer_months=_calibration["_provenance"]["buffer_months"])
 
 
@@ -422,7 +441,7 @@ def calibrated_card(rel_demand, rents, calib, z_same=0.0, z_poi=0.0, n=1000, see
                            f"(1 an {100 * base1:.0f} % ; source officielle {calib['official']['source']}, "
                            f"n={calib['official']['n']})",
             "city_s3": base3, "city_s1": base1, "location_hr": round(hr, 3),
-            "typical_rent": round(RENT_SHARE["mode"] * th0 * max(rel_demand, 1e-9) ** k0 * modes["ticket"] *
+            "typical_rent": round(calib.get("rent_share", RENT_SHARE)["mode"] * th0 * max(rel_demand, 1e-9) ** k0 * modes["ticket"] *
                                   modes["days"], -2),
             "z": {"same_concept_150m": round(z_same, 2), "poi_200m": round(z_poi, 2)},
             "theta": round(calib["theta"], 1), "theta_ci90": calib["theta_ci90"], "sigma": round(calib["sigma"], 3),

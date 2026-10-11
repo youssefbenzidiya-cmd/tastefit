@@ -4,7 +4,9 @@
 
 The app never runs the model. This script ranks cells for each concept and, for calibrated cities, computes the
 landlord view (rent ceiling per tenant group) for every study cell, so /scan/unit is a lookup.
-A city whose food-place data confidence is below GATE_MIN is published as data-thin: no rankings, no rent numbers.
+A city whose map data fail the quality gate is published as data-thin: no rankings, no rent numbers. With an
+official register (--ground-truth from cityscan_groundtruth.py) the gate is chance-corrected recall >= GT_MIN;
+without one it falls back to two-source food-place confidence >= GATE_MIN.
 """
 import argparse
 import gzip
@@ -16,9 +18,10 @@ from datetime import datetime, timezone
 import cityscan as cs
 import cityscan_breakeven as be
 
-# Food-place data confidence (OSM vs Overture capture-recapture). Set from two cities, Paris 0.556 and Casablanca
-# 0.181, so it is provisional.
+# Fallback gate, no register: food-place data confidence (OSM vs Overture capture-recapture). Set from two cities,
+# Paris 0.556 and Casablanca 0.181, so it is provisional.
 GATE_MIN = 0.40
+# Register gate: chance-corrected recall of registered food businesses (Paris 0.841, Chicago 0.884, Philadelphia 0.602).
 GT_MIN = 0.70
 DEFAULT_CONCEPTS = ["specialty coffee", "burger", "pizza", "French bistro", "sushi", "brunch"]
 TOP_KEYS = ("id", "centroid", "bounds", "neighborhood", "opportunity", "confidence_width", "suitability",
@@ -81,10 +84,11 @@ def publish(pack, slug, concepts, top, ground_truth=None, gt_source=None):
         res, _ = cs.analyze(city, c, top=top)
         out["scans"].append(scan_summary(res))
     city_key = cs._norm(pack["info"].get("name") or "").split(",")[0].strip()
-    if be.calibration(city_key, "restaurant"):
+    calib = be.calibration(city_key, "restaurant")
+    if calib:
         pts = [cs.cell_center(g, i) for i in city["study"]]
         units = cs.unit_concepts_many(city, pts, catalog=list(be.GROUP_CONCEPT.values()))
-        out["units"] = {"mode": "calibrated", "currency": "EUR",
+        out["units"] = {"mode": "calibrated", "currency": calib["currency"],
                         "cells": {str(u["cell"]): landlord_rows(u["landlord"]["rows"]) for u in units}}
     return out
 

@@ -295,7 +295,8 @@ that both lack. Where an official register with coordinates exists, the gate mea
 Chicago would fail the two-source gate (0.33) yet has the best register recall, so agreement is a weak proxy for
 completeness, and it stays only as the fallback where no register exists (Casablanca, 0.181). By class,
 Philadelphia restaurants score 0.62 and fast food 0.59, so the shortfall is not one category.
-Registers are read in `/tmp` and never committed; only the five numbers per city go into the pack.
+Registers are read in `/tmp` and never committed. The pack stores only $n$, $R$, $P$, $\kappa_R$, the radius, the
+shift and the register's name.
 
 **Runway model.** Expected covers/day at a location are $\theta\, r^{\kappa}$, with $r$ the Huff relative demand of
 section 10. A venue's own covers are $\theta\, r^{\kappa} e^{\sigma z}$, with $z \sim N(0,1)$. With margin per
@@ -401,6 +402,39 @@ pooled model's definitions). This avoids survivor leakage from the 2026 snapshot
   The spread is real but small.
 - On the forward fold, 2019+ cohorts survived better than 2014–18 (restaurant 0.852 vs 0.779 train). Every method is
   6–7 pp too pessimistic there, a period effect that no location model sees.
+
+**Replication: Chicago (City of Chicago business licences).**
+
+The same script (`cityscan_calibrate.py --city chicago`) runs on new retail-food and tavern licences issued 2014+.
+Closure is a revoked or cancelled status, a lapsed licence, or an out-of-business inspection, as in the survival
+study's loader. Of 11,577 openings, 7,592 fall in the pack's study cells. The differences from Paris:
+
+- costs are in USD (`DEFAULTS[("chicago", ...)]`), with staff sized at the Chicago minimum wage;
+- the rent share is a US triangle, 4–6–10% of sales. The mode is the National Restaurant Association's 2024 urban
+  median occupancy cost of 6.0%;
+- with no arrondissements, the spatial folds are 1.5 km longitude strips.
+
+| Group (Chicago, licences) | n | $\hat S(1)$ | $\hat S(3)$ | $\theta$ covers/day (90%) | $\sigma$ (90%) | $\kappa$ (90%) |
+|---|---|---|---|---|---|---|
+| restaurant | 5,692 | 0.918 | 0.664 | 77 (76–80) | 0.40 (0.38–0.43) | 0 (0–0.03) |
+| fast food | 1,237 | 0.891 | 0.573 | 121 (116–127) | 0.40 (0.37–0.44) | 0 (0–0.05) |
+| bar / café | 663 | 0.920 | 0.707 | 164 (154–175) | 0.47 (0.41–0.55) | 0 (0–0) |
+
+| Fold (3-year IPCW Brier) | city baseline | Huff as is ($\kappa=1$) | calibrated model | model × Cox | Cox only |
+|---|---|---|---|---|---|
+| train west → test east (n=4,777) | 0.2218 | 0.3126 | **0.2217** | 0.2231 | 0.2232 |
+| train east → test west (n=2,815) | **0.2351** | 0.3130 | 0.2389 | 0.2377 | 0.2342 |
+| forward 2014–18 → 2019+ (n=4,170) | **0.2193** | 0.2866 | 0.2194 | 0.2194 | 0.2193 |
+
+What replicates and what does not:
+
+- $\kappa = 0$ again in every group. Higher-demand cells survive slightly *less*: restaurant −1.6 pp, fast food
+  −3.5 pp, bar/café −8.6 pp at 3 years. Cox HR per SD of $\log r$ is 1.02 (0.99–1.06). So the finding that measured
+  location demand carries no survival signal holds on a second continent and a different kind of register.
+- Taking Huff at face value is 31–41% worse than the city average, worse than in Paris.
+- The location Cox term does not rank Chicago units out of sample (C 0.47–0.54 per group). Chicago rent ceilings
+  should therefore be read as city-level figures for each tenant type, not as a location signal.
+- Chicago 3-year survival (0.57–0.71) is far below Paris (0.79–0.83), so the target the ceiling protects is lower.
 
 **Data-thin cities (Casablanca): conditional card.**
 

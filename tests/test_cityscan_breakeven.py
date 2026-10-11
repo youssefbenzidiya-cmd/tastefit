@@ -63,5 +63,31 @@ class Uncertain(unittest.TestCase):
         self.assertEqual([r["rent"] for r in card["by_rent"]], [15000, 30000])
 
 
+class Calibrated(unittest.TestCase):
+    def test_each_city_uses_its_own_currency_register_and_rent_share(self):
+        for city, cur, src, share in (("paris", "EUR", "SIRENE", 0.10), ("chicago", "USD", "Chicago", 0.06)):
+            for profile in ("restaurant", "fast_casual", "cafe"):
+                c = be.calibration(city, profile)
+                self.assertEqual(c["currency"], cur)
+                self.assertIn(src, c["official"]["source"])
+                self.assertEqual(c["rent_share"]["mode"], share)
+                self.assertTrue(0 < c["official"]["s3"] < c["official"]["s1"] < 1)
+                self.assertEqual(len(c["boot"]), 100)
+
+    def test_data_thin_and_unknown_cities_are_not_calibrated(self):
+        for city in ("casablanca", "philadelphia", "atlantis"):
+            self.assertIsNone(be.calibration(city, "restaurant"))
+
+    def test_chicago_ceiling_is_a_usd_figure_below_typical_revenue(self):
+        c = be.calibration("chicago", "restaurant")
+        card = be.rent_ceiling_card(1.0, c, n=400)
+        self.assertEqual(card["currency"], "USD")
+        modes = {k: c["inputs"][k]["mode"] for k in ("ticket", "days")}
+        revenue = c["theta"] * modes["ticket"] * modes["days"]
+        city = card["ceilings"]["city"]
+        self.assertEqual(city["target"], c["official"]["s3"])
+        self.assertTrue(0 < city["ci90"][0] <= city["rent_max"] <= city["ci90"][1] < 0.25 * revenue)
+
+
 if __name__ == "__main__":
     unittest.main()
