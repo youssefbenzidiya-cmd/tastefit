@@ -62,6 +62,11 @@ def scan_summary(res):
             "top": [{k: t[k] for k in TOP_KEYS if k in t} for t in res["top"]], "limits": res["limits"]}
 
 
+def units_meta(calib):
+    return {"mode": "calibrated", "currency": calib["currency"], "survival_source": calib["official"]["source"],
+            "location_specific": calib.get("location_hr", True)}
+
+
 def landlord_rows(rows):
     return [{"group": r["group"], "label_en": r["label_en"], "label_fr": r["label_fr"],
              "rent_max": r["rent_max_city_target"]["rent_max"], "ci90": r["rent_max_city_target"]["ci90"],
@@ -88,7 +93,7 @@ def publish(pack, slug, concepts, top, ground_truth=None, gt_source=None):
     if calib:
         pts = [cs.cell_center(g, i) for i in city["study"]]
         units = cs.unit_concepts_many(city, pts, catalog=list(be.GROUP_CONCEPT.values()))
-        out["units"] = {"mode": "calibrated", "currency": calib["currency"],
+        out["units"] = {**units_meta(calib),
                         "cells": {str(u["cell"]): landlord_rows(u["landlord"]["rows"]) for u in units}}
     return out
 

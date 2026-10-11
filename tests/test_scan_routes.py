@@ -193,6 +193,16 @@ class ShippedPacks(unittest.TestCase):
                 calib = be.calibration(slug, be.GROUP_PROFILE[row["group"]])
                 self.assertEqual(row["target_s3"], calib["official"]["s3"])
 
+    def test_unit_note_cites_the_citys_own_register(self):
+        scan._load.cache_clear()
+        for slug, lat, lon, cites, same_everywhere in (("paris", "48.865", "2.377", "SIRENE", False),
+                                                      ("chicago", "41.884", "-87.632", "Chicago business licences", True)):
+            code, d = scan.unit(slug, lat, lon)
+            self.assertEqual(code, 200)
+            self.assertIn(cites, d["note"])
+            self.assertEqual("Same figure in every cell" in d["note"], same_everywhere)
+        self.assertNotIn("SIRENE", scan.unit("chicago", "41.884", "-87.632")[1]["note"])
+
 
 if __name__ == "__main__":
     unittest.main()

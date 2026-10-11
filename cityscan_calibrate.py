@@ -16,6 +16,9 @@ Steps
   4. Held-out validation: west/east split of arrondissements (both folds), IPCW Brier at 3 years vs the city-average
      baseline, with and without the location Cox term (Cox refitted on the training half only).
   5. Forward test: calibrate on 2014-2018 openings, score 2019+ openings.
+  Chicago (--city chicago): new retail-food and tavern licences issued 2014+ (licence classes -> restaurant,
+  fast food, bar/cafe as in official.py), spatial folds are 1.5 km longitude strips, the fit's rent share is
+  be.rent_share(city) (US 4-6-10%), and the location HR is used only if held-out C > 0.5 in every fold and group.
 """
 import argparse
 import json
