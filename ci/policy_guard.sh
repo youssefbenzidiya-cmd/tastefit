@@ -2,7 +2,7 @@
 # Agent-authored merge requests (source branch medic/* or duo/*) may not edit their own policy.
 set -eu
 
-PROTECTED='^(AGENTS\.md|((\.gitlab|docs)/)?CODEOWNERS|\.gitlab/duo/|\.agents/|skills/)'
+PROTECTED='^(AGENTS\.md|((\.gitlab|docs)/)?CODEOWNERS|\.gitlab/duo/|\.agents/|skills/|ci/|security/)'
 AGENT_BRANCH='^(medic|duo)/'
 
 branch="${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:?not a merge request pipeline}"
