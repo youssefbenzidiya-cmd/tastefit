@@ -207,7 +207,8 @@ def build_scorecard(verdict, site_result):
 
 def memo_with_scorecard(memo, sc):
     """Rewrites the Verdict heading with the computed call and score, and puts a Scorecard section right after it."""
-    head = f"## Verdict: {sc['call']} (fit score {sc['fit']})"
+    head = (f"## Verdict: {sc['call']} (fit score {sc['fit']})" if sc["complete"]
+            else f"## Verdict: {sc['call']} (partial score {sc['fit']}, not a fit score)")
     card = "## Scorecard\n" + "\n".join(f"- {b['name']}: {b['score']}/100 - {b['reason']}".rstrip(" -")
                                         for b in sc["bars"]) + "\n\n"
     out, placed = [], False

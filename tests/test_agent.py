@@ -168,6 +168,12 @@ class Scorecard(unittest.TestCase):
         self.assertNotIn("99", memo)
         self.assertIn("## Risks", memo)
 
+    def test_incomplete_memo_heading_says_partial_score(self):
+        sc = agent.build_scorecard(self.verdict, None)
+        memo = agent.memo_with_scorecard("## Verdict: GO (fit score 99)\nWhy.", sc)
+        self.assertTrue(memo.startswith("## Verdict: INCOMPLETE (partial score 70, not a fit score)\nWhy."))
+        self.assertNotIn("fit score 70", memo)
+
 
 if __name__ == "__main__":
     unittest.main()

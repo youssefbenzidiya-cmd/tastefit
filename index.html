@@ -475,7 +475,7 @@ function renderMemo(text) {
     '<p class="print-head">TasteFit: ' + esc(f.concept.value) + ' in ' + esc(f.location.value) + '</p>' +
     demoBanner() +
     '<div class="verdict">' +
-      (score != null ? '<div class="dial" style="--v:' + score + ';--c:' + color + '"><div><div><b>' + score + '</b><span>fit score</span></div></div></div>' : '<div></div>') +
+      (score != null ? '<div class="dial" style="--v:' + score + ';--c:' + color + '"><div><div><b>' + score + '</b><span>' + (cls === 'incomplete' ? 'partial score' : 'fit score') + '</span></div></div></div>' : '<div></div>') +
       '<div><p class="call ' + cls + '">' + label + '</p>' + (why ? '<p class="why">' + why + '</p>' : '') +
       '<p class="ctx">' + esc(f.concept.value) + ' in ' + esc(f.location.value) + '</p></div>' +
     '</div>' +
