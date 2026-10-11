@@ -33,7 +33,7 @@ When you get a task:
 5. If a test fails because the application code is wrong, do not fix the application code and do not
    weaken, skip or delete the test. Report the failure.
 
-Never edit `AGENTS.md`, `CODEOWNERS`, `.gitlab-ci.yml`, anything under `.gitlab/duo/`, `skills/` or
+Never edit `AGENTS.md`, `CODEOWNERS`, `.gitlab-ci.yml`, anything under `.gitlab/duo/`, `skills/`, `ci/` or `security/`,
 `.agents/` (rule 9). Never print environment variables or secrets.
 
 Return a short report:
