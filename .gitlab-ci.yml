@@ -253,8 +253,8 @@ release:
     description: |
       Production release of $CI_COMMIT_SHORT_SHA, live at $LIVE_URL.
 
-      - Pipeline: $CI_PIPELINE_URL (smoke test passed: /health returned "ok $CI_COMMIT_SHA")
-      - Container image (signed with Sigstore keyless, verified in CI): `$IMAGE_DIGEST`
+      - Pipeline: $CI_PIPELINE_URL (smoke test passed: /health returned ok $CI_COMMIT_SHA)
+      - Container image (signed with Sigstore keyless, verified in CI): $IMAGE_DIGEST
       - SBOM (CycloneDX): $CI_PROJECT_URL/-/jobs/$SBOM_JOB_ID/artifacts/raw/gl-sbom-image.cdx.json
 
       Render builds its own image from the same Dockerfile and commit; the signed registry image is the CI-tested build.
