@@ -247,7 +247,7 @@ smoke-gcp:
         sleep 6
       done
       [ "$live" = "ok $CI_COMMIT_SHA" ] || { echo "Cloud Run is '$live', expected $CI_COMMIT_SHA"; exit 1; }
-    - curl -fsS "$GCP_URL/" | grep "Will your restaurant fit" > /dev/null
+    - curl -fsS "$GCP_URL/" | grep "Who should rent this unit" > /dev/null
     - |
       curl -fsS "$GCP_URL/scan/unit?city=chicago&lat=41.9&lon=-87.65" | grep '"currency": "USD"' > /dev/null
 
@@ -271,7 +271,7 @@ smoke-test:
         sleep 15
       done
       [ "$live" = "ok $CI_COMMIT_SHA" ] || { echo "live is '$live', expected $CI_COMMIT_SHA"; exit 1; }
-    - curl -fsS "$LIVE_URL/" | grep "Will your restaurant fit" > /dev/null
+    - curl -fsS "$LIVE_URL/" | grep "Who should rent this unit" > /dev/null
     - test "$(curl -s -o /dev/null -w '%{http_code}' "$LIVE_URL/run?concept=x")" = 400
     - |
       t_health=$(curl -fsS -o /dev/null -m 30 -w '%{time_total}' "$LIVE_URL/health")
