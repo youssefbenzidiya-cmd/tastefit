@@ -157,7 +157,9 @@ CLI: `python agent.py "Korean fried chicken counter" "Austin, TX"`
 
 **Claim ledger** (the "without Qloo" panel): the same LLM, with no tools, suggests concepts and names up to 5 competitors within 500 m. Each concept is marked confirmed (Taste Gap "white space", or "neutral" with a positive over-index), contradicted ("proven demand, crowded", "empty for a reason", "avoid"), partly supported, or not tested by this run. Each named venue is looked up in OpenStreetMap within 500 m with City Scan's name matcher (similarity >= 0.6 found, 0.45-0.6 ambiguous); Qloo's own area favourites that read as food venues go through the same check (1.5 km, since they are area-level; the OSM file holds food venues only). The page shows counts, and calls them agreement with the run's evidence and existence in open data, not accuracy: OSM misses real venues too. Supply estimates whose city-wide prior carries >= 80% of the weight are badged "Data coverage: low": the local OSM count barely moves them. This happens when the expected count near the unit is small or the city's block counts vary little; it is not a measure of how complete OSM mapping is.
 
-Tests: `python -m unittest discover -s tests -t . -v` (246 tests).
+Front end: `index.html` plus `static/` (`app.js`, `styles.css`, icons, and the Schibsted Grotesk font under the SIL Open Font License, served from the app itself), no build step. The map starts from a few example points; they are places on a map, not vacancy listings. "Read a sample memo" replays `/demo` (synthetic data, labelled as such).
+
+Tests: `python -m unittest discover -s tests -t . -v` (249 tests).
 
 ## Deploy
 

@@ -30,9 +30,19 @@ _TEMPLATE = (ROOT / "index.html").read_text().replace("{{CTA}}", _CTA).replace("
 DEMO_FILE = ROOT / "demo" / "sample-report.json"
 DEMO_DELAY_SCALE = float(os.environ.get("DEMO_DELAY_SCALE", "1"))
 
-CSP_PAGE = ("default-src 'self'; script-src 'nonce-{nonce}' https://unpkg.com https://cdn.jsdelivr.net; "
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; "
-            "font-src https://fonts.gstatic.com; img-src 'self' data: https://tile.openstreetmap.org; "
+STATIC = {
+    "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+    "/styles.css": ("styles.css", "text/css; charset=utf-8"),
+    "/favicon.svg": ("favicon.svg", "image/svg+xml"),
+    "/og.png": ("og.png", "image/png"),
+    "/apple-touch-icon.png": ("apple-touch-icon.png", "image/png"),
+    "/fonts/SchibstedGrotesk-latin.woff2": ("fonts/SchibstedGrotesk-latin.woff2", "font/woff2"),
+}
+_STATIC_BODIES = {path: ((ROOT / "static" / name).read_bytes(), ctype) for path, (name, ctype) in STATIC.items()}
+
+CSP_PAGE = ("default-src 'self'; script-src 'self' 'nonce-{nonce}' https://unpkg.com https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://unpkg.com; "
+            "font-src 'self'; img-src 'self' data: https://tile.openstreetmap.org; "
             "connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
 CSP_OTHER = "default-src 'none'; frame-ancestors 'none'"
 STREAMS = ("/run", "/tenant", "/demo")
@@ -107,6 +117,9 @@ class Handler(BaseHTTPRequestHandler):
             return 200, "text/html; charset=utf-8", render_index(nonce), CSP_PAGE.format(nonce=nonce)
         if path == "/health":
             return 200, "text/plain", f"ok {os.environ.get('RENDER_GIT_COMMIT', '')}".strip().encode(), None
+        if path in _STATIC_BODIES:
+            body, ctype = _STATIC_BODIES[path]
+            return 200, ctype, body, None
         return 404, "text/plain", b"not found", None
 
     def do_GET(self):

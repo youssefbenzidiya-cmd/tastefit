@@ -12,7 +12,8 @@ class ScanPanel(unittest.TestCase):
     def setUpClass(cls):
         cls.page = app.render_index("n").decode()
         cls.panel = cls.page.split('<section class="scan" id="scan">')[1].split("</section>")[0]
-        cls.script = cls.page.split('<script nonce="n">')[1].split("</script>")[0]
+        scripts = [s.split("</script>")[0] for s in cls.page.split('<script nonce="n">')[1:]]
+        cls.script = next(s for s in scripts if "scan-form" in s)
 
     def test_city_options_are_the_shipped_packs(self):
         self.assertEqual(sorted(re.findall(r'<option value="([a-z0-9-]+)">', self.panel)), scan.available())
