@@ -21,6 +21,7 @@ import statistics
 import threading
 
 import cityscan
+import cityscan_math
 
 PACKS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "packs")
 FOOD_FILE = os.path.join(PACKS, "food", "{slug}.json.gz")
@@ -28,6 +29,9 @@ RADIUS_M = 600  # the pack's "reasons" radius
 BLOCK = 3  # prior fitted on 3x3 blocks of 400 m cells, about the area of the 600 m disc
 DRAWS = 4000
 T_DEMAND, P_HIGH, P_LOW = 0.5, 0.8, 0.2
+LOW_COVERAGE = 0.8  # prior weight above which the local count barely moves the estimate: shown as low coverage
+CLAIM_RADIUS_M = 500  # venue-existence check for named competitors
+NAME_MATCH, NAME_MAYBE = 0.6, 0.45  # City Scan's name-similarity threshold (METHOD.md 1b); below it, borderline
 BETA = (0.0, 1.0, -1.0)  # (alpha, beta_D, beta_log_theta): stated priors, not fitted ("uncalibrated")
 
 # OSM cuisine values per catalog concept; other concepts fall back to City Scan's concept mapping.
@@ -182,8 +186,27 @@ class Venues:
                 n += h
         e = food * share
         theta, p_under = supply_ratio(n, e, *prior, draws=draws)
+        w = prior[1] / (prior[1] + e)  # weight of the city prior in the posterior mean
         return {"n": n, "food": food, "expected": round(e, 2), "theta": round(theta, 3), "p_under": round(p_under, 3),
-                "raw": round(n / e, 2) if e else None}
+                "raw": round(n / e, 2) if e else None, "prior_weight": round(w, 3),
+                "coverage": "low" if w >= LOW_COVERAGE else "ok"}
+
+    def find(self, name, lat, lon, radius=CLAIM_RADIUS_M):
+        """(True | None | False, matched OSM name): a venue with a similar name (City Scan's matcher) within `radius`
+        m; None when the best match is only borderline."""
+        key = cityscan._name_key(name)
+        if not key:
+            return False, None
+        kx = 111_320 * math.cos(math.radians(lat))
+        best, best_name = 0.0, None
+        for v in self.venues:
+            if len(v) > 4 and v[4] and math.hypot((v[0] - lat) * 111_320, (v[1] - lon) * kx) <= radius:
+                s = cityscan_math.name_similarity(key, cityscan._name_key(v[4]))
+                if s > best:
+                    best, best_name = s, v[4]
+        if best >= NAME_MATCH:
+            return True, best_name
+        return (None, best_name) if best >= NAME_MAYBE else (False, None)
 
 
 _cache, _lock = {}, threading.Lock()
@@ -215,14 +238,15 @@ def overpass_food_query(bbox, date=None):
 
 
 def compact(elements):
-    """[[lat, lon, kind, cuisine]] from Overpass elements; bars and pubs are not queried."""
+    """[[lat, lon, kind, cuisine, name]] from Overpass elements; bars and pubs are not queried."""
     out = []
     for el in elements:
         t = el.get("tags") or {}
         c = el if "lat" in el else el.get("center") or {}
         kind = FOOD.get(t.get("amenity")) or ("b" if t.get("shop") in ("bakery", "pastry") else None)
         if kind and c.get("lat") is not None:
-            out.append([round(c["lat"], 6), round(c["lon"], 6), kind, cityscan._norm(t.get("cuisine", ""))[:60]])
+            out.append([round(c["lat"], 6), round(c["lon"], 6), kind, cityscan._norm(t.get("cuisine", ""))[:60],
+                        (t.get("name") or t.get("brand") or "")[:60]])
     return out
 
 

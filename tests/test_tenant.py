@@ -87,7 +87,8 @@ CANDIDATES = {"candidates": [
     {"concept": "Grain bowls", "tag_query": "bowls", "rent_group": "fast_food", "why": "w"},
 ]}
 BASELINE = {"candidates": [{"concept": "Ramen shop", "why": "a"}, {"concept": "Coffee shop", "why": "b"},
-                           {"concept": "Wine bar", "why": "c"}, {"concept": "Pizza", "why": "d"}]}
+                           {"concept": "Wine bar", "why": "c"}, {"concept": "Pizza", "why": "d"}],
+            "competitors": ["Leopardi", "Totally Invented Bistro", 7]}
 RENT = [{"group": "restaurant", "rent_max": 3000.0, "ci90": [2500.0, 3600.0], "viable": True},
         {"group": "fast_food", "rent_max": 2000.0, "ci90": [1500.0, 2400.0], "viable": True}]
 
@@ -264,6 +265,36 @@ class TasteGapPipelineTest(unittest.TestCase):
         memo = self.kinds(self.run_all(chat_fn=no_llm), "memo")[0]["markdown"]
         self.assertIn("OpenStreetMap-mapped venues within 600 m", memo)
         self.assertIn("local places serve it (Qloo)", memo)  # pho has no OSM venue here: Qloo count, labelled
+
+    def test_claim_ledger(self):
+        base = self.kinds(self.run_all(), "baseline")[0]
+        status = {r["concept"]: r["status"] for r in base["candidates"]}
+        self.assertIn(status["Ramen shop"], {"confirmed", "partly"})
+        self.assertTrue(base["candidates"][0]["evidence"].startswith("Taste Gap:"))
+        self.assertEqual(status["Wine bar"], "excluded")
+        self.assertEqual([(v["name"], v["status"]) for v in base["venues"]],
+                         [("Leopardi", "exists"), ("Totally Invented Bistro", "not found")])
+        L = base["ledger"]
+        self.assertEqual(L["llm_venues"], {"exists": 1, "not found": 1, "ambiguous": 0, "named": 2, "radius_m": 500})
+        self.assertEqual(L["qloo_venues"]["named"], 1)  # only "Sample Tacos" reads as food; the gallery is not in OSM's food file
+        self.assertEqual(L["source"], "OpenStreetMap")
+        self.assertEqual(sum(L["concepts"].values()), 4)
+
+    def test_food_places_filter(self):
+        places = [{"name": "Sample Gallery", "description": "Art space"}, {"name": "Lula", "description": "Seasonal restaurant"},
+                  {"name": "Sample Tacos", "description": None}, {"name": "Record Shop"}]
+        self.assertEqual(tenant.food_places(places), ["Lula", "Sample Tacos"])
+
+    def test_ledger_verdict_rules(self):
+        rows = [{"concept": c, "tag": None, "tgi_label": g, "overindex": d, "local_supply": 1, "supply_expected": 1.0}
+                for c, g, d in [("ramen", "white space", 1.0), ("pho", "neutral", 0.2), ("tacos", "proven demand, crowded", 1.0),
+                                ("salad", "neutral", -0.3), ("burger", "avoid", -1.0)]]
+        base = {"candidates": [{"concept": c, "why": "", "excluded": False} for c in ("Ramen", "Pho", "Tacos", "Salad", "Burger", "Sushi")]}
+        out = tenant.judge_baseline(base, rows)
+        self.assertEqual([r["status"] for r in out["candidates"]],
+                         ["confirmed", "confirmed", "contradicted", "partly", "contradicted", "not tested"])
+        self.assertIsNone(out["ledger"]["llm_venues"])
+        self.assertIsNone(out["ledger"]["source"])
 
     def test_unmapped_concept_falls_back_to_qloo_supply(self):
         with mock.patch("tenant.tgi.cuisines_for", side_effect=lambda c, t=None: set() if "Pho" in c else {"ramen"}):

@@ -14,8 +14,8 @@ GRID = cityscan.make_grid([41.85, -87.75, 41.95, -87.60])
 POINT = (41.90, -87.68)
 
 
-def venue(lat, lon, kind="r", cuisine="american"):
-    return [lat, lon, kind, cuisine]
+def venue(lat, lon, kind="r", cuisine="american", name=""):
+    return [lat, lon, kind, cuisine, name]
 
 
 def city(near_ramen=0, near_coffee=8, seed=3):
@@ -27,6 +27,7 @@ def city(near_ramen=0, near_coffee=8, seed=3):
     vs += [venue(POINT[0] + 0.0005 * i, POINT[1], cuisine="ramen") for i in range(near_ramen)]
     vs += [venue(POINT[0], POINT[1] + 0.0005 * i, kind="c", cuisine="coffee_shop") for i in range(near_coffee)]
     vs += [venue(POINT[0] - 0.0005 * i, POINT[1]) for i in range(30)]
+    vs += [venue(POINT[0] + 0.001, POINT[1] + 0.001, name="Café Leopardi"), venue(41.86, -87.74, name="Far Away Diner")]
     return tgi.Venues(GRID, vs)
 
 
@@ -128,12 +129,30 @@ class VenueTest(unittest.TestCase):
         self.assertIsNone(v.supply(set(), *POINT))
         self.assertIsNone(v.supply({"nonexistent"}, *POINT))
 
+    def test_low_coverage_when_the_prior_dominates(self):
+        v = city(near_ramen=0, near_coffee=12)
+        s = v.supply(tgi.CUISINES["ramen"], *POINT, draws=200)
+        self.assertTrue(0 < s["prior_weight"] <= 1)
+        a, b = tgi.gamma_prior([0, 9, 1, 6, 0, 4], [3, 3, 3, 3, 3, 3])  # overdispersed blocks: a loose prior
+        self.assertLess(b / (b + 30), tgi.LOW_COVERAGE)  # a large expected count outweighs it
+        self.assertGreaterEqual(b / (b + 0.1), tgi.LOW_COVERAGE)  # a tiny expected count does not
+        flat = tgi.Venues(GRID, [venue(41.86 + 0.0001 * i, -87.74, cuisine="ramen" if i % 10 == 0 else "") for i in range(400)])
+        self.assertEqual(flat.supply({"ramen"}, 41.87, -87.74, draws=200)["coverage"], "low")  # Poisson-like: floored prior
+
+    def test_find_named_venue(self):
+        v = city()
+        self.assertEqual(v.find("Leopardi", *POINT), (True, "Café Leopardi"))
+        self.assertEqual(v.find("Far Away Diner", *POINT)[0], False)  # exists, but not within 500 m
+        self.assertEqual(v.find("Totally Invented Bistro", *POINT), (False, None))
+        self.assertEqual(v.find("Lapard Bistro", *POINT), (None, "Café Leopardi"))  # similarity 0.57: ambiguous
+        self.assertEqual(v.find("", *POINT), (False, None))
+
     def test_compact_keeps_food_only(self):
         els = [{"type": "node", "lat": 1.0, "lon": 2.0, "tags": {"amenity": "restaurant", "cuisine": "Ramen", "name": "X"}},
                {"type": "way", "center": {"lat": 1.5, "lon": 2.5}, "tags": {"shop": "bakery"}},
                {"type": "node", "lat": 1.0, "lon": 2.0, "tags": {"amenity": "bar"}},
                {"type": "way", "tags": {"amenity": "cafe"}}]
-        self.assertEqual(tgi.compact(els), [[1.0, 2.0, "r", "ramen"], [1.5, 2.5, "b", ""]])
+        self.assertEqual(tgi.compact(els), [[1.0, 2.0, "r", "ramen", "X"], [1.5, 2.5, "b", "", ""]])
 
     def test_query_dates_the_snapshot(self):
         q = tgi.overpass_food_query([41.0, -88.0, 42.0, -87.0], "2023-01-01")
@@ -158,7 +177,7 @@ class VenueTest(unittest.TestCase):
                 d = json.load(f)
             self.assertEqual(set(d), {"slug", "as_of", "source", "grid", "venues"})
             self.assertIn("OpenStreetMap", d["source"])
-            self.assertTrue(all(len(v) == 4 and v[2] in "rcfib" for v in d["venues"]))
+            self.assertTrue(all(len(v) == 5 and v[2] in "rcfib" for v in d["venues"]))
 
 
 if __name__ == "__main__":
