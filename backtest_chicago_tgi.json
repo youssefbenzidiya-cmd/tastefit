@@ -1,0 +1,131 @@
+{
+ "window": [
+  "2023-01-01",
+  "2024-12-31"
+ ],
+ "survival_seen": "2025-04-01",
+ "radius_km": 1.2,
+ "k": 3,
+ "areas": 12,
+ "openings": 1751,
+ "classified": 200,
+ "survival_rate_all": 0.452,
+ "qloo_calls": 41,
+ "benchmarks": 10,
+ "qloo_rank_failures": {
+  "status ok: no usable ranking": 2
+ },
+ "llm_provider": null,
+ "osm_snapshot": "2023-01-01",
+ "supply_radius_m": 600,
+ "random_hit_at_k": 0.3,
+ "areas_scored": [
+  "Wicker Park",
+  "Logan Square",
+  "Lincoln Park",
+  "West Loop",
+  "Hyde Park",
+  "Andersonville",
+  "Lakeview",
+  "Bridgeport",
+  "Uptown"
+ ],
+ "methods": {
+  "qloo": {
+   "areas": 9,
+   "hit_at_k": 0.29,
+   "survivors": 31,
+   "survival_top": 0.643,
+   "opened_top": 14,
+   "survival_rest": 0.44,
+   "opened_rest": 50,
+   "spearman": 0.022
+  },
+  "prior": {
+   "areas": 9,
+   "hit_at_k": 0.677,
+   "survivors": 31,
+   "survival_top": 0.488,
+   "opened_top": 43,
+   "survival_rest": 0.476,
+   "opened_rest": 21,
+   "spearman": 0.308
+  },
+  "qloo_D": {
+   "areas": 9,
+   "hit_at_k": 0.355,
+   "survivors": 31,
+   "survival_top": 0.524,
+   "opened_top": 21,
+   "survival_rest": 0.465,
+   "opened_rest": 43,
+   "spearman": -0.037
+  },
+  "osm_under": {
+   "areas": 9,
+   "hit_at_k": 0.323,
+   "survivors": 31,
+   "survival_top": 0.556,
+   "opened_top": 18,
+   "survival_rest": 0.457,
+   "opened_rest": 46,
+   "spearman": -0.104
+  },
+  "tgi": {
+   "areas": 9,
+   "hit_at_k": 0.484,
+   "survivors": 31,
+   "survival_top": 0.577,
+   "opened_top": 26,
+   "survival_rest": 0.421,
+   "opened_rest": 38,
+   "spearman": -0.159
+  },
+  "prior_tgi": {
+   "areas": 9,
+   "hit_at_k": 0.548,
+   "survivors": 31,
+   "survival_top": 0.472,
+   "opened_top": 36,
+   "survival_rest": 0.5,
+   "opened_rest": 28,
+   "spearman": 0.228
+  }
+ },
+ "qloo_minus_prior_ci90": [
+  -0.656,
+  -0.036
+ ],
+ "qloo_minus_qloo_D_ci90": [
+  -0.29,
+  0.233
+ ],
+ "qloo_minus_osm_under_ci90": [
+  -0.241,
+  0.25
+ ],
+ "qloo_minus_tgi_ci90": [
+  -0.417,
+  0.129
+ ],
+ "qloo_minus_prior_tgi_ci90": [
+  -0.516,
+  0.071
+ ],
+ "qloo_D_minus_prior_ci90": [
+  -0.444,
+  -0.214
+ ],
+ "osm_under_minus_prior_ci90": [
+  -0.531,
+  -0.206
+ ],
+ "tgi_minus_prior_ci90": [
+  -0.36,
+  -0.062
+ ],
+ "prior_tgi_minus_prior_ci90": [
+  -0.222,
+  -0.056
+ ]
+}

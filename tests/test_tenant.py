@@ -59,6 +59,8 @@ class FakeQloo:
                                {"id": TAGS[key], "name": key.title(), "type": "urn:tag:cuisine:qloo"}]), False
         if op == "rank":
             order = ["B1", "B3", "B2", "B4", "B5", "B6"]
+            if params["signal_location"] == "Chicago":  # the city-wide ranking for the over-index
+                order = ["B2", "B4", "B1", "B3", "B5", "B6"]
             return ok(results=[{"entity_id": e, "affinity": 0.999 - i * 0.0001} for i, e in enumerate(order)
                                if e in params["options"]]), False
         if op == "compare_audiences":
@@ -112,10 +114,14 @@ class PipelineTest(unittest.TestCase):
                    mock.patch("tenant.geo.reverse", return_value={"areas": ["Sample Park"], "city": "Chicago", "postcode": "60622"}),
                    mock.patch("tenant.geo.geocode", side_effect=AssertionError("no geocoding expected")),
                    mock.patch("tenant.scan.unit", return_value=(200, {"calibrated": True, "rent_ceiling": RENT,
-                                                                      "currency": "USD", "note": "model", "cell": 7}))]
+                                                                      "currency": "USD", "note": "model", "cell": 7})),
+                   mock.patch("tenant.tgi.load", return_value=self.venues())]
         for p in patches:
             p.start()
             self.addCleanup(p.stop)
+
+    def venues(self):
+        return None
 
     def run_all(self, **kw):
         kw.setdefault("chat_fn", chat_script())
@@ -213,6 +219,58 @@ class PipelineTest(unittest.TestCase):
         with mock.patch("tenant.geo.reverse", return_value=None):
             ev = self.run_all()
         self.assertEqual(ev, [("error", "Could not name that point; type the neighborhood instead.")])
+
+
+class TasteGapPipelineTest(unittest.TestCase):
+    """The same run with an OSM venue file: one extra city rank call, no Qloo local-supply calls."""
+    setUp, run_all, kinds = PipelineTest.setUp, PipelineTest.run_all, PipelineTest.kinds
+
+    def venues(self):
+        from tests import test_tgi
+        return test_tgi.city(near_ramen=0, near_coffee=12)
+
+    def test_osm_supply_replaces_qloo_local_calls(self):
+        ev = self.run_all(asking_rent=2800)
+        ranks = [p["signal_location"] for op, p in self.fake.calls if op == "rank"]
+        self.assertEqual(sorted(ranks), ["Chicago", "Sample Park, Chicago"])
+        local = [p for op, p in self.fake.calls if op == "recommend" and p.get("include_tags")
+                 and p.get("filter_location") == p.get("signal_location")]
+        # only concepts with no OSM venue anywhere in the city (salad, pho here) still ask Qloo
+        self.assertEqual(sorted(p["include_tags"][0] for p in local), ["urn:tag:t:pho", "urn:tag:t:salad"])
+        osm = [s for s in self.kinds(ev, "step") if s.get("source") == "OpenStreetMap"]
+        self.assertTrue(osm)
+        self.assertNotIn("input", osm[0])
+        budget = self.kinds(ev, "budget")[0]
+        self.assertLessEqual(budget["qloo_calls"], tenant.BUDGET)
+        self.assertIn("trends", budget["workflows"])
+        self.assertIn("where_popular", budget["workflows"])
+
+    def test_taste_gap_fields(self):
+        ev = self.run_all()
+        rows = {s["concept"]: s for s in self.kinds(ev, "shortlist")[0]["concepts"]}
+        ramen, coffee = rows["Ramen counter"], rows["Specialty coffee"]
+        self.assertGreater(ramen["overindex"], 0)  # 1st locally, 3rd citywide
+        self.assertLess(coffee["overindex"], 0)  # 3rd locally, 1st citywide
+        self.assertEqual(ramen["supply_source"], "OpenStreetMap")
+        self.assertEqual(ramen["white_space"], round(100 * ramen["p_under"]))
+        self.assertGreater(ramen["p_under"], coffee["p_under"])
+        self.assertGreater(ramen["tgi"], coffee["tgi"])
+        self.assertIn(ramen["tgi_label"], {"white space", "neutral"})
+        self.assertIn("uncalibrated", self.kinds(ev, "shortlist")[0]["method"])
+        self.assertIn("else the Qloo count", self.kinds(ev, "shortlist")[0]["method"])
+
+    def test_memos_attribute_osm_supply(self):
+        self.assertIn("must be attributed to OpenStreetMap", tenant.MEMO_PROMPT)
+        memo = self.kinds(self.run_all(chat_fn=no_llm), "memo")[0]["markdown"]
+        self.assertIn("OpenStreetMap-mapped venues within 600 m", memo)
+        self.assertIn("local places serve it (Qloo)", memo)  # pho has no OSM venue here: Qloo count, labelled
+
+    def test_unmapped_concept_falls_back_to_qloo_supply(self):
+        with mock.patch("tenant.tgi.cuisines_for", side_effect=lambda c, t=None: set() if "Pho" in c else {"ramen"}):
+            ev = self.run_all()
+        rows = {s["concept"]: s for s in self.kinds(ev, "shortlist")[0]["concepts"]}
+        self.assertEqual(rows["Pho house"]["supply_source"], "Qloo")
+        self.assertEqual(rows["Ramen counter"]["supply_source"], "OpenStreetMap")
 
 
 class DeadlineTest(unittest.TestCase):

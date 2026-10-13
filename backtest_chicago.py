@@ -12,6 +12,8 @@ For each area, three orderings of the ten concepts are scored against that area'
          demand signal);
   llm    the same LLM TasteFit uses, asked to rank the ten concepts for the area with no data;
   prior  citywide share of survived openings per concept, computed without the area (leave-one-area-out).
+With --food (an OpenStreetMap snapshot dated before the window) the Taste Gap Index orderings are added; see
+tgi_orders. Their weights are the spec's stated priors, fixed before this run, not fitted to these outcomes.
 Only numbers are printed or written; no Qloo response and no business name is stored.
 
 Caveat: Qloo and the LLM describe today's taste, after these places opened, so this checks agreement with what
@@ -30,6 +32,7 @@ import urllib.request
 
 import qloo
 import tenant
+import tgi
 
 REGISTER = "https://data.cityofchicago.org/resource/4ijn-s7e5.json"
 WINDOW = ("2023-01-01", "2024-12-31")
@@ -199,8 +202,60 @@ def load_register():
     return opened, alive
 
 
-def qloo_orders(areas, led):
-    """{area: concept order} from one rank call per area over the concepts' Chicago benchmarks."""
+def prior_counts(table, leave_out):
+    totals = collections.Counter({c: 0 for c in CONCEPTS})
+    for area, row in table.items():
+        if area != leave_out:
+            for c, (_, s) in row.items():
+                totals[c] += s
+    return totals
+
+
+def order_by(values):
+    """Concepts sorted by value, best first; missing values last, ties in catalog order."""
+    return sorted(CONCEPTS, key=lambda c: (values.get(c) is None, -(values.get(c) or 0), CONCEPTS.index(c)))
+
+
+def tgi_orders(table, areas, overindex, supply):
+    """Pre-registered TGI orderings per area. overindex: {area: {concept: D}}; supply: {area: {concept: (theta, p_under)}}.
+      qloo_D     demand over-index D alone (area rank z minus city rank z)
+      osm_under  P(theta < 1) alone: the concept is under-supplied around the area (OSM, before the window)
+      tgi        the spec's score sigma(D - log theta), stated priors, never fitted
+      prior_tgi  log citywide share (leave-one-area-out, +0.5 smoothing) + D - log theta"""
+    out = {m: {} for m in ("qloo_D", "osm_under", "tgi", "prior_tgi")}
+    for name, _, _ in areas:
+        d, s = overindex.get(name) or {}, supply.get(name) or {}
+        theta = {c: s[c][0] for c in s}
+        out["qloo_D"][name] = order_by(d) if d else None
+        out["osm_under"][name] = order_by({c: s[c][1] for c in s}) if s else None
+        if d and s:
+            out["tgi"][name] = order_by({c: tgi.score(d.get(c), theta.get(c)) for c in CONCEPTS})
+            counts = prior_counts(table, name)
+            tot = sum(counts.values()) + 0.5 * len(CONCEPTS)
+            out["prior_tgi"][name] = order_by({c: math.log((counts[c] + 0.5) / tot) + (d.get(c) or 0.0)
+                                               - (math.log(theta[c]) if theta.get(c) else 0.0) for c in CONCEPTS})
+        else:
+            out["tgi"][name] = out["prior_tgi"][name] = None
+    return out
+
+
+def osm_supply(areas, venues):
+    """{area: {concept: (theta, p_under)}} around each area centre, from an OSM snapshot."""
+    out = {}
+    for name, lat, lon in areas:
+        row = {}
+        for c in CONCEPTS:
+            s = venues.supply(tgi.cuisines_for(c), lat, lon)
+            if s:
+                row[c] = (s["theta"], s["p_under"])
+        out[name] = row
+    return out
+
+
+def qloo_orders(areas, led, city_rank=False, wait=15, sleep=time.sleep):
+    """{area: concept order} from one rank call per area over the concepts' Chicago benchmarks (retried once after
+    `wait` s on a rate limit). With city_rank, one more rank call over the same benchmarks for the whole city gives
+    each area's over-index D (else {})."""
     bench = {}
     for concept, query, _group, _chain in tenant.CATALOG:
         res, _ = led.call(*qloo.p_find_tags(query), purpose="tag")
@@ -211,14 +266,22 @@ def qloo_orders(areas, led):
         b = tenant.usable_benchmark([tenant._place(r) for r in tenant._results(res) if r.get("entity_id")])
         if b:
             bench.setdefault(b["id"], []).append(concept)
-    orders, failures = {}, collections.Counter()
+    orders, failures, overindex, city = {}, collections.Counter(), {}, {}
+    if city_rank and bench:
+        res, _ = led.call(*qloo.p_rank(list(bench), "Chicago"), purpose="rank")
+        city = tgi.rank_scores(res, bench)
     for name, _, _ in areas:
         res, step = led.call(*qloo.p_rank(list(bench), f"{name}, Chicago"), purpose="rank")
+        if step.get("error") == "QLOO_RATE_LIMIT":
+            sleep(wait)
+            res, step = led.call(*qloo.p_rank(list(bench), f"{name}, Chicago"), purpose="rank")
         scores = tenant.demand_scores(res, bench)
         orders[name] = sorted(CONCEPTS, key=lambda c: (scores.get(c, (0, 99))[1], CONCEPTS.index(c))) if scores else None
         if not scores:
             failures[step.get("error") or f"status {(res or {}).get('status') or 'none'}: no usable ranking"] += 1
-    return orders, len(bench), dict(failures)
+        if city:
+            overindex[name] = tgi.demand_overindex(tgi.rank_scores(res, bench), city)
+    return orders, len(bench), dict(failures), overindex
 
 
 def llm_orders(areas, chat_fn, tries=3, wait=20, sleep=time.sleep):
@@ -275,13 +338,21 @@ def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--json")
     ap.add_argument("--no-llm", action="store_true")
+    ap.add_argument("--food", help="OSM food-venue snapshot from before the window (tgi.py build chicago 2023-01-01 OUT)")
     args = ap.parse_args(argv)
 
     opened, alive = load_register()
     table = outcomes(opened, alive)
-    led = tenant.Ledger(budget=40)
-    q_orders, n_bench, q_failures = qloo_orders(AREAS, led)
+    led = tenant.Ledger(budget=45)
+    q_orders, n_bench, q_failures, overindex = qloo_orders(AREAS, led, city_rank=bool(args.food))
     orders = {"qloo": q_orders, "prior": {a[0]: prior_order(table, a[0]) for a in AREAS}}
+    food_as_of = None
+    if args.food:
+        import gzip
+        with gzip.open(args.food, "rt") as f:
+            snap = json.load(f)
+        food_as_of = snap.get("as_of")
+        orders.update(tgi_orders(table, AREAS, overindex, osm_supply(AREAS, tgi.Venues(snap["grid"], snap["venues"]))))
     provider = None
     if not args.no_llm:
         import llm
@@ -291,15 +362,15 @@ def main(argv=None):
         "openings": len(opened), "classified": sum(classify(o["name"]) is not None for o in opened.values()),
         "survival_rate_all": round(sum(alive.values()) / len(alive), 3) if alive else None,
         "qloo_calls": led.network, "benchmarks": n_bench, "qloo_rank_failures": q_failures, "llm_provider": provider,
+        "osm_snapshot": food_as_of, "supply_radius_m": tgi.RADIUS_M if food_as_of else None,
         "random_hit_at_k": K / len(CONCEPTS), "areas_scored": common_areas(table, orders),
         "methods": score(table, orders),
     }
-    pairs = {}
-    for m in orders:
-        if m != "qloo":
-            rows = [(hits_at_k(orders["qloo"][a], table[a])[0], hits_at_k(orders[m][a], table[a])[0],
-                     hits_at_k(orders["qloo"][a], table[a])[1]) for a in common_areas(table, orders)]
-            pairs[f"qloo_minus_{m}_ci90"] = bootstrap_diff(rows) if rows else None
+    pairs, common = {}, common_areas(table, orders)
+    for a_m, b_m in [("qloo", m) for m in orders if m != "qloo"] + [(m, "prior") for m in orders if m not in ("qloo", "prior", "llm")]:
+        rows = [(hits_at_k(orders[a_m][a], table[a])[0], hits_at_k(orders[b_m][a], table[a])[0],
+                 hits_at_k(orders[a_m][a], table[a])[1]) for a in common]
+        pairs[f"{a_m}_minus_{b_m}_ci90"] = bootstrap_diff(rows) if rows else None
     result.update(pairs)
     text = json.dumps(result, indent=1)
     print(text)
