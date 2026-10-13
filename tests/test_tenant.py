@@ -178,6 +178,16 @@ class PipelineTest(unittest.TestCase):
         self.assertIn("## Limits", memo["markdown"])
         self.assertEqual(self.kinds(ev, "baseline")[0], {"unavailable": True})
 
+    def test_past_the_deadline_the_run_skips_the_llm_and_still_finishes(self):
+        ticks = iter([0.0])
+        clock = lambda: next(ticks, tenant.DEADLINE)  # noqa: E731  starts at 0, then is out of time
+        with mock.patch("tenant.llm.chat", side_effect=AssertionError("no LLM call expected")):
+            ev = self.run_all(chat_fn=None, clock=clock)
+        self.assertEqual(self.kinds(ev, "candidates")[0]["source"], "catalog")
+        self.assertEqual(self.kinds(ev, "memo")[0]["author"], "template")
+        self.assertEqual(ev[-1][0], "budget")
+        self.assertTrue(self.kinds(ev, "shortlist")[0]["concepts"])
+
     def test_llm_memo_always_gets_limits(self):
         memo = self.kinds(self.run_all(), "memo")[0]
         self.assertEqual(memo["author"], "fake")
@@ -203,6 +213,26 @@ class PipelineTest(unittest.TestCase):
         with mock.patch("tenant.geo.reverse", return_value=None):
             ev = self.run_all()
         self.assertEqual(ev, [("error", "Could not name that point; type the neighborhood instead.")])
+
+
+class DeadlineTest(unittest.TestCase):
+    def test_timeout_shrinks_to_the_time_left(self):
+        now = [0.0]
+        chat = mock.Mock(return_value={"content": "ok"})
+        call = tenant.deadline_chat(0.0, clock=lambda: now[0], chat=chat)
+        with mock.patch("tenant.llm.provider_names", return_value=["community"]):
+            call([])
+            self.assertEqual(chat.call_args.kwargs["timeout"], tenant.LLM_TIMEOUT)
+            now[0] = tenant.DEADLINE - 20
+            call([])
+            self.assertEqual(chat.call_args.kwargs["timeout"], 20)
+        with mock.patch("tenant.llm.provider_names", return_value=["gemini", "community"]):
+            call([])
+            self.assertEqual(chat.call_args.kwargs["timeout"], 10)
+            now[0] = tenant.DEADLINE - tenant.MIN_LLM_WINDOW + 1
+            with self.assertRaises(TimeoutError):
+                call([])
+        self.assertEqual(chat.call_count, 3)
 
 
 class LedgerTest(unittest.TestCase):
