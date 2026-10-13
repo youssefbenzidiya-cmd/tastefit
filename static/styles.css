@@ -564,6 +564,7 @@ body.in-app .foot, body.in-app .topbar [data-go-app] { display: none; }
   .app { display: block; height: auto; }
   .map-wrap { height: 46dvh; min-height: 300px; position: sticky; top: var(--topbar-h); z-index: 1; }
   .map-legend { display: none; }
+  .map-wrap .leaflet-bottom { bottom: 18px; }
   .panel { position: relative; z-index: 2; border-left: 0; border-radius: var(--r-xl) var(--r-xl) 0 0; margin-top: -18px; box-shadow: 0 -8px 24px -12px rgba(21, 32, 59, .3); }
   .panel::before { content: ""; display: block; width: 40px; height: 4px; border-radius: 2px; background: var(--rule-strong); margin: 10px auto 0; }
   .panel-scroll { overflow: visible; padding: var(--s-4) var(--s-4) var(--s-10); }

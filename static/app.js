@@ -445,7 +445,7 @@ function founderResultHTML() {
     <ol class="cards">${(sc.bars || []).map(b => `<li class="card"><div class="card-head" style="grid-template-columns:1fr auto"><div class="card-name" style="font-size:var(--t-16)">${esc(b.name)}</div><span class="score-n" style="font-size:var(--t-22)">${esc(b.score ?? '–')}</span></div>
       <div class="stack-bar"><i class="seg-demand" style="width:${+b.score || 0}%"></i></div><p class="card-why">${esc(b.reason)}</p></li>`).join('')}</ol>
     ${state.competitors.length ? `<div><h3 style="font-size:var(--t-16);margin-bottom:8px">Closest competitors (${state.demo ? 'sample' : 'Qloo'})</h3><div class="chips">${state.competitors.map(c => `<span class="chip">${esc(c)}</span>`).join('')}</div></div>` : ''}
-    ${g && g.recommended ? `<p class="hint-line">Suggested spot: opportunity index ${esc(g.recommended.opportunity_index)}, ${esc(g.recommended.nearest_competitor_km)} km from the nearest competitor, catchment ${esc(g.catchment_km)} km. Barycenters of ${esc(g.demand_points)} demand and ${esc(g.competitor_points)} competitor points; a geometric heuristic, not a site survey.</p>` : ''}
+    ${g && g.recommended ? `<p class="hint-line">Suggested spot: opportunity index ${esc(g.recommended.opportunity_index)}, ${esc(g.recommended.nearest_competitor_km)} km from the nearest competitor, catchment ${esc(g.catchment_km)} km. Barycenters of ${esc(g.demand_points)} demand and ${esc(g.competitor_points)} competitor points; a geometric heuristic, not a site survey. The suggested spot is a block to scout, not a vetted address.</p>` : ''}
     ${sc.method ? `<p class="hint-line">${esc(sc.method)}</p>` : ''}`;
 }
 

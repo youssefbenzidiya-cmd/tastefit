@@ -38,7 +38,7 @@ Hotspot cells come with coordinates; places carry an address, geocoded with Open
 - **Suggested spot**: on a 41×41 grid over the area, maximize `Σ wᵢ·K(x, dᵢ) − 0.7 · Σ wⱼ·K(x, cⱼ)`, with a Gaussian kernel `K` whose width follows the demand spread (0.3 to 3 km). This is a gravity model: be close to demand, away from look-alike competitors.
 - **Opportunity index**: the score at the suggested spot as a share of the peak demand pull (0 to 100).
 
-The map uses Leaflet with OpenStreetMap tiles, and the suggested spot links to Google Maps and Street View (plain links, no API key). It points to a block to scout, not a vetted address.
+The map uses Leaflet with OpenStreetMap tiles. The suggested spot points to a block to scout, not a vetted address.
 
 The memo only cites places, tags and numbers returned by Qloo, plus OpenStreetMap supply counts attributed as such in tenant memos, keeps Qloo results separate from interpretation, and ends with a **Limits** section: Qloo describes aggregate group affinities, not foot traffic, rents or individual behaviour. No personal data is sent to Qloo; inputs are a concept and a place name.
 
