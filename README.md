@@ -159,7 +159,7 @@ CLI: `python agent.py "Korean fried chicken counter" "Austin, TX"`
 
 Front end: `index.html` plus `static/` (`app.js`, `styles.css`, icons, and the Schibsted Grotesk font under the SIL Open Font License, served from the app itself), no build step. The map starts from a few example points; they are places on a map, not vacancy listings. "Read a sample memo" replays `/demo` (synthetic data, labelled as such).
 
-Tests: `python -m unittest discover -s tests -t . -v` (249 tests).
+Tests: `python -m unittest discover -s tests -t . -v` (250 tests).
 
 ## Deploy
 

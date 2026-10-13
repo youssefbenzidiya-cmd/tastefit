@@ -1,15 +1,15 @@
 {
  "_notice": "SYNTHETIC SAMPLE REPORT. Every place name, coordinate, affinity and score in this file is invented to demonstrate the TasteFit interface. It is not live Qloo output and contains no Qloo response data (AGENTS.md rule 2). Replayed by GET /demo.",
- "concept": "a natural wine bar with small plates",
+ "concept": "a Levantine mezze café with small plates",
  "location": "Silver Lake, Los Angeles",
  "model_verdict": {
   "taste_match": {
    "score": 74,
-   "reason": "Five of the seven places the area favors most are sit-down, small-plates or natural-wine adjacent (sample data)."
+   "reason": "Five of the seven places the area favors most are sit-down, small-plates or mezze adjacent (sample data)."
   },
   "competition_gap": {
    "score": 48,
-   "reason": "Two strong look-alikes, Fernhollow Wine Room and Cassis & Crumb, already sit near the demand center (sample data)."
+   "reason": "Two strong look-alikes, Fernhollow Mezze Room and Cassis & Crumb, already sit near the demand center (sample data)."
   }
  },
  "events": [
@@ -17,7 +17,7 @@
    "event": "demo",
    "delay_ms": 0,
    "data": {
-    "concept": "a natural wine bar with small plates",
+    "concept": "a Levantine mezze café with small plates",
     "location": "Silver Lake, Los Angeles",
     "notice": "Sample report: synthetic data, not live Qloo output."
    }
@@ -28,13 +28,13 @@
    "data": {
     "tool": "find_tags",
     "args": {
-     "query": "natural wine bar small plates"
+     "query": "levantine mezze small plates"
     },
     "names": [
-     "Natural wine",
-     "Wine bar",
+     "Mezze",
+     "Levantine",
      "Small plates",
-     "Tapas bar"
+     "Shared plates"
     ],
     "error": null,
     "site": null
@@ -53,7 +53,7 @@
      "Cobalt Noodle House",
      "Paloma Verde Taqueria",
      "The Reservoir Bakehouse",
-     "Magnolia Records & Bar",
+     "Magnolia Records & Café",
      "Saltgrass Oyster Counter"
     ],
     "error": null,
@@ -68,15 +68,15 @@
     "args": {
      "location": "Silver Lake, Los Angeles",
      "tag_urns": [
-      "urn:tag:sample:natural_wine",
+      "urn:tag:sample:mezze",
       "urn:tag:sample:small_plates"
      ]
     },
     "names": [
-     "Fernhollow Wine Room",
+     "Fernhollow Mezze Room",
      "Cassis & Crumb",
-     "The Quiet Decanter",
-     "Bramble Pour House"
+     "The Quiet Olive",
+     "Bramble Grill House"
     ],
     "error": null,
     "site": null
@@ -88,7 +88,7 @@
    "data": {
     "tool": "hotspots",
     "args": {
-     "place": "Fernhollow Wine Room",
+     "place": "Fernhollow Mezze Room",
      "location": "Silver Lake, Los Angeles"
     },
     "names": [],
@@ -178,7 +178,7 @@
       "w": 0.77
      },
      {
-      "name": "Magnolia Records & Bar",
+      "name": "Magnolia Records & Café",
       "lat": 34.08896,
       "lon": -118.2698,
       "w": 0.74
@@ -222,7 +222,7 @@
     ],
     "competition": [
      {
-      "name": "Fernhollow Wine Room",
+      "name": "Fernhollow Mezze Room",
       "lat": 34.08464,
       "lon": -118.27772,
       "w": 0.9
@@ -234,13 +234,13 @@
       "w": 0.84
      },
      {
-      "name": "The Quiet Decanter",
+      "name": "The Quiet Olive",
       "lat": 34.0736,
       "lon": -118.2758,
       "w": 0.72
      },
      {
-      "name": "Bramble Pour House",
+      "name": "Bramble Grill House",
       "lat": 34.1036,
       "lon": -118.2566,
       "w": 0.58
@@ -259,14 +259,14 @@
       "key": "taste_match",
       "name": "Taste match",
       "score": 74,
-      "reason": "Five of the seven places the area favors most are sit-down, small-plates or natural-wine adjacent (sample data).",
+      "reason": "Five of the seven places the area favors most are sit-down, small-plates or mezze adjacent (sample data).",
       "source": "model"
      },
      {
       "key": "competition_gap",
       "name": "Competition gap",
       "score": 48,
-      "reason": "Two strong look-alikes, Fernhollow Wine Room and Cassis & Crumb, already sit near the demand center (sample data).",
+      "reason": "Two strong look-alikes, Fernhollow Mezze Room and Cassis & Crumb, already sit near the demand center (sample data).",
       "source": "model"
      },
      {
@@ -284,7 +284,7 @@
   {
    "event": "memo",
    "delay_ms": 100,
-   "data": "## Verdict: ADJUST (fit score 67)\nThe sample audience clearly over-indexes on the small-plates, natural-wine format, but the two closest look-alikes sit right where demand peaks. Opening slightly north-west of them, with a sharper food program, is what makes this work.\n\n## Scorecard\n- Taste match: 74/100 - Five of the seven places the area favors most are sit-down, small-plates or natural-wine adjacent (sample data).\n- Competition gap: 48/100 - Two strong look-alikes, Fernhollow Wine Room and Cassis & Crumb, already sit near the demand center (sample data).\n- Location strength: 80/100 - Opportunity index 80/100 at the suggested spot, 1.11 km from the nearest competitor\n\n## Evidence\n- Natural wine and Small plates were the closest tag matches for the concept; 5 of the area's 7 top places share a sit-down, small-plates format.\n- Larkspur Coffee Lab (affinity 0.92) and Cobalt Noodle House (0.88) lead what the area already loves.\n- Fernhollow Wine Room (0.90) and Cassis & Crumb (0.84) are the strongest matches for the concept, 0.68 km and 0.44 km from the demand center.\n- Fernhollow Wine Room is most loved in four sub-areas; the strongest one (0.95) lies west of the demand center.\n\n## Best location within the area\nThe suggested point is 1.02 km north-west of the demand center, near Larkspur Coffee Lab and the north-west hotspot, and 1.11 km from the nearest competitor. Opportunity index there: 80/100, inside a catchment of 1.44 km. Treat it as a block to scout, not an address.\n\n## Positioning\n- Menu signatures: 6-8 seasonal small plates built around vegetables and seafood, echoing Saltgrass Oyster Counter's pull.\n- Price tier: mid, below Fernhollow Wine Room, with a by-the-glass list that changes weekly.\n- Vibe: daytime-to-evening room that borrows the record-bar crowd from Magnolia Records & Bar.\n\n## Risks\n- Fernhollow Wine Room already owns the natural-wine story; a copy loses on familiarity.\n- The suggested spot leans on daytime coffee traffic that may not convert to evening wine.\n\n## Before you sign\n- Count evening foot traffic at the suggested block on a Thursday and a Saturday.\n- Compare asking rent with a mid price tier at 40-60 covers.\n- Visit Fernhollow Wine Room and Cassis & Crumb at 8pm to see how full they are.\n- Check the liquor licence situation for the exact unit.\n\n## Limits\nThis is a sample report built from synthetic data: place names, affinities and scores are invented to show what a TasteFit report looks like. A live report uses Qloo aggregate taste affinities, which do not measure foot traffic, rents or individual behaviour, and the suggested spot is never a vetted address."
+   "data": "## Verdict: ADJUST (fit score 67)\nThe sample audience clearly over-indexes on the small-plates, mezze format, but the two closest look-alikes sit right where demand peaks. Opening slightly north-west of them, with a sharper food program, is what makes this work.\n\n## Scorecard\n- Taste match: 74/100 - Five of the seven places the area favors most are sit-down, small-plates or mezze adjacent (sample data).\n- Competition gap: 48/100 - Two strong look-alikes, Fernhollow Mezze Room and Cassis & Crumb, already sit near the demand center (sample data).\n- Location strength: 80/100 - Opportunity index 80/100 at the suggested spot, 1.11 km from the nearest competitor\n\n## Evidence\n- Mezze and Small plates were the closest tag matches for the concept; 5 of the area's 7 top places share a sit-down, small-plates format.\n- Larkspur Coffee Lab (affinity 0.92) and Cobalt Noodle House (0.88) lead what the area already loves.\n- Fernhollow Mezze Room (0.90) and Cassis & Crumb (0.84) are the strongest matches for the concept, 0.68 km and 0.44 km from the demand center.\n- Fernhollow Mezze Room is most loved in four sub-areas; the strongest one (0.95) lies west of the demand center.\n\n## Best location within the area\nThe suggested point is 1.02 km north-west of the demand center, near Larkspur Coffee Lab and the north-west hotspot, and 1.11 km from the nearest competitor. Opportunity index there: 80/100, inside a catchment of 1.44 km. Treat it as a block to scout, not an address.\n\n## Positioning\n- Menu signatures: 6-8 seasonal small plates built around vegetables and seafood, echoing Saltgrass Oyster Counter's pull.\n- Price tier: mid, below Fernhollow Mezze Room, with a fresh-juice and mint-tea list that changes weekly.\n- Vibe: daytime-to-evening room that borrows the record-shop crowd from Magnolia Records & Café.\n\n## Risks\n- Fernhollow Mezze Room already owns the mezze story; a copy loses on familiarity.\n- The suggested spot leans on daytime coffee traffic that may not convert to evening dining.\n\n## Before you sign\n- Count evening foot traffic at the suggested block on a Thursday and a Saturday.\n- Compare asking rent with a mid price tier at 40-60 covers.\n- Visit Fernhollow Mezze Room and Cassis & Crumb at 8pm to see how full they are.\n- Check the extraction and kitchen fit-out for the exact unit.\n\n## Limits\nThis is a sample report built from synthetic data: place names, affinities and scores are invented to show what a TasteFit report looks like. A live report uses Qloo aggregate taste affinities, which do not measure foot traffic, rents or individual behaviour, and the suggested spot is never a vetted address."
   }
  ]
 }
