@@ -95,16 +95,17 @@ def survived(history, opened, seen=SURVIVAL_SEEN):
 
 
 def outcomes(opened, alive, areas=AREAS, radius=RADIUS_KM):
-    """{area: {concept: [openings, survived]}} for classified openings within `radius` of each area's centre."""
+    """{area: {concept: [openings, survived]}} for classified openings within `radius` of an area's centre. Areas
+    overlap, so each opening counts once, for the nearest centre, and the areas stay independent."""
     table = {a[0]: {c: [0, 0] for c in CONCEPTS} for a in areas}
     for lic, o in opened.items():
         concept = classify(o["name"])
         if concept is None:
             continue
-        for name, lat, lon in areas:
-            if km((o["lat"], o["lon"]), (lat, lon)) <= radius:
-                table[name][concept][0] += 1
-                table[name][concept][1] += int(alive.get(lic, False))
+        dist, name = min((km((o["lat"], o["lon"]), (lat, lon)), name) for name, lat, lon in areas)
+        if dist <= radius:
+            table[name][concept][0] += 1
+            table[name][concept][1] += int(alive.get(lic, False))
     return table
 
 
@@ -211,7 +212,7 @@ def qloo_orders(areas, led):
         scores = tenant.demand_scores(res, bench)
         orders[name] = sorted(CONCEPTS, key=lambda c: (scores.get(c, (0, 99))[1], CONCEPTS.index(c))) if scores else None
         if not scores:
-            failures[step.get("error") or (res or {}).get("status") or "no result"] += 1
+            failures[step.get("error") or f"status {(res or {}).get('status') or 'none'}: no usable ranking"] += 1
     return orders, len(bench), dict(failures)
 
 

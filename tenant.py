@@ -444,7 +444,8 @@ def ensure_limits(memo):
     (the prompt puts Limits last)."""
     if not re.search(r"(?m)^##\s*Limits\b", memo):
         return memo.rstrip() + "\n\n" + LIMITS
-    return memo if "backtest" in memo.lower() else memo.rstrip() + "\n" + BACKTEST_NOTE
+    limits = re.split(r"(?m)^##\s*Limits\b", memo, maxsplit=1)[1]
+    return memo if "backtest" in limits.lower() else memo.rstrip() + "\n" + BACKTEST_NOTE
 
 
 # ---------- the run ----------

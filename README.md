@@ -93,13 +93,15 @@ Qloo returns an affinity per option. TasteFit turns the order into a demand scor
 
 `backtest_chicago.py` checks the tenant agent's demand ranking against what actually opened and survived. The ground truth is the City of Chicago Food Inspections register: a restaurant or bakery opened when its license passed its first License inspection in 2023-2024, and survived when no later inspection says Out of Business and it was inspected again since April 2025. Names are matched to the ten catalog concepts by keyword (201 of 1,754 openings match). For each area (1.2 km radius), the ten concepts are ordered by one Qloo `rank` call, and by the citywide share of surviving openings without that area (a "what is opening everywhere" baseline). The output is numbers only (`backtest_chicago.json`).
 
-| 9 Chicago areas, 33 surviving openings | Qloo demand | Citywide baseline | Random |
+| 9 Chicago areas, 31 surviving openings | Qloo demand | Citywide baseline | Random |
 |---|---|---|---|
-| Surviving openings whose concept is in the top 3 | 30% | 64% | 30% |
-| Mean rank correlation with surviving openings | 0.05 | 0.30 | 0 |
-| Survival rate of openings in the top-3 concepts (vs. the rest) | 67% of 15 (45% of 51) | 49% of 43 (52% of 23) | |
+| Surviving openings whose concept is in the top 3 | 29% | 68% | 30% |
+| Mean rank correlation with surviving openings | 0.02 | 0.31 | 0 |
+| Survival rate of openings in the top-3 concepts (vs. the rest) | 64% of 14 (44% of 50) | 49% of 43 (48% of 21) | |
 
-Result: **no measurable gain** from Qloo's demand ranking for predicting which concepts open and survive. The citywide baseline does better, and the Qloo-minus-baseline difference has a 90% bootstrap interval of -59 to 0 points. Openings in the concepts Qloo ranks highest did survive more often (67% vs. 45%), but on 15 openings that is not evidence. A same-day rerun gave Qloo 54% on 8 areas, so the rank output also varies between runs. The LLM-only column needs a working LLM for every area and is not reported. Qloo and the LLM describe today's taste, after these places opened, so this checks agreement with what survived, not a forecast made in 2023.
+Each opening counts once, for the nearest area centre, because neighbouring areas overlap. 3 of the 12 areas are not scored (Pilsen, Chinatown, River North): they had no surviving catalog opening, or Qloo's rank call returned no usable ranking (2 areas). So this is 9 areas and 31 openings, a small sample.
+
+Result: **no gain**. Qloo's demand ranking did no better than random at naming the concepts that opened and survived, and the citywide baseline did clearly better: the Qloo-minus-baseline difference has a 90% bootstrap interval of -66 to -4 points. Openings in the concepts Qloo ranked highest did survive more often (64% vs. 44%), but on 14 openings that is not evidence. Earlier runs the same day, before each opening was counted once, gave Qloo between 30% and 54%, so the rank output also varies between runs. The LLM-only column needs a working LLM for every area and is not reported. Qloo and the LLM describe today's taste, after these places opened, so this checks agreement with what survived, not a forecast made in 2023.
 
 What this means for the product: Qloo is useful here as evidence a broker can show (what the area loves, who already serves it, where the audience is), not as a validated predictor of tenant survival. Every tenant memo's Limits section reports this backtest result (`tenant.BACKTEST_NOTE`, added by code if the LLM leaves it out).
 
@@ -132,7 +134,7 @@ CLI: `python agent.py "Korean fried chicken counter" "Austin, TX"`
 
 **Tenant match** (`GET /tenant?lat=41.9088&lon=-87.6796&rent=4000`, or `?city=Paris&location=Le%20Marais`): for a vacant unit, which food concepts the local audience wants that nobody nearby serves, and whether each can pay the rent. A fixed pipeline of at most 25 Qloo calls (8 workflows; a cache that lives for one request only, so repeated calls within a run are free and nothing Qloo returns outlives the request) streams each step, then a scored shortlist, a "without Qloo" comparison and a memo (`tenant.py`).
 
-Tests: `python -m unittest discover -s tests -t . -v` (215 tests).
+Tests: `python -m unittest discover -s tests -t . -v` (216 tests).
 
 ## Deploy
 

@@ -301,6 +301,8 @@ class HelpersTest(unittest.TestCase):
         self.assertTrue(tenant.ensure_limits(llm_limits).endswith(tenant.BACKTEST_NOTE))
         already = llm_limits + "\n- A Chicago backtest found no gain over a citywide baseline."
         self.assertEqual(tenant.ensure_limits(already), already)
+        elsewhere = "# Memo\n## Recommendation\nOur backtest says go.\n## Limits\n- Aggregate taste."
+        self.assertTrue(tenant.ensure_limits(elsewhere).endswith(tenant.BACKTEST_NOTE))
 
     def test_propose_tops_up_from_catalog(self):
         cands, source = tenant.propose("A", "C", [], [], {}, lambda m: {"content": "no json", "provider": "p"})

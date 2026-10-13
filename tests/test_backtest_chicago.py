@@ -59,6 +59,12 @@ class Register(unittest.TestCase):
         self.assertEqual(t["Wicker Park"]["taqueria"], [1, 1])
         self.assertEqual(sum(o for o, _ in t["Wicker Park"].values()), 1)
 
+    def test_overlapping_areas_count_an_opening_once(self):
+        opened = {"1": {"name": "Tacos Uno", "lat": 41.9100, "lon": -87.6796, "opened": "2023-05-01"}}
+        areas = [("Near", 41.9088, -87.6796), ("Also within radius", 41.9180, -87.6796)]
+        t = bt.outcomes(opened, {"1": True}, areas=areas)
+        self.assertEqual((t["Near"]["taqueria"], t["Also within radius"]["taqueria"]), ([1, 1], [0, 0]))
+
 
 class Metrics(unittest.TestCase):
     def test_hits_and_split(self):
