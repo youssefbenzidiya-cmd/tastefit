@@ -132,8 +132,10 @@ class VenueTest(unittest.TestCase):
     def test_low_coverage_when_the_prior_dominates(self):
         v = city(near_ramen=0, near_coffee=12)
         s = v.supply(tgi.CUISINES["ramen"], *POINT, draws=200)
-        self.assertEqual(s["coverage"], "low" if s["prior_weight"] >= tgi.LOW_COVERAGE else "ok")
         self.assertTrue(0 < s["prior_weight"] <= 1)
+        a, b = tgi.gamma_prior([0, 9, 1, 6, 0, 4], [3, 3, 3, 3, 3, 3])  # overdispersed blocks: a loose prior
+        self.assertLess(b / (b + 30), tgi.LOW_COVERAGE)  # a large expected count outweighs it
+        self.assertGreaterEqual(b / (b + 0.1), tgi.LOW_COVERAGE)  # a tiny expected count does not
         flat = tgi.Venues(GRID, [venue(41.86 + 0.0001 * i, -87.74, cuisine="ramen" if i % 10 == 0 else "") for i in range(400)])
         self.assertEqual(flat.supply({"ramen"}, 41.87, -87.74, draws=200)["coverage"], "low")  # Poisson-like: floored prior
 
@@ -142,6 +144,7 @@ class VenueTest(unittest.TestCase):
         self.assertEqual(v.find("Leopardi", *POINT), (True, "Café Leopardi"))
         self.assertEqual(v.find("Far Away Diner", *POINT)[0], False)  # exists, but not within 500 m
         self.assertEqual(v.find("Totally Invented Bistro", *POINT), (False, None))
+        self.assertEqual(v.find("Lapard Bistro", *POINT), (None, "Café Leopardi"))  # similarity 0.57: ambiguous
         self.assertEqual(v.find("", *POINT), (False, None))
 
     def test_compact_keeps_food_only(self):
