@@ -124,6 +124,25 @@ Result: **no measurable gain**. The index beats the plain Qloo rank by 19 points
 
 What this means for the product: Qloo is useful here as evidence a broker can show (what the area loves, who already serves it, where the audience is), not as a validated predictor of tenant survival. Every tenant memo's Limits section reports this backtest result (`tenant.BACKTEST_NOTE`, added by code if the LLM leaves it out).
 
+### Decision layer (`decision.py`)
+
+Three additions turn the evidence into a decision. None of them uses an extra Qloo call.
+
+- **Rent-first call.** This applies wherever a concept has a Taste Gap label. The rent is checked before taste: no taste fit rescues a rent the unit cannot carry.
+  - NO-GO if the asking rent is above the ceiling's 90% range, or the label is "avoid".
+  - GO if the rent fits and taste is strong. Strong means "white space", or a positive over-index in the run's top third by Taste Gap Index.
+  - ADJUST otherwise, with the adjustment spelled out: negotiate to the central ceiling, or reposition toward the run's white-space concept.
+  - Concepts without a label (no venue file for the city) keep the score thresholds. The score still orders concepts within each call.
+- **Score breakdown.** An exact Shapley split (Shapley 1953) over all 16 coalitions of four signals, against a city-typical baseline: taste over-index (Qloo), supply ratio (OpenStreetMap), audience fit (Qloo, relative to the run's median), and rent headroom (City Scan).
+  - The card shows each signal's contribution and the Qloo share.
+  - The weights are stated priors, not fitted, so the split explains TasteFit's model, not cause and effect.
+  - Momentum is left out because `trends` covers one reference brand, not each concept.
+- **Check first, before signing.** This is the expected value of partial perfect information (Howard 1966; binned estimator, 20 bins, 2,000 seeded draws). It is computed on monthly profit at the asking rent, or at the ceiling when none is given, using the City Scan break-even model's stated cost ranges.
+  - It ranks which input (covers per day, ticket, staff, …) is worth checking before signing, in currency per month of decision value.
+  - A check is shown only when its value exceeds twice a noise floor, measured with a random input.
+  - The figures are monthly, with no discounting and no interest.
+  - They come from TasteFit's stated assumptions, not the user's own numbers. For example, a Chicago restaurant at 6,000/month: covers per day dominates.
+
 ### Limits
 
 - Qloo describes aggregate taste affinities, not foot traffic, sales or rents. The rent ceiling comes from City Scan (official survival data for Paris and Chicago only).
@@ -159,7 +178,7 @@ CLI: `python agent.py "Korean fried chicken counter" "Austin, TX"`
 
 Front end: `index.html` plus `static/` (`app.js`, `styles.css`, icons, and the Schibsted Grotesk font under the SIL Open Font License, served from the app itself), no build step. The map starts from a few example points; they are places on a map, not vacancy listings. "Read a sample memo" replays `/demo` (synthetic data, labelled as such).
 
-Tests: `python -m unittest discover -s tests -t . -v` (250 tests).
+Tests: `python -m unittest discover -s tests -t . -v` (266 tests).
 
 ## Deploy
 

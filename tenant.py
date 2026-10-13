@@ -10,10 +10,13 @@ When no LLM answers, a fixed catalog and a template memo take over, so a run alw
 import concurrent.futures
 import datetime
 import json
+import math
 import re
+import statistics
 import threading
 import time
 
+import decision
 import geo
 import llm
 import qloo
@@ -338,6 +341,53 @@ def verdict(score, downgrade):
     return call
 
 
+CALL_ORDER = {"GO": 0, "ADJUST": 1, "NO-GO": 2}
+
+
+def rent_first_calls(rows, rent_of, asking):
+    """Rent-first (lexicographic) call for rows with a Taste Gap label (decision.verdict), with the adjustment to make.
+    Rows without a label keep the score rule."""
+    gap = [r for r in rows if r.get("tgi_label")]
+    tgis = sorted((r["tgi"] for r in gap if r.get("tgi") is not None), reverse=True)
+    cut = tgis[math.ceil(len(tgis) / 3) - 1] if tgis else None
+    white = [r["concept"] for r in sorted(gap, key=lambda r: -(r.get("tgi") or 0)) if r["tgi_label"] == "white space"]
+    for r in gap:
+        strong = r["tgi_label"] == "white space" or (
+            (r.get("overindex") or 0) > 0 and r.get("tgi") is not None and r["tgi"] >= cut)
+        afford = decision.affordability(rent_of.get(r["concept"]), asking)
+        avoid = r["tgi_label"] == "avoid"
+        r.update(call=decision.verdict(afford, strong, avoid), call_rule="rent-first", afford=afford, strong_taste=strong)
+        if r["call"] == "ADJUST":
+            notes = []
+            if afford == "stretch":
+                notes.append(f"Negotiate the rent to at most {r['rent_max']:.0f}/month (the central ceiling).")
+            if not strong:
+                alt = next((w for w in white if w != r["concept"]), None)
+                notes.append("Taste evidence is not strong here" + (f"; reposition toward {alt}." if alt else "."))
+            r["adjust_note"] = " ".join(notes)
+        elif avoid:
+            r["adjust_note"] = "Taste Gap 'avoid': below-average taste for it here and already well supplied."
+
+
+def add_breakdowns(rows, asking):
+    """Exact Shapley split of each Taste Gap row's explanatory score against a city-typical baseline (decision.explain)."""
+    overlaps = [r["overlap"] for r in rows if r.get("overlap") is not None]
+    med = statistics.median(overlaps) if overlaps else None
+    for r in rows:
+        if r.get("tgi_label"):
+            x, base = decision.features(r.get("overindex"), r.get("theta"), r.get("overlap"), med, r.get("rent_max"), asking)
+            r["breakdown"] = decision.explain(x, base)
+
+
+def value_of_information(row, rent_row, city, asking):
+    """Value of information for one concept at the asking rent (else at its ceiling), or None without stated inputs."""
+    if not rent_row or not rent_row.get("viable") or rent_row.get("relative_demand") is None:
+        return None
+    rent = asking if asking is not None else rent_row["rent_max"]
+    v = decision.value_of_information(scan.slugify(city), row["rent_group"], rent_row["relative_demand"], rent)
+    return v and v | {"concept": row["concept"], "rent": rent, "rent_source": "asking" if asking is not None else "ceiling"}
+
+
 # ---------- baseline (same LLM, no tools) ----------
 
 BASELINE_PROMPT = """A commercial broker has a vacant retail unit in {area} ({city}).
@@ -447,8 +497,12 @@ def judge_baseline(base, shortlist, venues=None, point=None, places=()):
 MEMO_PROMPT = """Write a one-page tenant memo for a commercial broker in Markdown, using ONLY the JSON evidence below.
 Do not change any verdict, score or number, and do not invent places, tags, rents or numbers.
 Sections: ## Recommendation (2 sentences naming the top tenant and its call), ## Shortlist (one bullet per scored
-concept: call, score, the evidence behind it with its source, Qloo or OpenStreetMap, rent check), ## Why this audience (local places, tags and age skew),
-## Before you sign (3 bullets of on-site checks), ## Limits (Qloo describes aggregate taste affinities, not foot
+concept: call, score, the evidence behind it with its source, Qloo or OpenStreetMap, rent check, and its adjust_note
+if any; where a concept has a breakdown, give its Shapley split as "explanatory score vs city-typical, per source, Qloo
+share", stated weights, not causal), ## Why this audience (local places, tags and age skew),
+## Before you sign (if value_of_information is present, first the checks with above_noise true, best first, each with
+its evppi in currency per month as "worth up to about"; say these come from TasteFit's stated cost assumptions; then
+on-site checks, 3 to 5 bullets in total), ## Limits (Qloo describes aggregate taste affinities, not foot
 traffic, sales or individuals; rank scores are relative to these candidates; rent ceilings are a model, not a forecast;
 the Taste Gap Index (tgi, tgi_label) uses stated, uncalibrated weights; supply figures with supply_source OpenStreetMap
 are mapped OSM venues, not Qloo data, and must be attributed to OpenStreetMap (coverage "low" means the city-wide
@@ -462,14 +516,16 @@ LIMITS = ("## Limits\n- Qloo describes aggregate taste affinities of an area's a
           "- White space comes from OpenStreetMap venues near the unit where the city has a venue file (mapping is "
           "incomplete), else from the places Qloo returns inside the area (capped at "
           f"{LOCAL_LIMIT}); neither is a census of competitors.\n- Rent ceilings are a survival model built from "
-          "official data, not a forecast; cafés are not covered.\n- The unit is a point on a map, not a vetted address.")
+          "official data, not a forecast; cafés are not covered.\n- Score breakdowns split TasteFit's own scoring "
+          "model (stated weights), not cause and effect; the check values come from TasteFit's stated cost "
+          "assumptions, not your figures.\n- The unit is a point on a map, not a vetted address.")
 BACKTEST_NOTE = ("- In a Chicago backtest of 2023-2024 openings, neither Qloo demand rankings nor the Taste Gap Index "
                  "predicted which concepts opened and survived better than a citywide baseline: read them as taste and "
                  "supply evidence, not a survival forecast.")
 LIMITS += "\n" + BACKTEST_NOTE
 
 
-def template_memo(area, city, shortlist, profile):
+def template_memo(area, city, shortlist, profile, voi=None):
     scored = [s for s in shortlist if s.get("call")]
     lines = [f"# Tenant memo: {area if city.lower() in area.lower() else f'{area}, {city}'}", ""]
     if scored:
@@ -491,15 +547,47 @@ def template_memo(area, city, shortlist, profile):
             bits.append(f"{s['local_supply']} local places serve it (Qloo)")
         if s.get("shared_tags"):
             bits.append("shared taste: " + ", ".join(s["shared_tags"][:3]))
-        lines.append(f"- **{s['concept']}**: {s['call']}, score {s['score']}; " + "; ".join(bits) + f". Rent: {s['rent_note']}")
+        line = f"- **{s['concept']}**: {s['call']}, score {s['score']}; " + "; ".join(bits) + f". Rent: {s['rent_note']}"
+        if s.get("adjust_note"):
+            line += f" {s['adjust_note']}"
+        if s.get("breakdown"):
+            line += " " + breakdown_text(s["breakdown"])
+        lines.append(line)
     if profile.get("places"):
         lines += ["", "## Why this audience", "Local favourites (Qloo): " + ", ".join(p["name"] for p in profile["places"][:5]) + "."]
         if profile.get("tags"):
             lines.append("Characteristic tags: " + ", ".join(profile["tags"][:8]) + ".")
-    lines += ["", "## Before you sign", "- Count evening and weekend foot traffic at the unit.",
-              "- Check the extraction and kitchen fit-out the top concept needs.",
-              "- Visit the named local favourites to confirm price tier and queues.", "", LIMITS]
+    lines += ["", "## Before you sign"] + voi_lines(voi) + [
+        "- Count evening and weekend foot traffic at the unit.",
+        "- Check the extraction and kitchen fit-out the top concept needs.",
+        "- Visit the named local favourites to confirm price tier and queues.", "", LIMITS]
     return "\n".join(lines)
+
+
+_FEATURE_EN = {"taste": "taste over-index (Qloo)", "supply": "supply gap (OpenStreetMap)",
+               "audience": "audience fit (Qloo)", "rent": "rent headroom (City Scan)"}
+
+
+def breakdown_text(b):
+    parts = ", ".join(f"{_FEATURE_EN[k]} {v:+.1f}" for k, v in b["phi"].items())
+    share = f"; Qloo signals {round(100 * b['qloo_share'])}% of the gap" if b.get("qloo_share") is not None else ""
+    return (f"Breakdown, explanatory score {b['score']} vs city-typical {b['baseline']}: {parts}{share} "
+            "(exact Shapley split under TasteFit's stated weights; not causal).")
+
+
+def voi_lines(voi):
+    if not voi:
+        return []
+    top = [c for c in voi["checks"] if c["above_noise"]][:2]
+    if not top:
+        return []
+    at = f"{voi['rent']:.0f}/month {'asking' if voi['rent_source'] == 'asking' else 'at the ceiling'}"
+    lines = [f"- Check first, for {voi['concept']}: {top[0]['label']}. Knowing it is worth up to about "
+             f"{top[0]['evppi']} {voi['currency']}/month of decision value at {at} (perfect information on every input: "
+             f"{voi['evpi']}; P(monthly profit > 0) {voi['p_profit']:.0%}). From TasteFit's stated cost assumptions, "
+             "monthly figures, no discounting."]
+    lines += [f"- Then: {c['label']} (up to about {c['evppi']} {voi['currency']}/month)." for c in top[1:]]
+    return lines
 
 
 def ensure_limits(memo):
@@ -702,7 +790,7 @@ def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None,
                                          f"over {t['weeks']} weeks"] if t else []}
 
     # Join with the rent ceiling and compute the calls.
-    shortlist = []
+    shortlist, rent_of = [], {}
     for c in ranked:
         row = {k: c.get(k) for k in ("concept", "why", "rent_group", "tag", "benchmark", "demand", "position", "of",
                                      "local_supply", "local_names", "white_space", "shared_tags", "overlap", "trend",
@@ -711,13 +799,19 @@ def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None,
         if c in deep:
             rent_row, note, down = rent_check(c["rent_group"], rent_rows, asking_rent)
             row["score"] = tenant_score(c["demand"], c.get("white_space"), c.get("overlap"))
-            row["call"] = verdict(row["score"], down)
+            row["call"], row["call_rule"] = verdict(row["score"], down), "score"
             row["rent_note"] = note
             row["rent_max"] = rent_row and rent_row.get("rent_max")
+            rent_of[c["concept"]] = rent_row
         shortlist.append(row)
-    shortlist.sort(key=lambda s: (s.get("score") is None, -(s.get("score") or 0)))
+    deep_rows = [s for s in shortlist if s.get("call")]
+    rent_first_calls(deep_rows, rent_of, asking_rent)
+    add_breakdowns(deep_rows, asking_rent)
+    shortlist.sort(key=lambda s: (s.get("score") is None, CALL_ORDER.get(s.get("call"), 3), -(s.get("score") or 0)))
+    voi = next((v for v in (value_of_information(s, rent_of.get(s["concept"]), city, asking_rent)
+                            for s in shortlist if s.get("call")) if v), None)
     yield "shortlist", {"area": area, "city": city, "currency": unit.get("currency"), "asking_rent": asking_rent,
-                        "weights": WEIGHTS, "concepts": shortlist, "heat": heat[:8],
+                        "weights": WEIGHTS, "concepts": shortlist, "heat": heat[:8], "voi": voi,
                         "method": "Score = 0.45 x demand (position in one Qloo rank call) + 0.35 x white space "
                                   + (f"(where the concept maps to OpenStreetMap: 100 x the probability that it is "
                                      f"under-supplied within {tgi.RADIUS_M} m against the city's food mix, shrunk "
@@ -727,7 +821,11 @@ def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None,
                                   + "+ 0.20 x audience overlap (Qloo compare score). GO 65+, ADJUST 45-64, NO-GO below "
                                   "45; a rent above the ceiling downgrades the call."
                                   + (" Taste Gap Index = sigma(over-index - log supply ratio), stated priors, "
-                                     "uncalibrated; it did not beat a citywide baseline in the Chicago backtest."
+                                     "uncalibrated; it did not beat a citywide baseline in the Chicago backtest. "
+                                     "Where a concept has a Taste Gap label the call is rent-first instead: NO-GO if "
+                                     "the asking rent is above the ceiling's 90% range or the label is 'avoid'; GO if "
+                                     "the rent fits and taste is strong (white space, or a positive over-index in the "
+                                     "run's top third by Taste Gap Index); else ADJUST. The score still ranks."
                                      if venues else "")}
 
     try:
@@ -741,14 +839,15 @@ def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None,
     evidence = {"area": area, "city": city, "asking_rent": asking_rent, "currency": unit.get("currency"),
                 "profile": {"places": [p["name"] for p in places[:6]], "tags": tags[:10], "age_skew": demo.get("age")},
                 "shortlist": [{k: v for k, v in s.items() if k not in ("benchmark", "tag", "local_names")}
-                              | {"benchmark": (s.get("benchmark") or {}).get("name")} for s in shortlist]}
+                              | {"benchmark": (s.get("benchmark") or {}).get("name")} for s in shortlist],
+                "value_of_information": voi}
     try:
         msg = chat_fn([{"role": "user", "content": MEMO_PROMPT.format(evidence=json.dumps(evidence, ensure_ascii=False))}])
         memo, author = (msg.get("content") or "").strip(), msg.get("provider") or "llm"
         if len(memo) < 200:
             raise ValueError("memo too short")
     except Exception:  # noqa: BLE001  the template memo always works
-        memo, author = template_memo(area, city, shortlist, profile), "template"
+        memo, author = template_memo(area, city, shortlist, profile, voi), "template"
     yield "memo", {"markdown": ensure_limits(memo), "author": author}
     yield "budget", {"qloo_calls": led.network, "cache_hits": led.cached, "budget": led.budget,
                      "workflows": led.workflows()}
