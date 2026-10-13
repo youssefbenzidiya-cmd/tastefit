@@ -20,6 +20,12 @@ class SampleReport(unittest.TestCase):
         self.assertIn("not live Qloo output", self.events["demo"]["notice"])
         self.assertIn("synthetic data", self.events["memo"])
 
+    def test_sample_concept_is_not_alcohol_led(self):
+        import tenant
+        self.assertFalse(tenant.alcohol_led(self.doc["concept"]))
+        self.assertFalse(tenant.alcohol_led(self.events["demo"]["concept"]))
+        self.assertNotRegex(FIXTURE.read_text().lower(), r"wine|liquor|cocktail|decanter")
+
     def test_only_known_events_with_small_delays(self):
         kinds = [e["event"] for e in self.doc["events"]]
         self.assertEqual(kinds[0], "demo")

@@ -38,7 +38,7 @@ Hotspot cells come with coordinates; places carry an address, geocoded with Open
 - **Suggested spot**: on a 41×41 grid over the area, maximize `Σ wᵢ·K(x, dᵢ) − 0.7 · Σ wⱼ·K(x, cⱼ)`, with a Gaussian kernel `K` whose width follows the demand spread (0.3 to 3 km). This is a gravity model: be close to demand, away from look-alike competitors.
 - **Opportunity index**: the score at the suggested spot as a share of the peak demand pull (0 to 100).
 
-The map uses Leaflet with OpenStreetMap tiles, and the suggested spot links to Google Maps and Street View (plain links, no API key). It points to a block to scout, not a vetted address.
+The map uses Leaflet with OpenStreetMap tiles. The suggested spot points to a block to scout, not a vetted address.
 
 The memo only cites places, tags and numbers returned by Qloo, plus OpenStreetMap supply counts attributed as such in tenant memos, keeps Qloo results separate from interpretation, and ends with a **Limits** section: Qloo describes aggregate group affinities, not foot traffic, rents or individual behaviour. No personal data is sent to Qloo; inputs are a concept and a place name.
 
@@ -157,7 +157,9 @@ CLI: `python agent.py "Korean fried chicken counter" "Austin, TX"`
 
 **Claim ledger** (the "without Qloo" panel): the same LLM, with no tools, suggests concepts and names up to 5 competitors within 500 m. Each concept is marked confirmed (Taste Gap "white space", or "neutral" with a positive over-index), contradicted ("proven demand, crowded", "empty for a reason", "avoid"), partly supported, or not tested by this run. Each named venue is looked up in OpenStreetMap within 500 m with City Scan's name matcher (similarity >= 0.6 found, 0.45-0.6 ambiguous); Qloo's own area favourites that read as food venues go through the same check (1.5 km, since they are area-level; the OSM file holds food venues only). The page shows counts, and calls them agreement with the run's evidence and existence in open data, not accuracy: OSM misses real venues too. Supply estimates whose city-wide prior carries >= 80% of the weight are badged "Data coverage: low": the local OSM count barely moves them. This happens when the expected count near the unit is small or the city's block counts vary little; it is not a measure of how complete OSM mapping is.
 
-Tests: `python -m unittest discover -s tests -t . -v` (246 tests).
+Front end: `index.html` plus `static/` (`app.js`, `styles.css`, icons, and the Schibsted Grotesk font under the SIL Open Font License, served from the app itself), no build step. The map starts from a few example points; they are places on a map, not vacancy listings. "Read a sample memo" replays `/demo` (synthetic data, labelled as such).
+
+Tests: `python -m unittest discover -s tests -t . -v` (250 tests).
 
 ## Deploy
 

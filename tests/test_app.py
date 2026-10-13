@@ -65,6 +65,33 @@ class Server(unittest.TestCase):
         self.assertIn("TasteFit", body)
         self.assertNotIn("{{CTA}}", body)
 
+    def test_static_assets_are_served_with_their_types(self):
+        for path, (_, ctype) in app.STATIC.items():
+            conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+            try:
+                conn.request("GET", path)
+                r = conn.getresponse()
+                body = r.read()
+            finally:
+                conn.close()
+            self.assertEqual((r.status, r.getheader("Content-Type")), (200, ctype), path)
+            self.assertGreater(len(body), 0, path)
+        self.assertEqual(self.get("/static/app.js")[0], 404)
+        self.assertEqual(self.get("/../app.py")[0], 404)
+
+    def test_page_csp_allows_self_hosted_font_and_script_only(self):
+        csp = self.request("GET", "/")[1]["Content-Security-Policy"]
+        self.assertIn("font-src 'self';", csp)
+        self.assertIn("script-src 'self' 'nonce-", csp)
+        self.assertNotIn("fonts.gstatic.com", csp)
+        self.assertNotIn("unsafe-eval", csp)
+
+    def test_page_has_no_unfilled_placeholders_and_absolute_og_image(self):
+        body = self.get("/")[1]
+        self.assertNotRegex(body, r"\{\{[A-Z]+\}\}")
+        self.assertRegex(body, r'property="og:image" content="https://[^"]+/og\.png"')
+        self.assertEqual(len(re.findall(r'<script nonce="[^"]+">', body)), 2)
+
     def test_footer_build_dev_when_commit_unset(self):
         with mock.patch.dict(os.environ):
             os.environ.pop("RENDER_GIT_COMMIT", None)
@@ -134,12 +161,13 @@ class Server(unittest.TestCase):
 
     def test_cdn_scripts_are_pinned_with_sri(self):
         body = self.get("/")[1]
-        scripts = re.findall(r"<script src=\"([^\"]+)\"([^>]*)>", body)
+        scripts = re.findall(r"<script (?:defer )?src=\"(https://[^\"]+)\"([^>]*)>", body)
         self.assertEqual(len(scripts), 3)
         for src, attrs in scripts:
             self.assertRegex(src, r"@\d+\.\d+\.\d+/")
             self.assertIn('integrity="sha', attrs)
-        self.assertIn("DOMPurify.sanitize(marked.parse", body)
+        self.assertEqual(re.findall(r"<script (?:defer )?src=\"(/[^\"]+)\"", body), ["/app.js"])
+        self.assertIn("DOMPurify.sanitize(marked.parse", self.get("/app.js")[1])
 
     def test_copy_has_no_pricing_promise_or_unsourced_claim(self):
         body = self.get("/")[1]
