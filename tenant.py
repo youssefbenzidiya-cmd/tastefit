@@ -35,7 +35,8 @@ _FOOD_BARS = re.compile(r"\b(juice|salad|espresso|coffee|smoothie|dessert|noodle
                         r"oatmeal|acai|açaí|soup|burrito|taco|ramen|tea|matcha|yogurt|cereal|breakfast)\s+bars?\b", re.I)
 _ALCOHOL = re.compile(r"\b(bars?|pubs?|gastropubs?|brew\w*|taprooms?|taverns?|wines?|winery|wineries|cocktails?|"
                       r"beers?|biergarten|spirits|sake|speakeasy|speakeasies|izakayas?|lounges?|nightclubs?|"
-                      r"distiller\w*|cider\w*|liquor|alcohol\w*|saloons?|cantinas?|whisk(e)?y|vineyards?)\b", re.I)
+                      r"distiller\w*|cider\w*|liquor|alcohol\w*|saloons?|cantinas?|whisk(e)?y|vineyards?|"
+                      r"tequilas?|mezcal\w*|vodka|rum|gin|bourbon|champagne|prosecco|margaritas?|sangria)\b", re.I)
 
 
 def alcohol_led(text):

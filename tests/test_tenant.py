@@ -239,9 +239,11 @@ class LedgerTest(unittest.TestCase):
 
 class HelpersTest(unittest.TestCase):
     def test_alcohol_led(self):
-        for s in ("wine bar", "Craft brewery", "cocktail lounge", "Irish pub", "izakaya", "Sports Bar & Grill"):
+        for s in ("wine bar", "Craft brewery", "cocktail lounge", "Irish pub", "izakaya", "Sports Bar & Grill",
+                  "Federales Tacos & Tequila", "Mezcaleria Las Flores", "Gin & Tonic Club"):
             self.assertTrue(tenant.alcohol_led(s), s)
-        for s in ("salad bar", "juice bar", "espresso bar", "ramen counter", "bakery", "sushi bar", "Barbecue"):
+        for s in ("salad bar", "juice bar", "espresso bar", "ramen counter", "bakery", "sushi bar", "Barbecue",
+                  "Ginger Thai", "Rumi Persian Grill", "Pizza Margherita"):
             self.assertFalse(tenant.alcohol_led(s), s)
 
     def test_usable_benchmark_keeps_licensed_restaurants(self):
