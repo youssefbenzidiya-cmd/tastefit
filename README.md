@@ -40,7 +40,7 @@ Hotspot cells come with coordinates; places carry an address, geocoded with Open
 
 The map uses Leaflet with OpenStreetMap tiles, and the suggested spot links to Google Maps and Street View (plain links, no API key). It points to a block to scout, not a vetted address.
 
-The memo only cites places, tags and numbers returned by Qloo, keeps Qloo results separate from interpretation, and ends with a **Limits** section: Qloo describes aggregate group affinities, not foot traffic, rents or individual behaviour. No personal data is sent to Qloo; inputs are a concept and a place name.
+The memo only cites places, tags and numbers returned by Qloo, plus OpenStreetMap supply counts attributed as such in tenant memos, keeps Qloo results separate from interpretation, and ends with a **Limits** section: Qloo describes aggregate group affinities, not foot traffic, rents or individual behaviour. No personal data is sent to Qloo; inputs are a concept and a place name.
 
 ### City Scan and rent ceiling (`/scan`, `/scan/unit`)
 
@@ -155,7 +155,7 @@ CLI: `python agent.py "Korean fried chicken counter" "Austin, TX"`
 
 **Tenant match** (`GET /tenant?lat=41.9088&lon=-87.6796&rent=4000`, or `?city=Paris&location=Le%20Marais`): for a vacant unit, which food concepts the local audience wants that nobody nearby serves, and whether each can pay the rent. A fixed pipeline of at most 25 Qloo calls (8 workflows; a cache that lives for one request only, so repeated calls within a run are free and nothing Qloo returns outlives the request) streams each step, then a scored shortlist, a "without Qloo" comparison and a memo (`tenant.py`).
 
-Tests: `python -m unittest discover -s tests -t . -v` (240 tests).
+Tests: `python -m unittest discover -s tests -t . -v` (241 tests).
 
 ## Deploy
 

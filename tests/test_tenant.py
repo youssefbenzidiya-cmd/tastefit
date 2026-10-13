@@ -257,6 +257,13 @@ class TasteGapPipelineTest(unittest.TestCase):
         self.assertGreater(ramen["tgi"], coffee["tgi"])
         self.assertIn(ramen["tgi_label"], {"white space", "neutral"})
         self.assertIn("uncalibrated", self.kinds(ev, "shortlist")[0]["method"])
+        self.assertIn("else the Qloo count", self.kinds(ev, "shortlist")[0]["method"])
+
+    def test_memos_attribute_osm_supply(self):
+        self.assertIn("must be attributed to OpenStreetMap", tenant.MEMO_PROMPT)
+        memo = self.kinds(self.run_all(chat_fn=no_llm), "memo")[0]["markdown"]
+        self.assertIn("OpenStreetMap-mapped venues within 600 m", memo)
+        self.assertIn("local places serve it (Qloo)", memo)  # pho has no OSM venue here: Qloo count, labelled
 
     def test_unmapped_concept_falls_back_to_qloo_supply(self):
         with mock.patch("tenant.tgi.cuisines_for", side_effect=lambda c, t=None: set() if "Pho" in c else {"ramen"}):

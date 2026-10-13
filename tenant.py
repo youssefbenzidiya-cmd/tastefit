@@ -400,10 +400,11 @@ def judge_baseline(base, shortlist):
 MEMO_PROMPT = """Write a one-page tenant memo for a commercial broker in Markdown, using ONLY the JSON evidence below.
 Do not change any verdict, score or number, and do not invent places, tags, rents or numbers.
 Sections: ## Recommendation (2 sentences naming the top tenant and its call), ## Shortlist (one bullet per scored
-concept: call, score, the Qloo evidence behind it, rent check), ## Why this audience (local places, tags and age skew),
+concept: call, score, the evidence behind it with its source, Qloo or OpenStreetMap, rent check), ## Why this audience (local places, tags and age skew),
 ## Before you sign (3 bullets of on-site checks), ## Limits (Qloo describes aggregate taste affinities, not foot
 traffic, sales or individuals; rank scores are relative to these candidates; rent ceilings are a model, not a forecast;
-the Taste Gap Index (tgi, tgi_label) uses stated, uncalibrated weights; in a Chicago backtest neither Qloo demand
+the Taste Gap Index (tgi, tgi_label) uses stated, uncalibrated weights; supply figures with supply_source OpenStreetMap
+are mapped OSM venues, not Qloo data, and must be attributed to OpenStreetMap; in a Chicago backtest neither Qloo demand
 rankings nor the Taste Gap Index predicted which concepts survived better than a citywide baseline).
 Evidence:
 {evidence}"""
@@ -430,8 +431,13 @@ def template_memo(area, city, shortlist, profile):
     lines.append("## Shortlist")
     for s in scored:
         bits = [f"demand {s['demand']} (rank {s['position']} of {s['of']})"]
-        if s.get("local_supply") is not None:
-            bits.append(f"{s['local_supply']} local places serve it")
+        if s.get("local_supply") is not None and s.get("supply_source") == "OpenStreetMap":
+            bits.append(f"{s['local_supply']} OpenStreetMap-mapped venues within {tgi.RADIUS_M} m "
+                        f"({s['supply_expected']} expected from the city's mix)")
+            if s.get("tgi_label"):
+                bits.append(f"Taste Gap: {s['tgi_label']} (index {s['tgi']}, uncalibrated)")
+        elif s.get("local_supply") is not None:
+            bits.append(f"{s['local_supply']} local places serve it (Qloo)")
         if s.get("shared_tags"):
             bits.append("shared taste: " + ", ".join(s["shared_tags"][:3]))
         lines.append(f"- **{s['concept']}**: {s['call']}, score {s['score']}; " + "; ".join(bits) + f". Rent: {s['rent_note']}")
@@ -662,9 +668,10 @@ def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None,
     yield "shortlist", {"area": area, "city": city, "currency": unit.get("currency"), "asking_rent": asking_rent,
                         "weights": WEIGHTS, "concepts": shortlist, "heat": heat[:8],
                         "method": "Score = 0.45 x demand (position in one Qloo rank call) + 0.35 x white space "
-                                  + (f"(100 x the probability that the concept is under-supplied within {tgi.RADIUS_M} m, "
-                                     "from OpenStreetMap venues against the city's food mix, shrunk toward the city "
-                                     "average) " if venues else
+                                  + (f"(where the concept maps to OpenStreetMap: 100 x the probability that it is "
+                                     f"under-supplied within {tgi.RADIUS_M} m against the city's food mix, shrunk "
+                                     f"toward the city average; else the Qloo count, 100 minus 10 per local place) "
+                                     if venues else
                                      f"(100 minus 10 per local place, {LOCAL_LIMIT}+ = 0) ")
                                   + "+ 0.20 x audience overlap (Qloo compare score). GO 65+, ADJUST 45-64, NO-GO below "
                                   "45; a rent above the ceiling downgrades the call."
