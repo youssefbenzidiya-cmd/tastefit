@@ -276,9 +276,14 @@ class TasteGapPipelineTest(unittest.TestCase):
                          [("Leopardi", "exists"), ("Totally Invented Bistro", "not found")])
         L = base["ledger"]
         self.assertEqual(L["llm_venues"], {"exists": 1, "not found": 1, "ambiguous": 0, "named": 2, "radius_m": 500})
-        self.assertEqual(L["qloo_venues"]["named"], 3)  # the area favourites, checked the same way
+        self.assertEqual(L["qloo_venues"]["named"], 1)  # only "Sample Tacos" reads as food; the gallery is not in OSM's food file
         self.assertEqual(L["source"], "OpenStreetMap")
         self.assertEqual(sum(L["concepts"].values()), 4)
+
+    def test_food_places_filter(self):
+        places = [{"name": "Sample Gallery", "description": "Art space"}, {"name": "Lula", "description": "Seasonal restaurant"},
+                  {"name": "Sample Tacos", "description": None}, {"name": "Record Shop"}]
+        self.assertEqual(tenant.food_places(places), ["Lula", "Sample Tacos"])
 
     def test_ledger_verdict_rules(self):
         rows = [{"concept": c, "tag": None, "tgi_label": g, "overindex": d, "local_supply": 1, "supply_expected": 1.0}

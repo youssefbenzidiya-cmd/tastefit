@@ -955,7 +955,7 @@ function shortlistHTML(d) {
     const supply = c.local_supply == null ? '–' : c.supply_source === 'OpenStreetMap'
       ? '<b>' + esc(c.local_supply) + '</b><small>' + esc(c.supply_expected) + ' expected within 600 m (OpenStreetMap)</small>' +
         '<small>P(under-supplied) ' + esc(c.p_under) + '</small>' +
-        (c.coverage === 'low' ? '<small class="badge partly" title="Few mapped venues: the estimate stays near the city average">Data coverage: low</small>' : '')
+        (c.coverage === 'low' ? '<small class="badge partly" title="The city-wide prior outweighs the local OpenStreetMap count: the estimate stays near the city average">Data coverage: low</small>' : '')
       : '<b>' + esc(c.local_supply) + (c.local_supply >= 10 ? '+' : '') + '</b>' +
         (c.local_names && c.local_names.length ? '<small>' + esc(c.local_names.slice(0, 3).join(', ')) + '</small>' : '<small>none found</small>');
     const gap = c.tgi_label ? '<small>Taste Gap: ' + esc(c.tgi_label) + (c.overindex != null ? ', over-index ' + (c.overindex > 0 ? '+' : '') + esc(c.overindex) : '') +
@@ -1000,10 +1000,10 @@ function baselineHTML(b, d) {
     esc(k['not tested'] || 0) + ' not tested by this run' + (k.excluded ? ', ' + esc(k.excluded) + ' excluded (alcohol-led)' : '') + '.' +
     (lv ? ' It named ' + esc(lv.named) + ' competitors within ' + esc(lv.radius_m) + ' m: ' + esc(lv.exists) + ' found in OpenStreetMap, ' +
       esc(lv['not found']) + ' not found, ' + esc(lv.ambiguous) + ' ambiguous.' : '') +
-    (qv ? ' Qloo\'s ' + esc(qv.named) + ' area favourites: ' + esc(qv.exists) + ' found in OpenStreetMap within ' + esc(qv.radius_m / 1000) + ' km.' : '') +
+    (qv ? ' Qloo\'s ' + esc(qv.named) + ' food-venue area favourites (the OSM file holds food venues only): ' + esc(qv.exists) + ' found in OpenStreetMap within ' + esc(qv.radius_m / 1000) + ' km.' : '') +
     ' Agreement with this run\'s evidence and existence in open data, not accuracy.</p>' +
     ((b.venues || []).length ? '<ul class="claims">' + b.venues.map(v => '<li><b>' + esc(v.name) + '</b><span class="badge ' +
-      (v.status === 'exists' ? 'confirmed' : v.status === 'ambiguous' ? 'partly' : 'contradicted') + '">' + esc(v.status) + '</span>' +
+      (v.status === 'exists' ? 'confirmed' : v.status === 'ambiguous' ? 'partly' : 'not-tested') + '">' + esc(v.status) + '</span>' +
       (v.match ? '<small>OpenStreetMap: ' + esc(v.match) + '</small>' : '') + '</li>').join('') + '</ul>' : '');
   return '<div class="t-two t-baseline"><div class="t-card"><h3>Same LLM, without Qloo</h3><p>Asked the same question with no tools (' +
     esc(b.provider || 'LLM') + '). Each claim checked against this run\'s Qloo and OpenStreetMap evidence.</p><ul class="claims">' + items + '</ul>' + ledger + '</div>' +

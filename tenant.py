@@ -370,6 +370,14 @@ def baseline(area, city, chat_fn):
 
 _CROWDED = ("avoid", "empty for a reason", "proven demand, crowded")
 QLOO_PLACE_RADIUS_M = 1500  # Qloo's favourites are area-level, not next-door claims
+_FOODISH = re.compile(r"restaurant|caf[eé]|coffee|espresso|bakery|boulanger|patisser|p[âa]tisser|bistro|brasserie|"
+                      r"diner|grill|kitchen|eatery|pizz|taco|taqueria|burger|ramen|sushi|noodle|bagel|deli|dumpling|"
+                      r"food|cuisine|dishes|brunch|breakfast|ice cream|gelat|bbq|barbecue|chicken|sandwich", re.I)
+
+
+def food_places(places):
+    """Names of Qloo places that read as food venues (name or description), the only kind the OSM file holds."""
+    return [p["name"] for p in places if _FOODISH.search(f"{p.get('name') or ''} {p.get('description') or ''}")]
 
 
 def venue_checks(names, venues, point, radius):
@@ -443,8 +451,8 @@ concept: call, score, the evidence behind it with its source, Qloo or OpenStreet
 ## Before you sign (3 bullets of on-site checks), ## Limits (Qloo describes aggregate taste affinities, not foot
 traffic, sales or individuals; rank scores are relative to these candidates; rent ceilings are a model, not a forecast;
 the Taste Gap Index (tgi, tgi_label) uses stated, uncalibrated weights; supply figures with supply_source OpenStreetMap
-are mapped OSM venues, not Qloo data, and must be attributed to OpenStreetMap (coverage "low" means the estimate
-stays near the city average: say so); in a Chicago backtest neither Qloo demand
+are mapped OSM venues, not Qloo data, and must be attributed to OpenStreetMap (coverage "low" means the city-wide
+prior outweighs the local count and the estimate stays near the city average: say so); in a Chicago backtest neither Qloo demand
 rankings nor the Taste Gap Index predicted which concepts survived better than a citywide baseline).
 Evidence:
 {evidence}"""
@@ -475,7 +483,8 @@ def template_memo(area, city, shortlist, profile):
             bits.append(f"{s['local_supply']} OpenStreetMap-mapped venues within {tgi.RADIUS_M} m "
                         f"({s['supply_expected']} expected from the city's mix)")
             if s.get("coverage") == "low":
-                bits.append("data coverage low: few mapped venues, so the supply estimate stays near the city average")
+                bits.append("data coverage low: the city-wide prior outweighs the local OpenStreetMap count, so the "
+                            "supply estimate stays near the city average")
             if s.get("tgi_label"):
                 bits.append(f"Taste Gap: {s['tgi_label']} (index {s['tgi']}, uncalibrated)")
         elif s.get("local_supply") is not None:
@@ -725,7 +734,7 @@ def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None,
         base_result = base_future.result(timeout=max(1, DEADLINE - (clock() - started)))
     except concurrent.futures.TimeoutError:
         base_result = None
-    base = judge_baseline(base_result, shortlist, venues, point, [p["name"] for p in places])
+    base = judge_baseline(base_result, shortlist, venues, point, food_places(places))
     pool.shutdown(wait=False)
     yield "baseline", base or {"unavailable": True}
 
