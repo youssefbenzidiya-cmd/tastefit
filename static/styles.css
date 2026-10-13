@@ -618,3 +618,16 @@ body.in-app .foot, body.in-app .topbar [data-go-app] { display: none; }
 .rent-table tr:first-child th { color: var(--ink-2); font-weight: 600; }
 .rent-table th[scope=row] { font-weight: 500; }
 .scan-attr { font-size: var(--t-13); color: var(--ink-3); max-width: 80ch; }
+.adjust-note { font-size: var(--t-14); color: var(--adjust); font-weight: 600; }
+.breakdown { display: grid; gap: var(--s-2); padding-top: var(--s-2); }
+.wf-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.wf-bars li { display: grid; grid-template-columns: minmax(0, 11rem) 1fr 3.2rem; gap: var(--s-2); align-items: center; font-size: var(--t-13); }
+.wf-bars .k { color: var(--ink-3); }
+.wf-bars b { text-align: right; }
+.wf-track { position: relative; height: 10px; background: var(--sunken); border-radius: 5px; }
+.wf-track::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--rule-strong); }
+.wf-track i { position: absolute; top: 0; bottom: 0; border-radius: 5px; }
+.wf-pos { background: var(--go); }
+.wf-neg { background: var(--nogo); }
+.voi { margin-top: var(--s-3); padding: var(--s-3) var(--s-4); border-left: 3px solid var(--hl); background: var(--hl-soft); border-radius: var(--r-sm); display: grid; gap: var(--s-1); }
+.voi p { font-size: var(--t-14); color: var(--ink); }

@@ -429,5 +429,90 @@ class HelpersTest(unittest.TestCase):
         self.assertFalse(any(tenant.alcohol_led(c["concept"]) for c in cands))
 
 
+ROW = {"rent_max": 3230.0, "ci90": [2800.0, 4000.0], "viable": True, "relative_demand": 0.616, "group": "restaurant"}
+
+
+def gap_row(concept, label, tgi_=0.6, d=0.8):
+    return {"concept": concept, "tgi_label": label, "tgi": tgi_, "overindex": d, "rent_max": 3230.0, "call": "GO",
+            "rent_group": "restaurant", "theta": 0.5, "overlap": 60}
+
+
+class DecisionWiringTest(unittest.TestCase):
+    def calls(self, asking, *rows):
+        rows = [dict(r) for r in rows]
+        tenant.rent_first_calls(rows, {r["concept"]: ROW for r in rows}, asking)
+        return {r["concept"]: r for r in rows}
+
+    def test_rent_first_verdict_table(self):
+        self.assertEqual(self.calls(5000, gap_row("A", "white space"))["A"]["call"], "NO-GO")  # over + white space
+        self.assertEqual(self.calls(3000, gap_row("A", "white space"))["A"]["call"], "GO")  # ok + white space
+        r = self.calls(3500, gap_row("A", "white space"))["A"]  # stretch + white space
+        self.assertEqual((r["call"], r["call_rule"]), ("ADJUST", "rent-first"))
+        self.assertIn("at most 3230/month", r["adjust_note"])
+        self.assertEqual(self.calls(3000, gap_row("A", "avoid", d=-0.8))["A"]["call"], "NO-GO")
+
+    def test_weak_taste_repositions_toward_a_white_space(self):
+        r = self.calls(3000, gap_row("A", "white space", tgi_=0.8), gap_row("B", "neutral", tgi_=0.2, d=0.1),
+                       gap_row("C", "neutral", tgi_=0.1, d=-0.2))
+        self.assertEqual(r["B"]["call"], "ADJUST")
+        self.assertIn("reposition toward A", r["B"]["adjust_note"])
+
+    def test_rows_without_a_taste_gap_keep_the_score_rule(self):
+        rows = [{"concept": "X", "call": "GO", "call_rule": "score", "tgi_label": None}]
+        tenant.rent_first_calls(rows, {"X": ROW}, 9999)
+        self.assertEqual((rows[0]["call"], rows[0]["call_rule"]), ("GO", "score"))
+
+    def test_breakdown_is_exact_and_labelled(self):
+        rows = [gap_row("A", "white space"), {**gap_row("B", "neutral"), "overlap": 40}]
+        tenant.add_breakdowns(rows, 3000)
+        for r in rows:
+            b = r["breakdown"]
+            self.assertAlmostEqual(sum(b["phi"].values()), b["score"] - b["baseline"], delta=0.3)
+        self.assertGreater(rows[0]["breakdown"]["phi"]["audience"], 0)  # above the run's median overlap
+        text = tenant.breakdown_text(rows[0]["breakdown"])
+        self.assertIn("not causal", text)
+        self.assertIn("supply gap (OpenStreetMap)", text)
+
+    def test_value_of_information_at_asking_or_ceiling(self):
+        row = gap_row("A", "white space")
+        v = tenant.value_of_information(row, ROW, "Chicago", 6000)
+        self.assertEqual((v["concept"], v["rent"], v["rent_source"], v["currency"]), ("A", 6000, "asking", "USD"))
+        self.assertEqual(tenant.value_of_information(row, ROW, "Chicago", None)["rent_source"], "ceiling")
+        self.assertIsNone(tenant.value_of_information(row, {**ROW, "relative_demand": None}, "Chicago", 6000))
+        self.assertIsNone(tenant.value_of_information(row, None, "Chicago", 6000))
+        lines = tenant.voi_lines(v)
+        self.assertTrue(lines[0].startswith("- Check first, for A: your real covers per day"))
+        self.assertIn("no discounting", lines[0])
+
+    def test_template_memo_carries_the_decision_layer(self):
+        row = {**gap_row("A", "white space"), "score": 70, "call": "ADJUST", "demand": 100, "position": 1, "of": 3,
+               "rent_note": "Asking rent 3500 is above the central ceiling 3230: negotiate.",
+               "adjust_note": "Negotiate the rent to at most 3230/month (the central ceiling)."}
+        tenant.add_breakdowns([row], 3500)
+        voi = tenant.value_of_information(row, ROW, "Chicago", 3500)
+        memo = tenant.template_memo("Sample Park", "Chicago", [row], {}, voi)
+        self.assertIn("Negotiate the rent to at most 3230/month", memo)
+        self.assertIn("Breakdown, explanatory score", memo)
+        self.assertIn("Check first, for A", memo)
+        self.assertIn("not cause and effect", memo)
+
+
+class DecisionPipelineTest(unittest.TestCase):
+    setUp, run_all, kinds = PipelineTest.setUp, PipelineTest.run_all, PipelineTest.kinds
+    venues = TasteGapPipelineTest.venues
+
+    def test_shortlist_carries_rent_first_calls(self):
+        sl = self.kinds(self.run_all(asking_rent=2800), "shortlist")[0]
+        scored = [s for s in sl["concepts"] if s.get("call")]
+        for s in scored:
+            self.assertEqual(s["call_rule"], "rent-first" if s.get("tgi_label") else "score")
+            self.assertEqual("breakdown" in s, bool(s.get("tgi_label")))
+        self.assertTrue(any(s["call_rule"] == "rent-first" for s in scored))
+        order = [tenant.CALL_ORDER[s["call"]] for s in scored]
+        self.assertEqual(order, sorted(order))
+        self.assertIn("voi", sl)
+        self.assertIn("rent-first", sl["method"])
+
+
 if __name__ == "__main__":
     unittest.main()

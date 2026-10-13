@@ -380,8 +380,21 @@ function callsFor(c) {
   const bench = c.benchmark && c.benchmark.name;
   return state.steps.flatMap(s => s.calls).filter(x => (x.purpose || '').includes(c.concept) || (bench && x.purpose.includes(bench)) || (c.trend && x.purpose.includes(c.trend.brand)));
 }
+const FEATURE = { taste: ['Taste over-index', 'Qloo'], supply: ['Supply gap', 'OpenStreetMap'], audience: ['Audience fit', 'Qloo'], rent: ['Rent headroom', 'City Scan'] };
+function breakdownHTML(b) {
+  const max = Math.max(1, ...Object.values(b.phi).map(Math.abs));
+  const rows = Object.entries(b.phi).map(([k, v]) => {
+    const w = Math.round(50 * Math.abs(v) / max);
+    return `<li><span>${esc(FEATURE[k][0])} <span class="k">${esc(FEATURE[k][1])}</span></span>
+      <span class="wf-track"><i class="${v >= 0 ? 'wf-pos' : 'wf-neg'}" style="width:${w}%;${v >= 0 ? 'left:50%' : `left:${50 - w}%`}"></i></span>
+      <b class="num">${v > 0 ? '+' : ''}${esc(v.toFixed(1))}</b></li>`;
+  }).join('');
+  return `<details class="card-more"><summary class="btn btn-quiet btn-sm">${icon('chev')}Why: score breakdown${b.qloo_share != null ? `, Qloo ${Math.round(100 * b.qloo_share)}%` : ''}</summary>
+    <div class="breakdown"><p class="hint-line">Explanatory score ${esc(b.score)} vs city-typical ${esc(b.baseline)}, split exactly (Shapley) across the evidence. Stated weights; it explains TasteFit's model, not cause and effect.</p>
+    <ul class="wf-bars">${rows}</ul></div></details>`;
+}
 function cardHTML(c, i) {
-  const rs = rentState(c.rent_note), cur = state.shortlist.currency;
+  const rs = c.afford ? { over: 'bad', stretch: 'mid', ok: 'ok' }[c.afford] : rentState(c.rent_note), cur = state.shortlist.currency;
   const rentCls = { bad: 'status-bad', mid: 'status-mid', ok: 'status-ok', none: 'status-none' }[rs];
   const calls = callsFor(c);
   return `<li class="card${i === 0 ? ' is-top' : ''}">
@@ -398,6 +411,9 @@ function cardHTML(c, i) {
       ${c.hotspot_km != null ? `<span class="chip"><span class="k">Hotspot</span><b>${esc(c.hotspot_km)} km</b></span>` : ''}
     </div>
     <div class="rent-line"><span class="k">Rent</span><span><span class="status ${rentCls}">${c.rent_max ? `max ${esc(money(c.rent_max, cur))}` : 'no ceiling'}</span> ${esc(c.rent_note)}</span></div>
+    ${c.adjust_note ? `<p class="adjust-note">${esc(c.adjust_note)}</p>` : ''}
+    ${c.call_rule === 'rent-first' ? '<p class="hint-line">Rent-first call: the rent is checked before taste, and taste cannot rescue an unpayable rent.</p>' : ''}
+    ${c.breakdown ? breakdownHTML(c.breakdown) : ''}
     ${calls.length ? `<details class="card-more"><summary class="btn btn-quiet btn-sm">${icon('chev')}Evidence: ${calls.length} Qloo ${calls.length === 1 ? 'call' : 'calls'}</summary><div class="receipts">${calls.map((x, j) => receiptHTML(x, j, calls.length)).join('')}</div></details>` : ''}
   </li>`;
 }
@@ -430,8 +446,16 @@ function leadHTML() {
   const top = state.shortlist.concepts.find(c => c.call);
   if (!top) return '';
   return `<section class="lead" aria-labelledby="lead-title"><div class="lead-row">${badge(top.call, 'badge-lg')}<span class="num" style="font-weight:700">${esc(top.score)}/100</span></div>
-    <h3 id="lead-title">${esc(top.concept)} scores highest for this unit.</h3>
-    <p>Rank ${esc(top.position)} of ${esc(top.of)} for the ${esc(state.shortlist.area)} audience${top.local_supply != null ? `, ${esc(top.local_supply)} similar places nearby` : ''}${top.trend ? `, interest ${top.trend.change >= 3 ? 'rising' : top.trend.change <= -3 ? 'fading' : 'steady'}` : ''}. ${esc(top.rent_note)}</p></section>`;
+    <h3 id="lead-title">${esc(top.concept)} leads the shortlist for this unit.</h3>
+    <p>Rank ${esc(top.position)} of ${esc(top.of)} for the ${esc(state.shortlist.area)} audience${top.local_supply != null ? `, ${esc(top.local_supply)} similar places nearby` : ''}${top.trend ? `, interest ${top.trend.change >= 3 ? 'rising' : top.trend.change <= -3 ? 'fading' : 'steady'}` : ''}. ${esc(top.rent_note)} ${esc(top.adjust_note || '')}</p>
+    ${voiHTML(state.shortlist.voi)}</section>`;
+}
+function voiHTML(v) {
+  const top = v && v.checks.filter(c => c.above_noise);
+  if (!top || !top.length) return '';
+  const at = `${money(v.rent, v.currency)}/month ${v.rent_source === 'asking' ? 'asking' : 'at the ceiling'}`;
+  return `<div class="voi"><p><b>Check first, before signing:</b> ${esc(top[0].label)}. For ${esc(v.concept)} at ${esc(at)}, knowing it is worth up to about <b>${esc(money(top[0].evppi, v.currency))}/month</b> of decision value${top[1] ? `; then ${esc(top[1].label)} (${esc(money(top[1].evppi, v.currency))})` : ''}.</p>
+    <p class="hint-line">Value of information (EVPPI) from TasteFit's stated cost assumptions, not your figures: P(monthly profit &gt; 0) ${esc(Math.round(100 * v.p_profit))}%, all inputs known ${esc(money(v.evpi, v.currency))}/month. Monthly figures, no discounting.</p></div>`;
 }
 function founderResultHTML() {
   const sc = state.scorecard, g = state.geo;
