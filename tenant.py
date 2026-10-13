@@ -27,6 +27,8 @@ LOCAL_LIMIT = 10
 PARALLEL = 3
 RETRY_AFTER = 2.0  # seconds before the single retry of a rate-limited call
 LLM_TIMEOUT = 40  # per provider; Cloud Run cuts requests at 300 s and a run makes up to 3 LLM calls
+DEADLINE = 230  # seconds: LLM calls are cut short so the memo always arrives before Cloud Run's 300 s cut
+MIN_LLM_WINDOW = 8  # below this many seconds left, skip the LLM and use the template memo
 WEIGHTS = {"demand": 0.45, "white_space": 0.35, "overlap": 0.20}
 THRESHOLDS = (("GO", 65), ("ADJUST", 45), ("NO-GO", 0))
 
@@ -468,9 +470,22 @@ def resolve_area(city, location, lat, lon):
     return [label], city, pt, None
 
 
-def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None, today=None):
+def deadline_chat(started, clock=time.monotonic, chat=None):
+    """llm.chat with each provider's timeout shrunk to fit the run's DEADLINE; raises TimeoutError when too late."""
+    chat = chat or llm.chat
+
+    def call(messages):
+        left = DEADLINE - (clock() - started)
+        if left < MIN_LLM_WINDOW:
+            raise TimeoutError("run deadline reached")
+        return chat(messages, timeout=min(LLM_TIMEOUT, left / max(1, len(llm.provider_names()))))
+    return call
+
+
+def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None, today=None, clock=time.monotonic):
     """Yields (kind, data): unit, step*, profile, candidates, shortlist, baseline, memo, budget; or error."""
-    chat_fn = chat_fn or (lambda messages: llm.chat(messages, timeout=LLM_TIMEOUT))
+    started = clock()
+    chat_fn = chat_fn or deadline_chat(started, clock)
     today = today or datetime.date.today()
     led = Ledger()
     labels, city, point, problem = resolve_area(city or "", location, lat, lon)
@@ -623,7 +638,11 @@ def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None,
                                   "(Qloo compare score). GO 65+, ADJUST 45-64, NO-GO below 45; a rent above the "
                                   "ceiling downgrades the call."}
 
-    base = judge_baseline(base_future.result(), shortlist)
+    try:
+        base_result = base_future.result(timeout=max(1, DEADLINE - (clock() - started)))
+    except concurrent.futures.TimeoutError:
+        base_result = None
+    base = judge_baseline(base_result, shortlist)
     pool.shutdown(wait=False)
     yield "baseline", base or {"unavailable": True}
 
