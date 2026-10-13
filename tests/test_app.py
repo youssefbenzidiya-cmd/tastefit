@@ -65,6 +65,14 @@ class Server(unittest.TestCase):
         self.assertIn("TasteFit", body)
         self.assertNotIn("{{CTA}}", body)
 
+    def test_index_has_the_ci_smoke_marker(self):
+        ci = (app.ROOT / ".gitlab-ci.yml").read_text()
+        markers = set(re.findall(r'_URL/" \| grep "([^"]+)"', ci))
+        self.assertTrue(markers)
+        body = self.get("/")[1]
+        for m in markers:
+            self.assertIn(m, body)
+
     def test_static_assets_are_served_with_their_types(self):
         for path, (_, ctype) in app.STATIC.items():
             conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
