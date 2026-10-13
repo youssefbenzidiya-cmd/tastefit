@@ -160,7 +160,7 @@ git clone https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248
 npm ci                             # installs @qloo/qloo-harness locally (no Python packages needed)
 export QLOO_API_KEY=...            # Qloo hackathon key, never commit it
 export QLOO_BASE_URL=https://hackathon.api.qloo.com
-export GEMINI_API_KEY=...          # optional: free Google AI Studio key, tried first (gemini-3.8-flash)
+export GEMINI_API_KEY=...          # optional: free Google AI Studio key. Tries gemini-3.8-flash (8s), then gemini-3.1-flash-lite
 export LLM_BASE_URL=...            # optional fallback: any OpenAI-compatible endpoint (default: a free keyless one)
 python app.py                      # http://localhost:8000 (broker mode: /?mode=broker)
 python backtest_chicago.py --no-llm  # optional: the Qloo backtest above (public Chicago data, about 35 Qloo calls)
