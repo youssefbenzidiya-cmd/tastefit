@@ -251,6 +251,72 @@
   .print-head { display: none; }
   [hidden] { display: none !important; }
 
+  /* Modes */
+  .modes { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--pine-line); border-radius: 999px; margin-bottom: 36px; }
+  .modes button { font: 600 15px/1 var(--body); color: #9fb2a7; background: none; border: 0; padding: 12px 18px; border-radius: 999px; cursor: pointer; }
+  .modes button[aria-selected="true"] { background: var(--saffron); color: var(--pine); }
+
+  /* Broker mode */
+  .tf-grid { display: grid; grid-template-columns: 1fr 340px; gap: 28px; align-items: stretch; }
+  #tmap { min-height: 380px; border-radius: 16px; background: var(--pine-2); }
+  #tmap .leaflet-tile-pane { filter: grayscale(1) brightness(.9) contrast(1.05); }
+  .tf-side { display: flex; flex-direction: column; gap: 16px; }
+  .tf-q { font: 600 clamp(28px, 3.6vw, 42px)/1.12 var(--display); letter-spacing: -0.03em; margin: 0; }
+  .tf-point { font-size: 15px; color: #c5d3ca; min-height: 1.4em; }
+  .tf-point b { color: #fff; }
+  .tf-side label { display: grid; gap: 6px; font-size: 14px; color: #9fb2a7; font-weight: 600; }
+  .tf-side input { font: 500 16px/1.2 var(--body); color: #fff; background: var(--pine-2); border: 1px solid var(--pine-line); border-radius: 12px; padding: 12px 14px; }
+  .tf-side input:focus { outline: none; border-color: var(--saffron); }
+  .tf-side .run { align-self: flex-start; }
+  .tf-try { color: #9fb2a7; font-size: 14px; display: flex; gap: 6px 14px; flex-wrap: wrap; }
+  .tf-try button { font: inherit; color: #dfe7e1; background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-decoration-color: var(--pine-line); text-underline-offset: 4px; }
+  .tf-try button:hover { text-decoration-color: var(--saffron); }
+  .wf { font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; background: #e7ece6; color: var(--pine); padding: 3px 6px; border-radius: 6px; margin-right: 6px; vertical-align: 1px; }
+  .cached { font: 600 10px/1 var(--body); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--rule); padding: 2px 6px; border-radius: 999px; margin-left: 6px; }
+  ol.steps details { margin-top: 4px; font-size: 12px; color: var(--muted); }
+  ol.steps details pre { white-space: pre-wrap; word-break: break-word; margin: 4px 0 0; font: 12px/1.4 ui-monospace, Menlo, monospace; }
+  .budget { font-size: 13px; color: var(--muted); margin: 0 0 18px; }
+  .t-head h2 { font: 600 30px/1.15 var(--display); letter-spacing: -0.02em; margin: 0 0 6px; }
+  .t-head p { margin: 0 0 24px; color: var(--muted); }
+  .t-table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--rule); border-radius: 16px; overflow: hidden; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .t-table th, .t-table td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  .t-table thead th { font-weight: 600; color: var(--muted); font-size: 13px; }
+  .t-table tr:last-child td { border-bottom: 0; }
+  .t-table td.concept b { display: block; font: 600 17px/1.25 var(--display); }
+  .t-table td small { display: block; color: var(--muted); margin-top: 3px; }
+  .t-table .num b { font: 700 20px/1 var(--display); }
+  .t-table tr.dim td { color: var(--muted); }
+  .t-method { font-size: 13px; color: var(--muted); margin: 10px 0 0; max-width: 90ch; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 0; padding: 0; list-style: none; }
+  .chips li { font-size: 13px; background: var(--card); border: 1px solid var(--rule); border-radius: 999px; padding: 4px 10px; }
+  .t-two { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 36px; }
+  .t-card { background: var(--card); border: 1px solid var(--rule); border-radius: 16px; padding: 22px 24px; }
+  .t-card h3 { font: 600 20px/1.25 var(--display); margin: 0 0 4px; letter-spacing: -0.01em; }
+  .t-card > p { margin: 0 0 12px; color: var(--muted); font-size: 14px; }
+  .t-card ul.claims { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+  .claims b { font-weight: 600; }
+  .claims small { display: block; color: var(--muted); font-size: 13px; }
+  .badge { font: 600 11px/1 var(--body); letter-spacing: .03em; text-transform: uppercase; padding: 3px 7px; border-radius: 999px; margin-left: 6px; vertical-align: 1px; }
+  .badge.confirmed { background: #dcefe2; color: var(--go); } .badge.contradicted { background: #f6ddd7; color: var(--nogo); }
+  .badge.partly { background: #f6ecd2; color: var(--adjust); } .badge.not-tested, .badge.excluded { background: #eceee9; color: var(--muted); }
+  .age { display: grid; grid-template-columns: 110px 1fr 48px; gap: 4px 10px; align-items: center; font-size: 13px; margin-top: 10px; }
+  .age .track { height: 8px; background: #eef0eb; border-radius: 4px; position: relative; }
+  .age .track i { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
+  .age .track::after { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--muted); }
+  #tresmap { height: 320px; border-radius: 16px; margin-top: 36px; border: 1px solid var(--rule); }
+  .t-memo { margin-top: 36px; }
+  .t-memo .sec-block:first-child { border-top: 0; }
+  .t-note { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
+  @media (max-width: 860px) { .tf-grid, .t-two { grid-template-columns: 1fr; } .t-scroll { overflow-x: auto; } }
+  @media print {
+    body.tenant-print .stage .progress, body.tenant-print #twork .progress, body.tenant-print .t-baseline, body.tenant-print #tresmap,
+    body.tenant-print .t-profile, body.tenant-print #work { display: none !important; }
+    body.tenant-print #twork { display: block !important; }
+    body.tenant-print .t-table { font-size: 11px; } body.tenant-print .t-table th, body.tenant-print .t-table td { padding: 6px 8px; }
+    body.tenant-print .t-memo { font-size: 12px; line-height: 1.45; } body.tenant-print .t-memo .sec-block { padding: 10px 0; }
+    body.tenant-print .t-memo .sec-block h3 { font-size: 15px; margin-bottom: 4px; }
+  }
+
   @media (max-width: 860px) {
     .wrap { padding: 0 20px; }
     .bar { margin-bottom: 44px; }
@@ -281,6 +347,33 @@
       <nav class="nav"><span>Site check for restaurants and cafés, built on Qloo taste data</span><a href="#scan">City Scan</a><a href="#plans">Plans</a></nav>
     </div>
 
+    <div class="modes" role="tablist" aria-label="Who is asking">
+      <button type="button" role="tab" id="tab-founder" aria-selected="true" aria-controls="f" data-mode="founder">Founder: will my concept fit?</button>
+      <button type="button" role="tab" id="tab-broker" aria-selected="false" aria-controls="tf" data-mode="broker">Broker / landlord: who should rent this unit?</button>
+    </div>
+
+    <form id="tf" autocomplete="off" hidden>
+      <h1 class="sr">TasteFit: which food tenant fits a vacant unit</h1>
+      <div class="tf-grid">
+        <div id="tmap" role="application" aria-label="Map: click the vacant unit"></div>
+        <div class="tf-side">
+          <p class="tf-q">Who should rent this unit?</p>
+          <p class="tf-point" id="tpoint">Click the vacant unit on the map, or pick an example.</p>
+          <div class="tf-try">Examples
+            <button type="button" data-lat="41.9088" data-lon="-87.6796" data-label="Wicker Park, Chicago">Wicker Park, Chicago</button>
+            <button type="button" data-lat="48.8590" data-lon="2.3600" data-label="Le Marais, Paris">Le Marais, Paris</button>
+            <button type="button" data-lat="41.9217" data-lon="-87.7005" data-label="Logan Square, Chicago">Logan Square, Chicago</button>
+          </div>
+          <label>Neighborhood name (optional, overrides the map's name)
+            <input name="location" maxlength="120" placeholder="e.g. Wicker Park"></label>
+          <label>Asking rent per month (optional, local currency)
+            <input name="rent" inputmode="decimal" maxlength="9" placeholder="e.g. 4000"></label>
+          <button class="run" id="tgo" type="submit" disabled>Find the best tenants</button>
+          <p class="hint">Rent ceilings are calibrated for Paris and Chicago; elsewhere the taste match still runs. About 30 to 90 seconds, at most 25 Qloo calls.</p>
+        </div>
+      </div>
+    </form>
+
     <form id="f" autocomplete="off">
       <h1 class="sr">TasteFit: test a restaurant concept against a neighborhood</h1>
       <div class="ask">
@@ -294,7 +387,7 @@
         <button class="sample-btn" type="button" data-action="sample">See a sample report</button>
         <div class="try">Try
           <button type="button" data-c="a late-night Korean fried chicken spot" data-l="East Austin, Texas">Korean chicken in Austin</button>
-          <button type="button" data-c="a natural wine bar with small plates" data-l="Silver Lake, Los Angeles">Wine bar in Silver Lake</button>
+          <button type="button" data-c="a ramen counter" data-l="Silver Lake, Los Angeles">Ramen in Silver Lake</button>
           <button type="button" data-c="a Moroccan tea house with pastries" data-l="Lower East Side, New York">Tea house on the Lower East Side</button>
         </div>
       </div>
@@ -332,6 +425,15 @@
         <ol class="steps" id="steps"></ol>
       </aside>
       <section class="report" id="report"></section>
+    </div>
+
+    <div id="twork" class="work" hidden>
+      <aside class="progress" aria-live="polite">
+        <h2>Qloo calls <span class="clock" id="tclock">0:00</span></h2>
+        <p class="budget" id="tbudget"></p>
+        <ol class="steps" id="tsteps"></ol>
+      </aside>
+      <section class="report" id="treport"></section>
     </div>
 
   </div>
@@ -690,7 +792,7 @@ async function stream(url) {
 }
 
 function begin() {
-  intro.hidden = true; work.hidden = false;
+  intro.hidden = true; work.hidden = false; $('#twork').hidden = true;
   stepsEl.innerHTML = ''; addLive();
   geoData = null; scoreData = null; demo = null; doneSteps = 0; lastStep = '';
   $('#sample-tag').hidden = true; $('#prefill-hint').hidden = true;
@@ -780,8 +882,255 @@ scanForm.onsubmit = async e => {
   }
 };
 
+/* ---------- Broker / landlord mode: tenant match ---------- */
+const tf = $('#tf'), tgo = $('#tgo'), twork = $('#twork'), tsteps = $('#tsteps'), treport = $('#treport'), tclock = $('#tclock');
+let tmap = null, tpin = null, tpoint = null, tres = {}, tctrl = null, ttimer = null, tresMap = null;
+const OSM = ['https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' }];
+
+function setMode(mode) {
+  const broker = mode === 'broker';
+  $('#tab-founder').setAttribute('aria-selected', String(!broker));
+  $('#tab-broker').setAttribute('aria-selected', String(broker));
+  f.hidden = broker; tf.hidden = !broker;
+  if (broker) { intro.hidden = true; work.hidden = true; initTenantMap(); }
+  else { twork.hidden = true; if (work.hidden) intro.hidden = false; }
+}
+document.querySelectorAll('.modes button').forEach(b => b.onclick = () => setMode(b.dataset.mode));
+
+function initTenantMap() {
+  if (tmap || !window.L) return;
+  tmap = L.map('tmap', { scrollWheelZoom: false }).setView([41.9088, -87.6796], 13);
+  L.tileLayer(...OSM).addTo(tmap);
+  tmap.on('click', e => setPoint(e.latlng.lat, e.latlng.lng));
+}
+
+function setPoint(lat, lon, label) {
+  tpoint = { lat, lon };
+  const icon = L.divIcon({ className: '', html: '<div class="pin"></div>', iconSize: [22, 22] });
+  if (tpin) tpin.setLatLng([lat, lon]); else tpin = L.marker([lat, lon], { icon }).addTo(tmap);
+  $('#tpoint').innerHTML = 'Unit: <b>' + esc(label || (lat.toFixed(4) + ', ' + lon.toFixed(4))) + '</b>';
+  tgo.disabled = false;
+}
+
+document.querySelectorAll('.tf-try button').forEach(b => b.onclick = () => {
+  initTenantMap();
+  const lat = +b.dataset.lat, lon = +b.dataset.lon;
+  tmap.setView([lat, lon], 14);
+  setPoint(lat, lon, b.dataset.label);
+});
+
+const CALL_CLS = { 'GO': 'go', 'ADJUST': 'adjust', 'NO-GO': 'nogo' };
+const WF_TEXT = {
+  recommend: 'recommend', entity_tags: 'entity_tags', audience_demographics: 'audience_demographics', find_tags: 'find_tags',
+  rank: 'rank', compare_audiences: 'compare_audiences', where_popular: 'where_popular', trends: 'trends',
+};
+
+function tAddStep(s) {
+  const li = document.createElement('li');
+  if (s.error || s.skipped) li.className = 'err';
+  const names = (s.names || []).filter(Boolean);
+  const sub = s.skipped ? 'Skipped: ' + s.skipped : s.error ? 'No data (' + s.error + '); the memo works without it'
+    : (s.choice ? 'Chose ' + s.choice + (s.alternatives && s.alternatives.length ? '; other matches: ' + s.alternatives.join(', ') : '') + '. ' : '') +
+      (names.length ? names.slice(0, 5).join(', ') + (names.length > 5 ? '…' : '') : '');
+  li.innerHTML = '<div class="s-title"><span class="wf">' + esc(WF_TEXT[s.workflow] || s.workflow) + '</span>' + esc(s.purpose) +
+    (s.cached ? '<span class="cached">cached</span>' : '') + '</div><div class="s-sub">' + esc(sub) + '</div>' +
+    '<details><summary>Request sent to Qloo</summary><pre>' + esc(JSON.stringify(s.input, null, 1)) + '</pre></details>';
+  tsteps.insertBefore(li, tsteps.querySelector('li.live'));
+}
+
+function tNote(title, sub) {
+  const li = document.createElement('li');
+  li.innerHTML = '<div class="s-title">' + esc(title) + '</div><div class="s-sub">' + esc(sub) + '</div>';
+  tsteps.insertBefore(li, tsteps.querySelector('li.live'));
+}
+
+const fmtMoney = (v, cur) => v == null ? '–' : cur ? new Intl.NumberFormat('en', { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(v) : String(Math.round(v));
+
+function shortlistHTML(d) {
+  const rows = d.concepts.map(c => {
+    const call = c.call ? '<span class="call-mini ' + CALL_CLS[c.call] + '">' + esc(c.call) + '</span>' : '<small>not scored</small>';
+    const tag = c.tag ? '<small>Qloo tag: ' + esc(c.tag.name) + '</small>' : '';
+    const bench = c.benchmark ? '<small>Benchmark: ' + esc(c.benchmark.name) + '</small>' : '';
+    const supply = c.local_supply == null ? '–' : '<b>' + esc(c.local_supply) + (c.local_supply >= 10 ? '+' : '') + '</b>' +
+      (c.local_names && c.local_names.length ? '<small>' + esc(c.local_names.slice(0, 3).join(', ')) + '</small>' : '<small>none found</small>');
+    const overlap = c.overlap == null ? '–' : '<b>' + esc(c.overlap) + '</b><small>' + esc((c.shared_tags || []).slice(0, 3).join(', ')) + '</small>';
+    const trend = c.trend ? '<small>' + esc(c.trend.brand) + ': popularity percentile ' + esc(c.trend.percentile) + ', ' +
+      (c.trend.change ? (c.trend.change > 0 ? '+' : '') + esc(c.trend.change) + ' pts' : 'no measurable change') + ' over ' + esc(c.trend.weeks) + ' weeks</small>' : '';
+    const hot = c.hotspot_km != null ? '<small>Nearest audience hotspot ' + esc(c.hotspot_km) + ' km from the unit</small>' : '';
+    return '<tr' + (c.call ? '' : ' class="dim"') + '><td class="concept"><b>' + esc(c.concept) + '</b>' + tag + bench + trend + hot + '</td>' +
+      '<td>' + call + '</td><td class="num">' + (c.score == null ? '–' : '<b>' + esc(c.score) + '</b>') + '</td>' +
+      '<td class="num">' + (c.demand == null ? '–' : '<b>' + esc(c.demand) + '</b><small>rank ' + esc(c.position) + ' of ' + esc(c.of) + '</small>') + '</td>' +
+      '<td class="num">' + supply + '</td><td class="num">' + overlap + '</td>' +
+      '<td>' + (c.rent_note ? esc(c.rent_note) : '<small>–</small>') + '</td></tr>';
+  }).join('');
+  return '<div class="t-scroll"><table class="t-table"><thead><tr><th>Concept and Qloo evidence</th><th>Call</th><th>Score</th>' +
+    '<th>Local demand</th><th>Already served here</th><th>Audience overlap</th><th>Rent check</th></tr></thead><tbody>' + rows +
+    '</tbody></table></div><p class="t-method">' + esc(d.method) + '</p>';
+}
+
+function profileHTML(p) {
+  if (!p) return '';
+  const ages = Object.entries((p.demographics || {}).age || {});
+  const ageHTML = ages.length ? '<div class="age">' + ages.map(([k, v]) => {
+    const w = Math.min(50, Math.abs(v) * 50), left = v >= 0 ? 50 : 50 - w;
+    return '<span>' + esc(k.replace(/_/g, ' ')) + '</span><span class="track"><i style="left:' + left + '%;width:' + w + '%;background:' +
+      (v >= 0 ? 'var(--go)' : 'var(--nogo)') + '"></i></span><span>' + (v > 0 ? '+' : '') + esc(v) + '</span>';
+  }).join('') + '</div>' : '';
+  return '<div class="t-card t-profile"><h3>What this audience loves</h3><p>Qloo places and tags the ' + esc(p.area) + ' audience over-indexes on.</p>' +
+    '<ul class="chips">' + p.places.slice(0, 8).map(x => '<li>' + esc(x.name) + '</li>').join('') + '</ul>' +
+    (p.tags.length ? '<ul class="chips">' + p.tags.slice(0, 12).map(t => '<li>' + esc(t) + '</li>').join('') + '</ul>' : '') +
+    (ageHTML ? '<p class="t-note">Age skew of ' + esc(p.places[0].name) + "'s audience vs. average (Qloo):</p>" + ageHTML : '') + '</div>';
+}
+
+function baselineHTML(b, d) {
+  if (!b || b.unavailable) return '<div class="t-card t-baseline"><h3>Without Qloo</h3><p>No LLM answered for the comparison this time; the Qloo shortlist above does not depend on it.</p></div>';
+  const items = b.candidates.map(c => '<li><b>' + esc(c.concept) + '</b><span class="badge ' + esc((c.status || '').replace(' ', '-')) + '">' +
+    esc(c.status) + '</span><small>LLM: ' + esc(c.why) + '</small><small>' + esc(c.evidence || '') + '</small></li>').join('');
+  const top = (d ? d.concepts.filter(c => c.call).slice(0, 3) : []);
+  return '<div class="t-two t-baseline"><div class="t-card"><h3>Same LLM, without Qloo</h3><p>Asked the same question with no tools (' +
+    esc(b.provider || 'LLM') + '). Each claim checked against this run\'s Qloo results.</p><ul class="claims">' + items + '</ul></div>' +
+    '<div class="t-card"><h3>With Qloo</h3><p>Ranked by measured local affinity, existing supply and audience overlap.</p><ul class="claims">' +
+    top.map(c => '<li><b>' + esc(c.concept) + '</b><span class="badge ' + (c.call === 'GO' ? 'confirmed' : c.call === 'ADJUST' ? 'partly' : 'contradicted') + '">' +
+      esc(c.call) + '</span><small>Score ' + esc(c.score) + ', rank ' + esc(c.position) + ' of ' + esc(c.of) + ' for this audience, ' +
+      esc(c.local_supply ?? '?') + ' local places already</small></li>').join('') + '</ul>' +
+    (b.qloo_only && b.qloo_only.length ? '<p class="t-note">Found by Qloo, missed by the LLM alone: ' + esc(b.qloo_only.join(', ')) + '.</p>' : '') +
+    '</div></div>';
+}
+
+function tRender() {
+  const d = tres.shortlist, u = tres.unit || {};
+  const top = d && d.concepts.find(c => c.call);
+  const label = top ? { GO: 'Go', ADJUST: 'Go, with changes', 'NO-GO': 'Not here' }[top.call] : '';
+  treport.innerHTML =
+    '<p class="print-head">TasteFit tenant memo: ' + esc(u.area || '') + '</p>' +
+    '<div class="t-head"><h2>Tenant shortlist for ' + esc(u.area || 'this unit') + '</h2><p>' +
+      (tres.asking ? 'Asking rent ' + esc(fmtMoney(tres.asking, d && d.currency)) + ' per month. ' : '') + esc(u.rent_note || '') + '</p></div>' +
+    (top ? '<div class="verdict"><div class="dial" style="--v:' + top.score + ';--c:var(--' + (CALL_CLS[top.call] === 'nogo' ? 'nogo' : CALL_CLS[top.call]) + ')"><div><div><b>' +
+      esc(top.score) + '</b><span>tenant score</span></div></div></div><div><p class="call ' + CALL_CLS[top.call] + '">' + esc(top.concept) + ': ' + esc(label) +
+      '</p><p class="why">Strongest of ' + esc(d.concepts.length) + ' concepts Qloo evaluated for this unit.</p></div></div>' : '') +
+    (d ? '<div style="margin-top:28px">' + shortlistHTML(d) + '</div>' : '<div class="waiting"><p>Shortlist on its way.</p><div class="skeleton" style="width:70%"></div></div>') +
+    (d ? '<div id="tresmap" role="img" aria-label="Unit and audience hotspots of the top concept"></div>' : '') +
+    (tres.baseline ? baselineHTML(tres.baseline, d) : '') +
+    '<div class="t-two">' + profileHTML(tres.profile) + '</div>' +
+    (tres.memo ? '<div class="t-memo"><div class="sections">' + parseSections(tres.memo.markdown) + '</div><p class="t-note">Memo written by ' +
+      esc(tres.memo.author === 'template' ? 'TasteFit\'s template (no LLM available)' : tres.memo.author) + ' from the Qloo evidence above; calls and scores are computed by TasteFit.</p></div>' : '') +
+    (tres.memo ? '<div class="tools"><button class="primary" type="button" data-taction="print">Print the one-page memo</button>' +
+      '<button type="button" data-taction="again">Check another unit</button></div>' : '');
+  if (d) drawTenantMap(d, u);
+}
+
+function parseSections(text) {
+  return text.split(/^##\s+/m).map(p => p.trim()).filter(Boolean).filter(p => !/^#\s/.test(p) || p.includes('\n')).map(p => {
+    const i = p.indexOf('\n'), title = (i < 0 ? p : p.slice(0, i)).replace(/^#\s*/, '').trim(), body = i < 0 ? '' : p.slice(i + 1).trim();
+    const k = /limit/i.test(title) ? 'wide limits' : /before you sign/i.test(title) ? 'wide checklist' : 'wide';
+    return '<div class="sec-block ' + k + '"><h3>' + esc(title) + '</h3>' + md(body) + '</div>';
+  }).join('');
+}
+
+function drawTenantMap(d, u) {
+  if (!window.L || !document.getElementById('tresmap') || !u.point) return;
+  if (tresMap) tresMap.remove();
+  tresMap = L.map('tresmap', { scrollWheelZoom: false });
+  L.tileLayer(...OSM).addTo(tresMap);
+  const pts = [[u.point.lat, u.point.lon]];
+  const css = getComputedStyle(document.documentElement);
+  (d.heat || []).forEach(h => {
+    pts.push([h.lat, h.lon]);
+    L.circleMarker([h.lat, h.lon], { radius: 6 + 6 * Math.min(1, h.w || 0), color: '#fff', weight: 1.5, fillColor: css.getPropertyValue('--pine').trim(), fillOpacity: .8 })
+      .addTo(tresMap).bindTooltip('Audience hotspot of the top concept\'s benchmark (Qloo where_popular)');
+  });
+  L.marker([u.point.lat, u.point.lon], { icon: L.divIcon({ className: '', html: '<div class="pin"></div>', iconSize: [22, 22] }), zIndexOffset: 1000 })
+    .addTo(tresMap).bindTooltip('The unit', { permanent: true, direction: 'top', offset: [0, -12] });
+  tresMap.fitBounds(L.latLngBounds(pts).pad(0.2), { maxZoom: 15 });
+}
+
+const T_ERRORS = { offline: 'Live Qloo data is not connected on this instance right now.', internal: 'Something went wrong on our side. Run it again.' };
+
+function tFinish() {
+  clearInterval(ttimer);
+  const live = tsteps.querySelector('li.live'); if (live) live.remove();
+  tgo.disabled = !tpoint; tgo.textContent = 'Find the best tenants';
+}
+
+function tFail(text) {
+  tFinish();
+  treport.innerHTML = '<div class="notice"><h3>The tenant match stopped</h3><p>' + esc(text) + '</p></div>';
+}
+
+const tHandlers = {
+  unit: u => { tres.unit = u; tRender(); },
+  step: s => tAddStep(s),
+  profile: p => { tres.profile = p; tres.unit.area = p.area; tRender(); },
+  candidates: c => tNote('Candidate concepts: ' + c.concepts.length, 'Proposed by ' + (c.source === 'catalog' ? "TasteFit's fixed list (no LLM answered)" : c.source) +
+    ', alcohol-led concepts removed: ' + c.concepts.map(x => x.concept).join(', ')),
+  shortlist: d => { tres.shortlist = d; tRender(); },
+  baseline: b => { tres.baseline = b; tRender(); },
+  memo: m => { tres.memo = m; tFinish(); tRender(); },
+  budget: b => { $('#tbudget').textContent = b.qloo_calls + ' Qloo calls (budget ' + b.budget + '), ' + b.cache_hits + ' from cache. Workflows used: ' + b.workflows.join(', ') + '.'; },
+  error: code => tFail(T_ERRORS[code] || String(code)),
+};
+
+async function tStream(url) {
+  if (tctrl) tctrl.abort();
+  const mine = tctrl = new AbortController();
+  let ended = false;
+  try {
+    const res = await fetch(url, { signal: mine.signal, headers: { Accept: 'text/event-stream' } });
+    if (!res.ok) { ended = true; tFail((await res.text()).trim() || T_ERRORS.internal); return; }
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = '';
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done || tctrl !== mine) break;
+      buf += dec.decode(value, { stream: true });
+      let i;
+      while ((i = buf.indexOf('\n\n')) >= 0) {
+        const [event, data] = parseEvent(buf.slice(0, i));
+        buf = buf.slice(i + 2);
+        if (event === 'error' || event === 'memo') ended = true;
+        if (tHandlers[event]) tHandlers[event](data);
+      }
+    }
+  } catch (e) {
+    if (e.name === 'AbortError') return;
+  }
+  if (!ended && tctrl === mine) tFail('The connection dropped before the memo arrived. Run it again.');
+}
+
+tf.onsubmit = e => {
+  e.preventDefault();
+  if (!tpoint) return;
+  const rent = tf.rent.value.replace(/[^\d.]/g, '');
+  tres = { asking: rent ? +rent : null };
+  intro.hidden = true; work.hidden = true; twork.hidden = false;
+  tsteps.innerHTML = '<li class="live"><div class="s-title">Working</div><div class="s-sub">Locating the unit</div></li>';
+  $('#tbudget').textContent = '';
+  treport.innerHTML = '<div class="waiting"><p>The tenant shortlist will appear here.</p><div class="skeleton" style="width:55%"></div><div class="skeleton" style="width:85%"></div></div>';
+  tgo.disabled = true; tgo.textContent = 'Matching tenants';
+  const t0 = Date.now(); clearInterval(ttimer); tclock.textContent = '0:00';
+  ttimer = setInterval(() => { const t = Math.floor((Date.now() - t0) / 1000); tclock.textContent = Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); }, 1000);
+  twork.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  const q = { lat: tpoint.lat.toFixed(6), lon: tpoint.lon.toFixed(6) };
+  if (tf.location.value.trim()) q.location = tf.location.value.trim();
+  if (rent) q.rent = rent;
+  tStream('/tenant?' + new URLSearchParams(q));
+};
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-taction]');
+  if (!el) return;
+  if (el.dataset.taction === 'print') {
+    document.body.classList.add('tenant-print');
+    window.print();
+    setTimeout(() => document.body.classList.remove('tenant-print'), 500);
+  } else if (el.dataset.taction === 'again') {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+});
+
 {
   const q = new URLSearchParams(location.search);
+  if (q.get('mode') === 'broker') setMode('broker');
   if (q.get('c') && q.get('l')) {
     f.concept.value = q.get('c').slice(0, 300); f.location.value = q.get('l').slice(0, 120);
     $('#prefill-hint').hidden = false; go.focus();
