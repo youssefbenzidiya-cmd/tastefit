@@ -55,17 +55,77 @@ Two read-only JSON endpoints serve prebuilt city packs (`packs/`, built offline 
 - Without a register, the check falls back to the share of food places confirmed by two map sources (below 40% fails, a provisional threshold). Casablanca (18%) is shipped as that case.
 - The Chicago calibration replicates the Paris finding: measured location demand does not predict 3-year survival in either city. So the ceiling mostly reflects each tenant type's calibrated revenue against its costs, and Chicago figures are city-level per tenant type rather than a location signal (`METHOD.md`, section 11).
 
+## Qloo
+
+TasteFit is a new project, started Oct 10, 2026. The broker / landlord mode ("who should rent this unit?") was built for the Qloo hackathon on top of it.
+
+### Workflows used and why
+
+All calls go through the official harness (`qloo exec`); 8 of its 9 workflows are used.
+
+| Workflow | Where | Why |
+|---|---|---|
+| `recommend` (place, location signal) | both modes | What the area's audience over-indexes on: the taste a tenant would sell into |
+| `recommend` (place, tag + location filter) | both modes | Benchmarks for a concept in the city, and the existing supply inside the area (white space) |
+| `entity_tags` | tenant | The tags behind the area's favourite places (cuisine, vibe, price) |
+| `audience_demographics` | tenant | Age and gender skew of the area's top place, shown as relative bars |
+| `find_tags` | both modes | Turn a concept into a Qloo tag URN; the choice and the alternatives are shown |
+| `rank` | tenant | One call ranks every benchmark for the area's audience, so the demand scores are comparable (scores from separate calls are not) |
+| `compare_audiences` | tenant | Shared taste between the area's favourites and the top concepts' benchmarks |
+| `where_popular` | both modes | Where the top benchmark's audience concentrates, and how far the unit is from it |
+| `trends` | tenant | Reach of the top concept's reference chain (trends cover brands, not places) |
+
+`describe` is not needed: `recommend` already returns each place's description. A tenant run makes at most 25 Qloo calls; a cache that lives for one request makes repeated calls free and is dropped when the run ends.
+
+### One step, request to result (redacted)
+
+For a unit clicked in Wicker Park, Chicago, step 5 ranks the six concepts' Chicago benchmarks for the local audience:
+
+```json
+{"workflow": "rank",
+ "input": {"options": ["<benchmark id: taqueria>", "<benchmark id: ramen shop>", "..."],
+           "option_type": "place", "signal_location": "Wicker Park"}}
+```
+
+Qloo returns an affinity per option. TasteFit turns the order into a demand score from 0 to 100 within that call, adds the white-space count from `recommend` with the concept's tag and the area as filter, and the overlap from `compare_audiences`, then joins the City Scan rent ceiling for the clicked cell. The page shows every step with the request it sent; no Qloo response is stored.
+
+### Does Qloo help? Backtest (Chicago, offline)
+
+`backtest_chicago.py` checks the tenant agent's demand ranking against what actually opened and survived. The ground truth is the City of Chicago Food Inspections register: a restaurant or bakery opened when its licence's first passing License inspection ever falls in 2023-2024 (licences that passed one earlier, such as renewals, are left out), and survived when no later inspection says Out of Business and it was inspected again since April 2025. Names are matched to the ten catalog concepts by keyword (200 of 1,751 openings match). For each area (1.2 km radius), the ten concepts are ordered by one Qloo `rank` call, and by the citywide share of surviving openings without that area (a "what is opening everywhere" baseline). The output is numbers only (`backtest_chicago.json`).
+
+| 9 Chicago areas, 31 surviving openings | Qloo demand | Citywide baseline | Random |
+|---|---|---|---|
+| Surviving openings whose concept is in the top 3 | 29% | 68% | 30% |
+| Mean rank correlation with surviving openings | 0.02 | 0.31 | 0 |
+| Survival rate of openings in the top-3 concepts (vs. the rest) | 64% of 14 (44% of 50) | 49% of 43 (48% of 21) | |
+
+Each opening counts once, for the nearest area centre, because neighbouring areas overlap. 3 of the 12 areas are not scored (Pilsen, Chinatown, River North): they had no surviving catalog opening, or Qloo's rank call returned no usable ranking (2 areas). So this is 9 areas and 31 openings, a small sample.
+
+Result: **no gain**. Qloo's demand ranking did no better than random at naming the concepts that opened and survived, and the citywide baseline did clearly better: the Qloo-minus-baseline difference has a 90% bootstrap interval of -66 to -4 points. Openings in the concepts Qloo ranked highest did survive more often (64% vs. 44%), but on 14 openings that is not evidence. Earlier runs the same day, before each opening was counted once, gave Qloo between 30% and 54%, so the rank output also varies between runs. The LLM-only column needs a working LLM for every area and is not reported. Qloo and the LLM describe today's taste, after these places opened, so this checks agreement with what survived, not a forecast made in 2023.
+
+What this means for the product: Qloo is useful here as evidence a broker can show (what the area loves, who already serves it, where the audience is), not as a validated predictor of tenant survival. Every tenant memo's Limits section reports this backtest result (`tenant.BACKTEST_NOTE`, added by code if the LLM leaves it out).
+
+### Limits
+
+- Qloo describes aggregate taste affinities, not foot traffic, sales or rents. The rent ceiling comes from City Scan (official survival data for Paris and Chicago only).
+- Scores are relative within one run's `rank` call; two runs can order close concepts differently.
+- `filter_location` is fuzzy for small neighborhoods (a Wicker Park filter can return Lincoln Park places).
+- Trend data in the hackathon environment showed no change over the periods tested, and the page says so.
+- Alcohol-led concepts and benchmarks are excluded by design.
+
 ## Run locally
 
 Requires Python 3.10+ and Node.js 22.19+ (for the harness).
 
 ```bash
-npm install                        # installs @qloo/qloo-harness locally
+git clone https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit.git && cd tastefit
+npm ci                             # installs @qloo/qloo-harness locally (no Python packages needed)
 export QLOO_API_KEY=...            # Qloo hackathon key, never commit it
 export QLOO_BASE_URL=https://hackathon.api.qloo.com
 export GEMINI_API_KEY=...          # optional: free Google AI Studio key, tried first (gemini-3.8-flash)
 export LLM_BASE_URL=...            # optional fallback: any OpenAI-compatible endpoint (default: a free keyless one)
-python app.py                      # http://localhost:8000
+python app.py                      # http://localhost:8000 (broker mode: /?mode=broker)
+python backtest_chicago.py --no-llm  # optional: the Qloo backtest above (public Chicago data, about 35 Qloo calls)
 ```
 
 The API keys stay on the server; the browser only receives the streamed steps and the memo. LLM calls go to Gemini first when `GEMINI_API_KEY` is set, then to the fallback endpoint. The tenant match never depends on an LLM to finish: without one it uses a fixed candidate list and a template memo.
@@ -74,7 +134,7 @@ CLI: `python agent.py "Korean fried chicken counter" "Austin, TX"`
 
 **Tenant match** (`GET /tenant?lat=41.9088&lon=-87.6796&rent=4000`, or `?city=Paris&location=Le%20Marais`): for a vacant unit, which food concepts the local audience wants that nobody nearby serves, and whether each can pay the rent. A fixed pipeline of at most 25 Qloo calls (8 workflows; a cache that lives for one request only, so repeated calls within a run are free and nothing Qloo returns outlives the request) streams each step, then a scored shortlist, a "without Qloo" comparison and a memo (`tenant.py`).
 
-Tests: `python -m unittest discover -s tests -t . -v` (203 tests).
+Tests: `python -m unittest discover -s tests -t . -v` (216 tests).
 
 ## Deploy
 
