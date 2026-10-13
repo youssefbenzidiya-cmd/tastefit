@@ -399,7 +399,8 @@ Do not change any verdict, score or number, and do not invent places, tags, rent
 Sections: ## Recommendation (2 sentences naming the top tenant and its call), ## Shortlist (one bullet per scored
 concept: call, score, the Qloo evidence behind it, rent check), ## Why this audience (local places, tags and age skew),
 ## Before you sign (3 bullets of on-site checks), ## Limits (Qloo describes aggregate taste affinities, not foot
-traffic, sales or individuals; rank scores are relative to these candidates; rent ceilings are a model, not a forecast).
+traffic, sales or individuals; rank scores are relative to these candidates; rent ceilings are a model, not a forecast;
+in a Chicago backtest Qloo demand rankings did not predict which concepts survived better than a citywide baseline).
 Evidence:
 {evidence}"""
 
@@ -408,6 +409,9 @@ LIMITS = ("## Limits\n- Qloo describes aggregate taste affinities of an area's a
           "- White space counts the places Qloo returns for the concept within its own area boundary (capped at "
           f"{LOCAL_LIMIT}); it is not a census of competitors.\n- Rent ceilings are a survival model built from "
           "official data, not a forecast; cafés are not covered.\n- The unit is a point on a map, not a vetted address.")
+BACKTEST_NOTE = ("- In a Chicago backtest of 2023-2024 openings, Qloo demand rankings did not predict which concepts opened "
+                 "and survived better than a citywide baseline: read them as taste evidence, not a survival forecast.")
+LIMITS += "\n" + BACKTEST_NOTE
 
 
 def template_memo(area, city, shortlist, profile):
@@ -436,7 +440,11 @@ def template_memo(area, city, shortlist, profile):
 
 
 def ensure_limits(memo):
-    return memo if re.search(r"(?m)^##\s*Limits\b", memo) else memo.rstrip() + "\n\n" + LIMITS
+    """Appends the Limits section if the LLM dropped it, and the backtest finding if its Limits section left it out
+    (the prompt puts Limits last)."""
+    if not re.search(r"(?m)^##\s*Limits\b", memo):
+        return memo.rstrip() + "\n\n" + LIMITS
+    return memo if "backtest" in memo.lower() else memo.rstrip() + "\n" + BACKTEST_NOTE
 
 
 # ---------- the run ----------

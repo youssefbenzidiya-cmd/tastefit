@@ -101,7 +101,7 @@ Qloo returns an affinity per option. TasteFit turns the order into a demand scor
 
 Result: **no measurable gain** from Qloo's demand ranking for predicting which concepts open and survive. The citywide baseline does better, and the Qloo-minus-baseline difference has a 90% bootstrap interval of -59 to 0 points. Openings in the concepts Qloo ranks highest did survive more often (67% vs. 45%), but on 15 openings that is not evidence. A same-day rerun gave Qloo 54% on 8 areas, so the rank output also varies between runs. The LLM-only column needs a working LLM for every area and is not reported. Qloo and the LLM describe today's taste, after these places opened, so this checks agreement with what survived, not a forecast made in 2023.
 
-What this means for the product: Qloo is useful here as evidence a broker can show (what the area loves, who already serves it, where the audience is), not as a validated predictor of tenant survival. The memo's Limits section says so.
+What this means for the product: Qloo is useful here as evidence a broker can show (what the area loves, who already serves it, where the audience is), not as a validated predictor of tenant survival. Every tenant memo's Limits section reports this backtest result (`tenant.BACKTEST_NOTE`, added by code if the LLM leaves it out).
 
 ### Limits
 
@@ -132,7 +132,7 @@ CLI: `python agent.py "Korean fried chicken counter" "Austin, TX"`
 
 **Tenant match** (`GET /tenant?lat=41.9088&lon=-87.6796&rent=4000`, or `?city=Paris&location=Le%20Marais`): for a vacant unit, which food concepts the local audience wants that nobody nearby serves, and whether each can pay the rent. A fixed pipeline of at most 25 Qloo calls (8 workflows; a cache that lives for one request only, so repeated calls within a run are free and nothing Qloo returns outlives the request) streams each step, then a scored shortlist, a "without Qloo" comparison and a memo (`tenant.py`).
 
-Tests: `python -m unittest discover -s tests -t . -v` (214 tests).
+Tests: `python -m unittest discover -s tests -t . -v` (215 tests).
 
 ## Deploy
 

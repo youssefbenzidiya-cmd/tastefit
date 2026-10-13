@@ -293,6 +293,14 @@ class HelpersTest(unittest.TestCase):
         memo = tenant.template_memo("Sample Park, Chicago", "Chicago", [], {})
         self.assertTrue(memo.startswith("# Tenant memo: Sample Park, Chicago\n"))
         self.assertIn("## Limits", memo)
+        self.assertIn(tenant.BACKTEST_NOTE, memo)
+
+    def test_ensure_limits_always_reports_the_backtest(self):
+        self.assertIn(tenant.BACKTEST_NOTE, tenant.ensure_limits("# Memo\n## Recommendation\nGo."))
+        llm_limits = "# Memo\n## Limits\n- Qloo is aggregate taste."
+        self.assertTrue(tenant.ensure_limits(llm_limits).endswith(tenant.BACKTEST_NOTE))
+        already = llm_limits + "\n- A Chicago backtest found no gain over a citywide baseline."
+        self.assertEqual(tenant.ensure_limits(already), already)
 
     def test_propose_tops_up_from_catalog(self):
         cands, source = tenant.propose("A", "C", [], [], {}, lambda m: {"content": "no json", "provider": "p"})
