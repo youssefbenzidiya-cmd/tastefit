@@ -13,6 +13,7 @@ from pathlib import Path
 
 import agent
 import scan
+import tenant
 
 log = logging.getLogger("tastefit")
 ROOT = Path(__file__).parent
@@ -34,6 +35,7 @@ CSP_PAGE = ("default-src 'self'; script-src 'nonce-{nonce}' https://unpkg.com ht
             "font-src https://fonts.gstatic.com; img-src 'self' data: https://tile.openstreetmap.org; "
             "connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
 CSP_OTHER = "default-src 'none'; frame-ancestors 'none'"
+STREAMS = ("/run", "/tenant", "/demo")
 
 BUSY_MSG = ("TasteFit is already running as many analyses as it can. Try again in a minute, "
             "or open the sample report in the meantime.")
@@ -111,6 +113,8 @@ class Handler(BaseHTTPRequestHandler):
         url = urllib.parse.urlparse(self.path)
         if url.path == "/run":
             self._run(urllib.parse.parse_qs(url.query))
+        elif url.path == "/tenant":
+            self._tenant(urllib.parse.parse_qs(url.query))
         elif url.path == "/demo":
             self._demo()
         elif url.path in ("/scan", "/scan/unit"):
@@ -120,7 +124,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_HEAD(self):
         path = urllib.parse.urlparse(self.path).path
-        if path in ("/run", "/demo"):
+        if path in STREAMS:
             return self._not_allowed()
         self._send(*self._page(path))
 
@@ -128,7 +132,7 @@ class Handler(BaseHTTPRequestHandler):
         path = urllib.parse.urlparse(self.path).path
         self.close_connection = True
         self._send(405, "text/plain; charset=utf-8", b"method not allowed",
-                   headers=[("Allow", "GET" if path in ("/run", "/demo") else "GET, HEAD")])
+                   headers=[("Allow", "GET" if path in STREAMS else "GET, HEAD")])
 
     do_POST = do_PUT = do_DELETE = do_PATCH = do_OPTIONS = _not_allowed
 
@@ -181,6 +185,26 @@ class Handler(BaseHTTPRequestHandler):
         concept, location = q.get("concept", [""])[0][:300], q.get("location", [""])[0][:120]
         if not concept or not location:
             return self._send(400, "text/plain", b"concept and location are required")
+        self._stream_agent(lambda: agent.run(concept, location))
+
+    def _tenant(self, q):
+        arg = lambda k: q.get(k, [""])[0].strip()  # noqa: E731
+        city, location = arg("city")[:120], arg("location")[:120]
+        try:
+            lat = float(arg("lat")) if arg("lat") else None
+            lon = float(arg("lon")) if arg("lon") else None
+            rent = float(arg("rent")) if arg("rent") else None
+        except ValueError:
+            return self._send(400, "text/plain", b"lat, lon and rent must be numbers")
+        if (lat is None) != (lon is None) or (lat is not None and not (-90 <= lat <= 90 and -180 <= lon <= 180)):
+            return self._send(400, "text/plain", b"lat and lon must both be valid coordinates")
+        if rent is not None and not (0 < rent < 1e7):
+            return self._send(400, "text/plain", b"rent must be a positive monthly amount")
+        if lat is None and not (city and location):
+            return self._send(400, "text/plain", b"a map point (lat, lon) or a city and location are required")
+        self._stream_agent(lambda: tenant.run(city, location or None, lat, lon, rent))
+
+    def _stream_agent(self, start):
         if not os.environ.get("QLOO_API_KEY"):
             self._start_stream()
             return self._event("error", "offline")
@@ -191,7 +215,7 @@ class Handler(BaseHTTPRequestHandler):
         events = None
         try:
             self._start_stream()
-            events = agent.run(concept, location)
+            events = start()
             for kind, data in events:
                 self._event(kind, data)
         except (BrokenPipeError, ConnectionResetError):

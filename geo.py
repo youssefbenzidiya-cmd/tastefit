@@ -94,6 +94,34 @@ def geocode(query, cache=None):
     return found
 
 
+AREA_KEYS = ("neighbourhood", "quarter", "suburb", "city_district")
+
+
+def reverse(lat, lon):
+    """{"areas": [names, finest first], "city", "postcode"} for a map click, or None. One throttled Nominatim call."""
+    _throttle()
+    url = "https://nominatim.openstreetmap.org/reverse?" + urllib.parse.urlencode(
+        {"lat": f"{lat:.6f}", "lon": f"{lon:.6f}", "format": "json", "zoom": 16, "addressdetails": 1,
+         "accept-language": "en"})
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            addr = json.loads(r.read()).get("address") or {}
+    except Exception:  # noqa: BLE001  the caller asks for a typed neighborhood instead
+        return None
+    city = addr.get("city") or addr.get("town") or addr.get("village") or addr.get("municipality")
+    if not city:
+        return None
+    areas = list(dict.fromkeys(addr[k] for k in AREA_KEYS if addr.get(k) and addr[k] != city))
+    return {"areas": areas, "city": city, "postcode": addr.get("postcode")}
+
+
+def km_between(a, b):
+    """Equirectangular distance in km between two (lat, lon) points; accurate at neighborhood scale."""
+    kx = 111.32 * math.cos(math.radians((a[0] + b[0]) / 2))
+    return math.hypot((a[1] - b[1]) * kx, (a[0] - b[0]) * KM_PER_DEG_LAT)
+
+
 def locate(points, area, limit=10, cache=None):
     """Fill missing coordinates by geocoding addresses; drops points that cannot be placed."""
     cache = {} if cache is None else cache

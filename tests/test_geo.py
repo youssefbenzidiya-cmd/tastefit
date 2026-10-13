@@ -150,6 +150,32 @@ class Geocoding(unittest.TestCase):
         geo.locate(pts, "Brooklyn")
         self.assertEqual(len(self.api.calls), 2)
 
+    def test_reverse_names_the_point_finest_area_first(self):
+        self.api.hits = {"address": {"neighbourhood": "Wicker Park", "suburb": "West Town", "quarter": "Wicker Park",
+                                     "city": "Chicago", "postcode": "60622"}}
+        self.assertEqual(geo.reverse(41.9088, -87.6796),
+                         {"areas": ["Wicker Park", "West Town"], "city": "Chicago", "postcode": "60622"})
+        _, url, ua = self.api.calls[0]
+        self.assertIn("nominatim.openstreetmap.org/reverse", url)
+        self.assertIn("lat=41.908800", url)
+        self.assertTrue(ua.startswith("TasteFit/"))
+
+    def test_reverse_shares_the_rate_limit_and_fails_soft(self):
+        self.api.hits = {"address": {"town": "Sampleton"}}
+        geo.geocode("1 Main St")
+        self.assertEqual(geo.reverse(1, 2), {"areas": [], "city": "Sampleton", "postcode": None})
+        self.assertGreaterEqual(self.api.calls[1][0] - self.api.calls[0][0], 1.0)
+        self.api.hits = {"address": {"country": "Nowhere"}}
+        self.assertIsNone(geo.reverse(1, 2))
+        with mock.patch("geo.urllib.request.urlopen", side_effect=OSError("down")):
+            self.assertIsNone(geo.reverse(1, 2))
+
+
+class Distance(unittest.TestCase):
+    def test_km_between(self):
+        self.assertEqual(geo.km_between((41.9, -87.68), (41.9, -87.68)), 0)
+        self.assertAlmostEqual(geo.km_between((41.9, -87.68), (42.0, -87.68)), 11.057, places=3)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,10 +1,9 @@
 """TasteFit agent: tests a restaurant/cafe concept against the local taste of a neighborhood."""
 import json
-import os
 import re
-import urllib.request
 
 import geo
+import llm
 import qloo
 
 SYSTEM = """You are TasteFit, an analyst that checks whether a food & drink concept fits the local taste of an area,
@@ -101,14 +100,7 @@ def call_tool(name, a, site=None):
 
 
 def chat(messages):
-    body = {"model": os.environ.get("LLM_MODEL", "turboderp/Qwen3.8-27B-exl3"), "messages": messages,
-            "tools": [{"type": "function", "function": t} for t in TOOLS], "temperature": 0.2}
-    req = urllib.request.Request(os.environ.get("LLM_BASE_URL", "https://hermes.ai.unturf.com/v1").rstrip("/") + "/chat/completions",
-                                 data=json.dumps(body).encode(),
-                                 headers={"Content-Type": "application/json",
-                                          "Authorization": f"Bearer {os.environ.get('LLM_API_KEY', 'none')}"})
-    with urllib.request.urlopen(req, timeout=180) as r:
-        return json.loads(r.read())["choices"][0]["message"]
+    return llm.chat(messages, tools=TOOLS)
 
 
 def _names(obj, limit=6):
