@@ -91,7 +91,7 @@ Qloo returns an affinity per option. TasteFit turns the order into a demand scor
 
 ### Does Qloo help? Backtest (Chicago, offline)
 
-`backtest_chicago.py` checks the tenant agent's demand ranking against what actually opened and survived. The ground truth is the City of Chicago Food Inspections register: a restaurant or bakery opened when its license passed its first License inspection in 2023-2024, and survived when no later inspection says Out of Business and it was inspected again since April 2025. Names are matched to the ten catalog concepts by keyword (201 of 1,754 openings match). For each area (1.2 km radius), the ten concepts are ordered by one Qloo `rank` call, and by the citywide share of surviving openings without that area (a "what is opening everywhere" baseline). The output is numbers only (`backtest_chicago.json`).
+`backtest_chicago.py` checks the tenant agent's demand ranking against what actually opened and survived. The ground truth is the City of Chicago Food Inspections register: a restaurant or bakery opened when its licence's first passing License inspection ever falls in 2023-2024 (licences that passed one earlier, such as renewals, are left out), and survived when no later inspection says Out of Business and it was inspected again since April 2025. Names are matched to the ten catalog concepts by keyword (200 of 1,751 openings match). For each area (1.2 km radius), the ten concepts are ordered by one Qloo `rank` call, and by the citywide share of surviving openings without that area (a "what is opening everywhere" baseline). The output is numbers only (`backtest_chicago.json`).
 
 | 9 Chicago areas, 31 surviving openings | Qloo demand | Citywide baseline | Random |
 |---|---|---|---|

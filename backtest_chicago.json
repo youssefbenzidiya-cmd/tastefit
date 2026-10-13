@@ -7,10 +7,10 @@
  "radius_km": 1.2,
  "k": 3,
  "areas": 12,
- "openings": 1754,
- "classified": 201,
- "survival_rate_all": 0.451,
- "qloo_calls": 34,
+ "openings": 1751,
+ "classified": 200,
+ "survival_rate_all": 0.452,
+ "qloo_calls": 35,
  "benchmarks": 10,
  "qloo_rank_failures": {
   "status ok: no usable ranking": 2

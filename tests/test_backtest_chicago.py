@@ -34,6 +34,12 @@ class Register(unittest.TestCase):
         rows = [
             {"license_": "1", "inspection_date": "2022-12-01T00:00:00", "results": "Pass", "dba_name": "A",
              "latitude": "41.9", "longitude": "-87.6"},
+            {"license_": "1", "inspection_date": "2023-06-01T00:00:00", "results": "Pass", "dba_name": "A",
+             "latitude": "41.9", "longitude": "-87.6"},
+            {"license_": "4", "inspection_date": "2022-11-01T00:00:00", "results": "Fail", "dba_name": "D",
+             "latitude": "41.9", "longitude": "-87.6"},
+            {"license_": "4", "inspection_date": "2023-02-01T00:00:00", "results": "Pass", "dba_name": "D",
+             "latitude": "41.9", "longitude": "-87.6"},
             {"license_": "2", "inspection_date": "2023-03-01T00:00:00", "results": "Fail", "dba_name": "B",
              "latitude": "41.9", "longitude": "-87.6"},
             {"license_": "2", "inspection_date": "2023-04-01T00:00:00", "results": "Pass w/ Conditions",
@@ -41,7 +47,7 @@ class Register(unittest.TestCase):
             {"license_": "3", "inspection_date": "2024-05-01T00:00:00", "results": "Pass", "dba_name": "C"},
         ]
         out = bt.openings(rows)
-        self.assertEqual(list(out), ["2"])
+        self.assertEqual(sorted(out), ["2", "4"])  # 1 passed before the window: a renewal, not an opening
         self.assertEqual(out["2"]["opened"], "2023-04-01")
         self.assertEqual(out["2"]["name"], "B Tacos")
 

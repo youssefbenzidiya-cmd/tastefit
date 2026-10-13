@@ -73,13 +73,19 @@ def km(a, b):
 
 
 def openings(rows):
-    """{license: {name, lat, lon, opened}} from License inspections: first passing one inside WINDOW."""
-    out = {}
+    """{license: {name, lat, lon, opened}} from the full License-inspection history: the licence's first passing
+    License inspection falls inside WINDOW. Licences that already passed one before WINDOW are not new openings."""
+    out, earlier = {}, set()
     for r in sorted(rows, key=lambda r: r.get("inspection_date") or ""):
         lic, day = r.get("license_"), (r.get("inspection_date") or "")[:10]
-        if not lic or lic == "0" or lic in out or not (WINDOW[0] <= day <= WINDOW[1]):
+        passed = str(r.get("results", "")).startswith("Pass")
+        if not lic or lic == "0":
             continue
-        if not str(r.get("results", "")).startswith("Pass") or r.get("latitude") is None:
+        if day < WINDOW[0]:
+            if passed:
+                earlier.add(lic)
+            continue
+        if day > WINDOW[1] or lic in out or lic in earlier or not passed or r.get("latitude") is None:
             continue
         out[lic] = {"name": r.get("aka_name") or r.get("dba_name") or "", "lat": float(r["latitude"]),
                     "lon": float(r["longitude"]), "opened": day}
@@ -182,8 +188,7 @@ def _register(where, select, limit=50000):
 
 def load_register():
     facilities = " or ".join(f"facility_type='{f}'" for f in FACILITIES)
-    lic_rows = _register(f"inspection_type='License' and inspection_date between '{WINDOW[0]}' and '{WINDOW[1]}T23:59:59'"
-                         f" and ({facilities})",
+    lic_rows = _register(f"inspection_type='License' and inspection_date <= '{WINDOW[1]}T23:59:59' and ({facilities})",
                          "license_,dba_name,aka_name,inspection_date,results,latitude,longitude")
     opened = openings(lic_rows)
     hist = collections.defaultdict(list)
