@@ -341,9 +341,10 @@ def verdict(score, downgrade):
 # ---------- baseline (same LLM, no tools) ----------
 
 BASELINE_PROMPT = """A commercial broker has a vacant retail unit in {area} ({city}).
-Without any external data, list the {n} restaurant or cafe concepts most likely to succeed there.
+Without any external data, list the {n} restaurant or cafe concepts most likely to succeed there, and name up to 5
+existing food or cafe competitors within 500 m of the unit.
 No alcohol-led concepts. Answer with JSON only:
-{{"candidates": [{{"concept": "short name", "why": "one line"}}]}}"""
+{{"candidates": [{{"concept": "short name", "why": "one line"}}], "competitors": ["venue name"]}}"""
 
 _STOP = {"shop", "restaurant", "cafe", "café", "counter", "house", "spot", "kitchen", "bistro", "eatery", "concept",
          "style", "modern", "casual", "fast", "the", "and", "a", "of", "s"}
@@ -358,25 +359,55 @@ def baseline(area, city, chat_fn):
         msg = chat_fn([{"role": "user", "content": BASELINE_PROMPT.format(area=area, city=city, n=N_CANDIDATES)}])
     except Exception:  # noqa: BLE001
         return None
-    rows = []
-    for c in ((_json_block(msg.get("content")) or {}).get("candidates") or [])[:N_CANDIDATES]:
+    rows, data = [], _json_block(msg.get("content")) or {}
+    for c in (data.get("candidates") or [])[:N_CANDIDATES]:
         if isinstance(c, dict) and isinstance(c.get("concept"), str):
             rows.append({"concept": c["concept"][:60], "why": str(c.get("why") or "")[:200],
                          "excluded": alcohol_led(c["concept"])})
-    return {"provider": msg.get("provider"), "candidates": rows}
+    named = [str(v)[:80] for v in (data.get("competitors") or []) if isinstance(v, str) and v.strip()][:5]
+    return {"provider": msg.get("provider"), "candidates": rows, "competitors": named}
 
 
-def judge_baseline(base, shortlist):
-    """Marks each LLM-only claim confirmed / contradicted / not tested against what Qloo returned in this run."""
+_CROWDED = ("avoid", "empty for a reason", "proven demand, crowded")
+QLOO_PLACE_RADIUS_M = 1500  # Qloo's favourites are area-level, not next-door claims
+
+
+def venue_checks(names, venues, point, radius):
+    """[{name, status, match}] for named venues against OSM within `radius` m of the unit; [] without a venue file."""
+    if not (venues and point):
+        return []
+    out = []
+    for name in names:
+        found, match = venues.find(name, *point, radius=radius)
+        out.append({"name": name, "status": {True: "exists", None: "ambiguous", False: "not found"}[found], "match": match})
+    return out
+
+
+def _counts(rows):
+    return {k: sum(r["status"] == k for r in rows) for k in ("exists", "not found", "ambiguous")} | {"named": len(rows)}
+
+
+def judge_baseline(base, shortlist, venues=None, point=None, places=()):
+    """Claim ledger: marks each LLM-only concept confirmed / contradicted / partly / not tested against this run's
+    evidence (the Taste Gap quadrant where there is one), and checks the venues it named, and Qloo's area favourites,
+    against OpenStreetMap. Agreement with TasteFit's evidence and existence in open data, not accuracy."""
     if not base:
         return None
     for row in base["candidates"]:
         toks = _tokens(row["concept"])
         match = next((s for s in shortlist if toks & (_tokens(s["concept"]) | _tokens(s["tag"]["name"] if s.get("tag") else ""))), None)
+        gap = match and match.get("tgi_label")
         if row["excluded"]:
             row["status"], row["evidence"] = "excluded", "Alcohol-led: left out."
         elif match is None:
             row["status"], row["evidence"] = "not tested", "Not among the concepts Qloo evaluated in this run."
+        elif gap:
+            d = match.get("overindex") or 0.0
+            row["status"] = ("confirmed" if gap == "white space" or (gap == "neutral" and d > 0)
+                             else "contradicted" if gap in _CROWDED else "partly")
+            row["evidence"] = (f"Taste Gap: {gap}. Over-index {d:+.2f} (Qloo rank, area vs city); "
+                               f"{match.get('local_supply')} OpenStreetMap venues within {tgi.RADIUS_M} m vs "
+                               f"{match.get('supply_expected')} expected.")
         elif match.get("call") in ("GO", "ADJUST") and match.get("position", 99) <= 3:
             row["status"] = "confirmed"
             row["evidence"] = f"Qloo: {match['concept']} ranks {match['position']} of {match['of']} for this audience, {match['call']}."
@@ -392,6 +423,14 @@ def judge_baseline(base, shortlist):
     mentioned = set().union(*(_tokens(r["concept"]) for r in base["candidates"])) if base["candidates"] else set()
     base["qloo_only"] = [s["concept"] for s in shortlist[:3] if s.get("call") in ("GO", "ADJUST")
                          and not (_tokens(s["concept"]) & mentioned)]
+    status = [r.get("status") for r in base["candidates"]]
+    base["venues"] = venue_checks(base.get("competitors") or [], venues, point, tgi.CLAIM_RADIUS_M)
+    qloo_named = venue_checks([p for p in places][:5], venues, point, QLOO_PLACE_RADIUS_M)
+    base["ledger"] = {
+        "concepts": {k: status.count(k) for k in ("confirmed", "contradicted", "partly", "not tested", "excluded")},
+        "llm_venues": _counts(base["venues"]) | {"radius_m": tgi.CLAIM_RADIUS_M} if base["venues"] else None,
+        "qloo_venues": _counts(qloo_named) | {"radius_m": QLOO_PLACE_RADIUS_M} if qloo_named else None,
+        "source": "OpenStreetMap" if venues and point else None}
     return base
 
 
@@ -404,7 +443,8 @@ concept: call, score, the evidence behind it with its source, Qloo or OpenStreet
 ## Before you sign (3 bullets of on-site checks), ## Limits (Qloo describes aggregate taste affinities, not foot
 traffic, sales or individuals; rank scores are relative to these candidates; rent ceilings are a model, not a forecast;
 the Taste Gap Index (tgi, tgi_label) uses stated, uncalibrated weights; supply figures with supply_source OpenStreetMap
-are mapped OSM venues, not Qloo data, and must be attributed to OpenStreetMap; in a Chicago backtest neither Qloo demand
+are mapped OSM venues, not Qloo data, and must be attributed to OpenStreetMap (coverage "low" means the estimate
+stays near the city average: say so); in a Chicago backtest neither Qloo demand
 rankings nor the Taste Gap Index predicted which concepts survived better than a citywide baseline).
 Evidence:
 {evidence}"""
@@ -434,6 +474,8 @@ def template_memo(area, city, shortlist, profile):
         if s.get("local_supply") is not None and s.get("supply_source") == "OpenStreetMap":
             bits.append(f"{s['local_supply']} OpenStreetMap-mapped venues within {tgi.RADIUS_M} m "
                         f"({s['supply_expected']} expected from the city's mix)")
+            if s.get("coverage") == "low":
+                bits.append("data coverage low: few mapped venues, so the supply estimate stays near the city average")
             if s.get("tgi_label"):
                 bits.append(f"Taste Gap: {s['tgi_label']} (index {s['tgi']}, uncalibrated)")
         elif s.get("local_supply") is not None:
@@ -599,7 +641,7 @@ def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None,
         s = venues.supply(tgi.cuisines_for(c["concept"], c["tag"]["name"]), *point)
         if s:
             c.update(local_supply=s["n"], supply_expected=s["expected"], theta=s["theta"], p_under=s["p_under"],
-                     supply_source="OpenStreetMap", white_space=round(100 * s["p_under"]),
+                     supply_source="OpenStreetMap", white_space=round(100 * s["p_under"]), coverage=s["coverage"],
                      tgi=tgi.score(c.get("overindex"), s["theta"]), tgi_label=tgi.label(c.get("overindex"), s["p_under"]))
             yield "step", {"workflow": "osm", "source": "OpenStreetMap", "purpose": f"Existing {c['concept']} supply within "
                            f"{tgi.RADIUS_M} m of the unit", "names": [f"{s['n']} found, {s['expected']} expected from the city's mix",
@@ -656,7 +698,7 @@ def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None,
         row = {k: c.get(k) for k in ("concept", "why", "rent_group", "tag", "benchmark", "demand", "position", "of",
                                      "local_supply", "local_names", "white_space", "shared_tags", "overlap", "trend",
                                      "hotspot_km", "supply_source", "supply_expected", "theta", "p_under", "overindex",
-                                     "tgi", "tgi_label")}
+                                     "tgi", "tgi_label", "coverage")}
         if c in deep:
             rent_row, note, down = rent_check(c["rent_group"], rent_rows, asking_rent)
             row["score"] = tenant_score(c["demand"], c.get("white_space"), c.get("overlap"))
@@ -683,7 +725,7 @@ def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None,
         base_result = base_future.result(timeout=max(1, DEADLINE - (clock() - started)))
     except concurrent.futures.TimeoutError:
         base_result = None
-    base = judge_baseline(base_result, shortlist)
+    base = judge_baseline(base_result, shortlist, venues, point, [p["name"] for p in places])
     pool.shutdown(wait=False)
     yield "baseline", base or {"unavailable": True}
 

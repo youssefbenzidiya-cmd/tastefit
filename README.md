@@ -155,7 +155,9 @@ CLI: `python agent.py "Korean fried chicken counter" "Austin, TX"`
 
 **Tenant match** (`GET /tenant?lat=41.9088&lon=-87.6796&rent=4000`, or `?city=Paris&location=Le%20Marais`): for a vacant unit, which food concepts the local audience wants that nobody nearby serves, and whether each can pay the rent. A fixed pipeline of at most 25 Qloo calls (8 workflows; a cache that lives for one request only, so repeated calls within a run are free and nothing Qloo returns outlives the request) streams each step, then a scored shortlist, a "without Qloo" comparison and a memo (`tenant.py`).
 
-Tests: `python -m unittest discover -s tests -t . -v` (241 tests).
+**Claim ledger** (the "without Qloo" panel): the same LLM, with no tools, suggests concepts and names up to 5 competitors within 500 m. Each concept is marked confirmed (Taste Gap "white space", or "neutral" with a positive over-index), contradicted ("proven demand, crowded", "empty for a reason", "avoid"), partly supported, or not tested by this run. Each named venue is looked up in OpenStreetMap within 500 m with City Scan's name matcher (similarity >= 0.6 found, 0.45-0.6 ambiguous); Qloo's own area favourites go through the same check (1.5 km, since they are area-level). The page shows counts, and calls them agreement with the run's evidence and existence in open data, not accuracy: OSM misses real venues too. Supply estimates whose city prior carries >= 80% of the weight are badged "Data coverage: low" (Chicago's OSM mapping is thin).
+
+Tests: `python -m unittest discover -s tests -t . -v` (245 tests).
 
 ## Deploy
 
