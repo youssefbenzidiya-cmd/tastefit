@@ -113,6 +113,44 @@ class Metrics(unittest.TestCase):
         self.assertIsNone(orders["B"])
         self.assertEqual(provider, "x")
 
+    def test_tgi_orders(self):
+        table = {"A": row(**{C[1]: (2, 2)}), "B": row(**{C[0]: (9, 9)})}
+        d = {"A": {c: (1.0 if c == C[2] else 0.0) for c in C}}
+        s = {"A": {c: ((0.5, 0.95) if c == C[3] else (1.0, 0.5)) for c in C}}
+        o = bt.tgi_orders(table, [("A", 0, 0), ("B", 0, 0)], d, s)
+        self.assertEqual(o["qloo_D"]["A"][0], C[2])
+        self.assertEqual(o["osm_under"]["A"][0], C[3])
+        self.assertEqual(set(o["tgi"]["A"][:2]), {C[2], C[3]})
+        self.assertEqual(o["prior_tgi"]["A"][0], C[0])  # 9 survivors elsewhere outweigh D = 1 and log 2
+        self.assertEqual(sorted(o["tgi"]["A"]), sorted(C))
+        self.assertIsNone(o["tgi"]["B"])
+        self.assertIsNone(o["qloo_D"]["B"])
+
+    def test_qloo_orders_city_rank_and_rate_limit_retry(self):
+        class Led:
+            def __init__(self):
+                self.calls, self.limited = [], 1
+
+            def call(self, op, params, purpose):
+                self.calls.append(params.get("signal_location") or op)
+                if op == "find_tags":
+                    return {"results": [{"id": f"urn:tag:{params['query']}", "name": params["query"],
+                                         "type": "urn:tag:cuisine:qloo"}]}, {}
+                if op == "recommend":
+                    return {"results": [{"entity_id": "P" + params["include_tags"][0][-4:], "name": "Place"}]}, {}
+                if params["signal_location"] == "A, Chicago" and self.limited:
+                    self.limited -= 1
+                    return None, {"error": "QLOO_RATE_LIMIT"}
+                opts = params["options"] if params["signal_location"] != "Chicago" else list(reversed(params["options"]))
+                return {"results": [{"entity_id": e, "affinity": 1 - i / 100} for i, e in enumerate(opts)]}, {}
+        led = Led()
+        orders, n, failures, d = bt.qloo_orders([("A", 0, 0)], led, city_rank=True, sleep=lambda s: None)
+        self.assertEqual(led.calls[-3:], ["Chicago", "A, Chicago", "A, Chicago"])
+        self.assertEqual(failures, {})
+        self.assertTrue(orders["A"])
+        self.assertTrue(d["A"])
+        self.assertAlmostEqual(sum(d["A"].values()), 0.0)
+
     def test_bootstrap(self):
         lo, hi = bt.bootstrap_diff([(2, 1, 4), (3, 3, 5), (1, 0, 2)])
         self.assertLessEqual(lo, hi)

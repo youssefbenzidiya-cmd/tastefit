@@ -18,6 +18,7 @@ import geo
 import llm
 import qloo
 import scan
+import tgi
 
 BUDGET = 25  # Qloo network calls per run; cache hits are free
 N_CANDIDATES = 6
@@ -402,17 +403,20 @@ Sections: ## Recommendation (2 sentences naming the top tenant and its call), ##
 concept: call, score, the Qloo evidence behind it, rent check), ## Why this audience (local places, tags and age skew),
 ## Before you sign (3 bullets of on-site checks), ## Limits (Qloo describes aggregate taste affinities, not foot
 traffic, sales or individuals; rank scores are relative to these candidates; rent ceilings are a model, not a forecast;
-in a Chicago backtest Qloo demand rankings did not predict which concepts survived better than a citywide baseline).
+the Taste Gap Index (tgi, tgi_label) uses stated, uncalibrated weights; in a Chicago backtest neither Qloo demand
+rankings nor the Taste Gap Index predicted which concepts survived better than a citywide baseline).
 Evidence:
 {evidence}"""
 
 LIMITS = ("## Limits\n- Qloo describes aggregate taste affinities of an area's audience, not foot traffic, sales or any "
           "individual.\n- Demand scores are relative to the candidates in this run (one Qloo rank call), not absolute.\n"
-          "- White space counts the places Qloo returns for the concept within its own area boundary (capped at "
-          f"{LOCAL_LIMIT}); it is not a census of competitors.\n- Rent ceilings are a survival model built from "
+          "- White space comes from OpenStreetMap venues near the unit where the city has a venue file (mapping is "
+          "incomplete), else from the places Qloo returns inside the area (capped at "
+          f"{LOCAL_LIMIT}); neither is a census of competitors.\n- Rent ceilings are a survival model built from "
           "official data, not a forecast; cafés are not covered.\n- The unit is a point on a map, not a vetted address.")
-BACKTEST_NOTE = ("- In a Chicago backtest of 2023-2024 openings, Qloo demand rankings did not predict which concepts opened "
-                 "and survived better than a citywide baseline: read them as taste evidence, not a survival forecast.")
+BACKTEST_NOTE = ("- In a Chicago backtest of 2023-2024 openings, neither Qloo demand rankings nor the Taste Gap Index "
+                 "predicted which concepts opened and survived better than a citywide baseline: read them as taste and "
+                 "supply evidence, not a survival forecast.")
 LIMITS += "\n" + BACKTEST_NOTE
 
 
@@ -561,23 +565,46 @@ def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None,
     by_id = {}
     for c in ranked:
         by_id.setdefault(c["benchmark"]["id"], []).append(c["concept"])
-    scores = {}
+    # With an OSM venue file the same benchmarks are also ranked for the whole city: the Taste Gap Index's over-index.
+    venues = tgi.load(scan.slugify(city)) if point else None
+    scores, overindex = {}, {}
     if by_id:
-        res, step = led.call(*qloo.p_rank(list(by_id), area), purpose=f"Rank the benchmarks for the {area} audience")
+        jobs = [(*qloo.p_rank(list(by_id), area), f"Rank the benchmarks for the {area} audience")]
+        if venues and len(by_id) > 1:
+            jobs.append((*qloo.p_rank(list(by_id), city), f"Rank the same benchmarks for all of {city} (over-index baseline)"))
+        results = led.batch(jobs)
+        res, step = results[0]
         scores = demand_scores(res, by_id)
         yield "step", {**step, "names": [f"{cs[0]}" for _, cs in sorted(by_id.items(), key=lambda kv: scores.get(kv[1][0], (0, 99))[1])]}
+        if len(results) > 1:
+            city_res, city_step = results[1]
+            overindex = tgi.demand_overindex(tgi.rank_scores(res, by_id), tgi.rank_scores(city_res, by_id))
+            yield "step", {**city_step, "names": [f"{c} {d:+.1f}" for c, d in sorted(overindex.items(), key=lambda kv: -kv[1])]}
     for c in ranked:
         c["demand"], c["position"], c["of"] = scores.get(c["concept"], (None, None, None))
+        if c["concept"] in overindex:
+            c["overindex"] = round(overindex[c["concept"]], 2)
     ranked.sort(key=lambda c: (c["position"] is None, c["position"] or 0))
     deep = [c for c in ranked if c["demand"] is not None][:N_DEEP]
 
-    # 6. White space: how many places already serve each concept inside the area.
-    for c, (res, step) in zip(deep, led.batch([
+    # 6. White space: OpenStreetMap venues within 600 m of the unit when the city has a venue file (no Qloo call),
+    # else how many places Qloo finds serving the concept inside the area.
+    for c in deep if venues else []:
+        s = venues.supply(tgi.cuisines_for(c["concept"], c["tag"]["name"]), *point)
+        if s:
+            c.update(local_supply=s["n"], supply_expected=s["expected"], theta=s["theta"], p_under=s["p_under"],
+                     supply_source="OpenStreetMap", white_space=round(100 * s["p_under"]),
+                     tgi=tgi.score(c.get("overindex"), s["theta"]), tgi_label=tgi.label(c.get("overindex"), s["p_under"]))
+            yield "step", {"workflow": "osm", "source": "OpenStreetMap", "purpose": f"Existing {c['concept']} supply within "
+                           f"{tgi.RADIUS_M} m of the unit", "names": [f"{s['n']} found, {s['expected']} expected from the city's mix",
+                                                                    f"P(under-supplied) {s['p_under']:.2f}"]}
+    qloo_supply = [c for c in deep if c.get("supply_source") is None]
+    for c, (res, step) in zip(qloo_supply, led.batch([
             (*qloo.p_concept_places(area, area, c["tag"]["id"], limit=LOCAL_LIMIT), f"Existing {c['concept']} supply in {area}")
-            for c in deep])):
+            for c in qloo_supply])):
         local = [_place(r) for r in _results(res) if r.get("entity_id")]
         if res is not None and not step.get("error"):
-            c["local_supply"], c["local_names"] = len(local), [p["name"] for p in local[:5]]
+            c["local_supply"], c["local_names"], c["supply_source"] = len(local), [p["name"] for p in local[:5]], "Qloo"
             c["white_space"] = round(100 * (1 - min(len(local), LOCAL_LIMIT) / LOCAL_LIMIT))
         yield "step", {**step, "names": [p["name"] for p in local[:6]] or ["none found: white space"]}
 
@@ -622,7 +649,8 @@ def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None,
     for c in ranked:
         row = {k: c.get(k) for k in ("concept", "why", "rent_group", "tag", "benchmark", "demand", "position", "of",
                                      "local_supply", "local_names", "white_space", "shared_tags", "overlap", "trend",
-                                     "hotspot_km")}
+                                     "hotspot_km", "supply_source", "supply_expected", "theta", "p_under", "overindex",
+                                     "tgi", "tgi_label")}
         if c in deep:
             rent_row, note, down = rent_check(c["rent_group"], rent_rows, asking_rent)
             row["score"] = tenant_score(c["demand"], c.get("white_space"), c.get("overlap"))
@@ -634,9 +662,15 @@ def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None,
     yield "shortlist", {"area": area, "city": city, "currency": unit.get("currency"), "asking_rent": asking_rent,
                         "weights": WEIGHTS, "concepts": shortlist, "heat": heat[:8],
                         "method": "Score = 0.45 x demand (position in one Qloo rank call) + 0.35 x white space "
-                                  f"(100 minus 10 per local place, {LOCAL_LIMIT}+ = 0) + 0.20 x audience overlap "
-                                  "(Qloo compare score). GO 65+, ADJUST 45-64, NO-GO below 45; a rent above the "
-                                  "ceiling downgrades the call."}
+                                  + (f"(100 x the probability that the concept is under-supplied within {tgi.RADIUS_M} m, "
+                                     "from OpenStreetMap venues against the city's food mix, shrunk toward the city "
+                                     "average) " if venues else
+                                     f"(100 minus 10 per local place, {LOCAL_LIMIT}+ = 0) ")
+                                  + "+ 0.20 x audience overlap (Qloo compare score). GO 65+, ADJUST 45-64, NO-GO below "
+                                  "45; a rent above the ceiling downgrades the call."
+                                  + (" Taste Gap Index = sigma(over-index - log supply ratio), stated priors, "
+                                     "uncalibrated; it did not beat a citywide baseline in the Chicago backtest."
+                                     if venues else "")}
 
     try:
         base_result = base_future.result(timeout=max(1, DEADLINE - (clock() - started)))

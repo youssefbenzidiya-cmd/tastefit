@@ -66,11 +66,11 @@ All calls go through the official harness (`qloo exec`); 8 of its 9 workflows ar
 | Workflow | Where | Why |
 |---|---|---|
 | `recommend` (place, location signal) | both modes | What the area's audience over-indexes on: the taste a tenant would sell into |
-| `recommend` (place, tag + location filter) | both modes | Benchmarks for a concept in the city, and the existing supply inside the area (white space) |
+| `recommend` (place, tag + location filter) | both modes | Benchmarks for a concept in the city, and the existing supply inside the area where no OpenStreetMap venue file ships for the city |
 | `entity_tags` | tenant | The tags behind the area's favourite places (cuisine, vibe, price) |
 | `audience_demographics` | tenant | Age and gender skew of the area's top place, shown as relative bars |
 | `find_tags` | both modes | Turn a concept into a Qloo tag URN; the choice and the alternatives are shown |
-| `rank` | tenant | One call ranks every benchmark for the area's audience, so the demand scores are comparable (scores from separate calls are not) |
+| `rank` | tenant | One call ranks every benchmark for the area's audience, so the demand scores are comparable (scores from separate calls are not); a second ranks the same benchmarks for the whole city, for the over-index |
 | `compare_audiences` | tenant | Shared taste between the area's favourites and the top concepts' benchmarks |
 | `where_popular` | both modes | Where the top benchmark's audience concentrates, and how far the unit is from it |
 | `trends` | tenant | Reach of the top concept's reference chain (trends cover brands, not places) |
@@ -103,6 +103,25 @@ Each opening counts once, for the nearest area centre, because neighbouring area
 
 Result: **no gain**. Qloo's demand ranking did no better than random at naming the concepts that opened and survived, and the citywide baseline did clearly better: the Qloo-minus-baseline difference has a 90% bootstrap interval of -66 to -4 points. Openings in the concepts Qloo ranked highest did survive more often (64% vs. 44%), but on 14 openings that is not evidence. Earlier runs the same day, before each opening was counted once, gave Qloo between 30% and 54%, so the rank output also varies between runs. The LLM-only column needs a working LLM for every area and is not reported. Qloo and the LLM describe today's taste, after these places opened, so this checks agreement with what survived, not a forecast made in 2023.
 
+**Taste Gap Index.** The second hypothesis was that Qloo helps once combined with supply: a concept the area loves *more than the city does* and that is *under-served nearby*. `tgi.py` computes, per concept:
+
+- **Over-index D**: the same benchmarks ranked once for the area and once for the whole city, each standardised within its own call, D = z(area) − z(city). Scores from different rank calls are never compared raw.
+- **Supply ratio θ**: OpenStreetMap venues of that cuisine within 600 m against the count expected from the local food mix at the city's concept share (a location quotient, Isserman 1977), shrunk with a Gamma prior fitted over the city's 1.2 km blocks (Clayton & Kaldor 1987) so one or zero venues cannot produce a wild ratio; P(under-supplied) = P(θ < 1) from 4,000 seeded draws.
+- **Index** σ(D − log θ) with stated, unfitted weights, and a quadrant label (white space / proven demand, crowded / empty for a reason / avoid / neutral).
+
+The backtest (`--food`, results in `backtest_chicago_tgi.json`) uses an OSM snapshot dated 2023-01-01, before the window, so supply has no look-ahead; D still comes from today's Qloo. The four orderings were fixed before the run. Same 9 areas and 31 surviving openings:
+
+| Top-3 hit rate (rank correlation) | |
+|---|---|
+| Qloo rank alone (as above) | 29% (0.02) |
+| Over-index D alone | 35% (−0.04) |
+| OSM under-supply alone | 32% (−0.10) |
+| Taste Gap Index | 48% (−0.16) |
+| Citywide baseline + Taste Gap Index | 55% (0.23) |
+| Citywide baseline alone | 68% (0.31) |
+
+Result: **no measurable gain**. The index beats the plain Qloo rank by 19 points, but the 90% interval of that difference (−13 to +42 points) includes zero, and every TGI variant is below the citywide baseline (index minus baseline: −36 to −6 points; adding the index to the baseline makes it worse, −22 to −6). On 9 areas, what is opening everywhere in Chicago predicts better than local taste or local gaps. The app still shows the index, labelled uncalibrated, because it is the clearest way to explain a recommendation; OSM supply also replaces four Qloo calls per run.
+
 What this means for the product: Qloo is useful here as evidence a broker can show (what the area loves, who already serves it, where the audience is), not as a validated predictor of tenant survival. Every tenant memo's Limits section reports this backtest result (`tenant.BACKTEST_NOTE`, added by code if the LLM leaves it out).
 
 ### Limits
@@ -126,6 +145,8 @@ export GEMINI_API_KEY=...          # optional: free Google AI Studio key, tried 
 export LLM_BASE_URL=...            # optional fallback: any OpenAI-compatible endpoint (default: a free keyless one)
 python app.py                      # http://localhost:8000 (broker mode: /?mode=broker)
 python backtest_chicago.py --no-llm  # optional: the Qloo backtest above (public Chicago data, about 35 Qloo calls)
+python tgi.py build chicago 2023-01-01 /tmp/chicago_2023.json.gz && \
+  python backtest_chicago.py --no-llm --food /tmp/chicago_2023.json.gz  # optional: with the Taste Gap Index
 ```
 
 The API keys stay on the server; the browser only receives the streamed steps and the memo. LLM calls go to Gemini first when `GEMINI_API_KEY` is set, then to the fallback endpoint. The tenant match never depends on an LLM to finish: without one it uses a fixed candidate list and a template memo.
@@ -134,7 +155,7 @@ CLI: `python agent.py "Korean fried chicken counter" "Austin, TX"`
 
 **Tenant match** (`GET /tenant?lat=41.9088&lon=-87.6796&rent=4000`, or `?city=Paris&location=Le%20Marais`): for a vacant unit, which food concepts the local audience wants that nobody nearby serves, and whether each can pay the rent. A fixed pipeline of at most 25 Qloo calls (8 workflows; a cache that lives for one request only, so repeated calls within a run are free and nothing Qloo returns outlives the request) streams each step, then a scored shortlist, a "without Qloo" comparison and a memo (`tenant.py`).
 
-Tests: `python -m unittest discover -s tests -t . -v` (218 tests).
+Tests: `python -m unittest discover -s tests -t . -v` (240 tests).
 
 ## Deploy
 

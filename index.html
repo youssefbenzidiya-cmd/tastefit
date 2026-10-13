@@ -922,7 +922,7 @@ document.querySelectorAll('.tf-try button').forEach(b => b.onclick = () => {
 const CALL_CLS = { 'GO': 'go', 'ADJUST': 'adjust', 'NO-GO': 'nogo' };
 const WF_TEXT = {
   recommend: 'recommend', entity_tags: 'entity_tags', audience_demographics: 'audience_demographics', find_tags: 'find_tags',
-  rank: 'rank', compare_audiences: 'compare_audiences', where_popular: 'where_popular', trends: 'trends',
+  rank: 'rank', compare_audiences: 'compare_audiences', where_popular: 'where_popular', trends: 'trends', osm: 'OpenStreetMap',
 };
 
 function tAddStep(s) {
@@ -934,7 +934,8 @@ function tAddStep(s) {
       (names.length ? names.slice(0, 5).join(', ') + (names.length > 5 ? '…' : '') : '');
   li.innerHTML = '<div class="s-title"><span class="wf">' + esc(WF_TEXT[s.workflow] || s.workflow) + '</span>' + esc(s.purpose) +
     (s.cached ? '<span class="cached">cached</span>' : '') + '</div><div class="s-sub">' + esc(sub) + '</div>' +
-    '<details><summary>Request sent to Qloo</summary><pre>' + esc(JSON.stringify(s.input, null, 1)) + '</pre></details>';
+    (s.source ? '<div class="s-sub">Source: ' + esc(s.source) + ' (no Qloo call)</div>'
+      : '<details><summary>Request sent to Qloo</summary><pre>' + esc(JSON.stringify(s.input, null, 1)) + '</pre></details>');
   tsteps.insertBefore(li, tsteps.querySelector('li.live'));
 }
 
@@ -951,13 +952,18 @@ function shortlistHTML(d) {
     const call = c.call ? '<span class="call-mini ' + CALL_CLS[c.call] + '">' + esc(c.call) + '</span>' : '<small>not scored</small>';
     const tag = c.tag ? '<small>Qloo tag: ' + esc(c.tag.name) + '</small>' : '';
     const bench = c.benchmark ? '<small>Benchmark: ' + esc(c.benchmark.name) + '</small>' : '';
-    const supply = c.local_supply == null ? '–' : '<b>' + esc(c.local_supply) + (c.local_supply >= 10 ? '+' : '') + '</b>' +
-      (c.local_names && c.local_names.length ? '<small>' + esc(c.local_names.slice(0, 3).join(', ')) + '</small>' : '<small>none found</small>');
+    const supply = c.local_supply == null ? '–' : c.supply_source === 'OpenStreetMap'
+      ? '<b>' + esc(c.local_supply) + '</b><small>' + esc(c.supply_expected) + ' expected within 600 m (OpenStreetMap)</small>' +
+        '<small>P(under-supplied) ' + esc(c.p_under) + '</small>'
+      : '<b>' + esc(c.local_supply) + (c.local_supply >= 10 ? '+' : '') + '</b>' +
+        (c.local_names && c.local_names.length ? '<small>' + esc(c.local_names.slice(0, 3).join(', ')) + '</small>' : '<small>none found</small>');
+    const gap = c.tgi_label ? '<small>Taste Gap: ' + esc(c.tgi_label) + (c.overindex != null ? ', over-index ' + (c.overindex > 0 ? '+' : '') + esc(c.overindex) : '') +
+      ' (index ' + esc(c.tgi) + ', uncalibrated)</small>' : '';
     const overlap = c.overlap == null ? '–' : '<b>' + esc(c.overlap) + '</b><small>' + esc((c.shared_tags || []).slice(0, 3).join(', ')) + '</small>';
     const trend = c.trend ? '<small>' + esc(c.trend.brand) + ': popularity percentile ' + esc(c.trend.percentile) + ', ' +
       (c.trend.change ? (c.trend.change > 0 ? '+' : '') + esc(c.trend.change) + ' pts' : 'no measurable change') + ' over ' + esc(c.trend.weeks) + ' weeks</small>' : '';
     const hot = c.hotspot_km != null ? '<small>Nearest audience hotspot ' + esc(c.hotspot_km) + ' km from the unit</small>' : '';
-    return '<tr' + (c.call ? '' : ' class="dim"') + '><td class="concept"><b>' + esc(c.concept) + '</b>' + tag + bench + trend + hot + '</td>' +
+    return '<tr' + (c.call ? '' : ' class="dim"') + '><td class="concept"><b>' + esc(c.concept) + '</b>' + tag + bench + gap + trend + hot + '</td>' +
       '<td>' + call + '</td><td class="num">' + (c.score == null ? '–' : '<b>' + esc(c.score) + '</b>') + '</td>' +
       '<td class="num">' + (c.demand == null ? '–' : '<b>' + esc(c.demand) + '</b><small>rank ' + esc(c.position) + ' of ' + esc(c.of) + '</small>') + '</td>' +
       '<td class="num">' + supply + '</td><td class="num">' + overlap + '</td>' +
