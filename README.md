@@ -63,17 +63,18 @@ Requires Python 3.10+ and Node.js 22.19+ (for the harness).
 npm install                        # installs @qloo/qloo-harness locally
 export QLOO_API_KEY=...            # Qloo hackathon key, never commit it
 export QLOO_BASE_URL=https://hackathon.api.qloo.com
-export LLM_BASE_URL=...            # any OpenAI-compatible endpoint with tool calling
-export LLM_API_KEY=...
-export LLM_MODEL=...
+export GEMINI_API_KEY=...          # optional: free Google AI Studio key, tried first (gemini-3.8-flash)
+export LLM_BASE_URL=...            # optional fallback: any OpenAI-compatible endpoint (default: a free keyless one)
 python app.py                      # http://localhost:8000
 ```
 
-The API key stays on the server; the browser only receives the streamed steps and the memo.
+The API keys stay on the server; the browser only receives the streamed steps and the memo. LLM calls go to Gemini first when `GEMINI_API_KEY` is set, then to the fallback endpoint. The tenant match never depends on an LLM to finish: without one it uses a fixed candidate list and a template memo.
 
 CLI: `python agent.py "Korean fried chicken counter" "Austin, TX"`
 
-Tests: `python -m unittest discover -s tests -t . -v` (164 tests).
+**Tenant match** (`GET /tenant?lat=41.9088&lon=-87.6796&rent=4000`, or `?city=Paris&location=Le%20Marais`): for a vacant unit, which food concepts the local audience wants that nobody nearby serves, and whether each can pay the rent. A fixed pipeline of at most 25 Qloo calls (8 workflows, in-memory cache) streams each step, then a scored shortlist, a "without Qloo" comparison and a memo (`tenant.py`).
+
+Tests: `python -m unittest discover -s tests -t . -v` (201 tests).
 
 ## Deploy
 

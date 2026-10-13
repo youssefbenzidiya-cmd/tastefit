@@ -66,5 +66,51 @@ class ExecWorkflow(unittest.TestCase):
         run.assert_not_called()
 
 
+class Cache(unittest.TestCase):
+    def test_lru_evicts_oldest_and_expires(self):
+        now = [0.0]
+        c = qloo.LRUCache(maxsize=2, ttl=10, clock=lambda: now[0])
+        c.put("a", 1)
+        c.put("b", 2)
+        c.get("a")
+        c.put("c", 3)
+        self.assertEqual((c.get("a"), c.get("b"), c.get("c")), (1, None, 3))
+        now[0] = 10
+        self.assertIsNone(c.get("a"))
+
+    def test_exec_cached_caches_only_successes(self):
+        results = [{"status": "error"}, {"status": "ok", "results": [1]}]
+        with mock.patch.object(qloo, "CACHE", qloo.LRUCache()), \
+                mock.patch.object(qloo, "exec_workflow", side_effect=lambda *a: results.pop(0)) as ex:
+            self.assertEqual(qloo.exec_cached("rank", {"b": 1, "a": 2}), ({"status": "error"}, False))
+            self.assertEqual(qloo.exec_cached("rank", {"a": 2, "b": 1})[1], False)
+            self.assertEqual(qloo.exec_cached("rank", {"a": 2, "b": 1}), ({"status": "ok", "results": [1]}, True))
+        self.assertEqual(ex.call_count, 2)
+
+
+class Builders(unittest.TestCase):
+    """Every tenant-match tool sends only concepts, places and Qloo ids, in the harness's documented shape."""
+
+    def test_builders(self):
+        self.assertEqual(qloo.p_area_taste("Wicker Park, Chicago"),
+                         ("recommend", {"target_type": "place", "signal_location": "Wicker Park, Chicago",
+                                        "filter_location": "Wicker Park, Chicago", "limit": 10, "explain": False}))
+        op, p = qloo.p_concept_places("Area", "City", "urn:tag:x", limit=5)
+        self.assertEqual((op, p["include_tags"], p["signal_location"], p["filter_location"], p["limit"]),
+                         ("recommend", ["urn:tag:x"], "Area", "City", 5))
+        self.assertEqual(qloo.p_entity_tags([str(i) for i in range(12)])[1]["entities"], [str(i) for i in range(10)])
+        self.assertEqual(qloo.p_demographics("E1"), ("audience_demographics", {"entity": "E1", "entity_type": "place"}))
+        self.assertEqual(qloo.p_find_tags("ramen"), ("find_tags", {"query": "ramen", "limit": 6}))
+        self.assertEqual(qloo.p_rank(["a", "b"], "Area"),
+                         ("rank", {"options": ["a", "b"], "option_type": "place", "signal_location": "Area"}))
+        self.assertEqual(qloo.p_compare(["a"], ["b"]),
+                         ("compare_audiences", {"group_a": ["a"], "group_b": ["b"], "limit": 8}))
+        self.assertEqual(qloo.p_trends("CAVA", "2026-04-01", "2026-10-01"),
+                         ("trends", {"entities": ["CAVA"], "entity_type": "brand", "start_date": "2026-04-01",
+                                     "end_date": "2026-10-01", "limit": 20}))
+        self.assertEqual(qloo.p_where_popular("E1", "Chicago"),
+                         ("where_popular", {"entity": "E1", "entity_type": "place", "within": "Chicago", "limit": 8}))
+
+
 if __name__ == "__main__":
     unittest.main()
