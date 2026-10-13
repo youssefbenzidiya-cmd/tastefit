@@ -64,7 +64,7 @@ class Ledger:
 
     def __init__(self, budget=BUDGET, sleep=time.sleep):
         self.budget, self.network, self.cached, self.lock, self.steps = budget, 0, 0, threading.Lock(), []
-        self.sleep = sleep
+        self.sleep, self.cache = sleep, qloo.LRUCache()
 
     def _reserve(self):
         with self.lock:
@@ -84,10 +84,10 @@ class Ledger:
         if not self._reserve():
             return None, {**step, "skipped": "call budget reached"}
         try:
-            result, hit = qloo.exec_cached(op, params)
+            result, hit = qloo.exec_cached(op, params, self.cache)
             if _rate_limited(result) and self._reserve():
                 self.sleep(RETRY_AFTER)
-                result, hit = qloo.exec_cached(op, params)
+                result, hit = qloo.exec_cached(op, params, self.cache)
         except Exception as e:  # noqa: BLE001  one failed call degrades the memo, never the whole run
             return None, {**step, "error": type(e).__name__}
         if hit:

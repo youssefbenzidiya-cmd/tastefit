@@ -67,25 +67,27 @@ class ExecWorkflow(unittest.TestCase):
 
 
 class Cache(unittest.TestCase):
-    def test_lru_evicts_oldest_and_expires(self):
-        now = [0.0]
-        c = qloo.LRUCache(maxsize=2, ttl=10, clock=lambda: now[0])
+    def test_lru_evicts_oldest(self):
+        c = qloo.LRUCache(maxsize=2)
         c.put("a", 1)
         c.put("b", 2)
         c.get("a")
         c.put("c", 3)
         self.assertEqual((c.get("a"), c.get("b"), c.get("c")), (1, None, 3))
-        now[0] = 10
-        self.assertIsNone(c.get("a"))
+
+    def test_no_module_level_cache(self):
+        """Rule 2: Qloo results live for one request, so there is no cache shared across requests."""
+        self.assertFalse([n for n, v in vars(qloo).items() if isinstance(v, qloo.LRUCache)])
 
     def test_exec_cached_caches_only_successes(self):
-        results = [{"status": "error"}, {"status": "ok", "results": [1]}]
-        with mock.patch.object(qloo, "CACHE", qloo.LRUCache()), \
-                mock.patch.object(qloo, "exec_workflow", side_effect=lambda *a: results.pop(0)) as ex:
-            self.assertEqual(qloo.exec_cached("rank", {"b": 1, "a": 2}), ({"status": "error"}, False))
-            self.assertEqual(qloo.exec_cached("rank", {"a": 2, "b": 1})[1], False)
-            self.assertEqual(qloo.exec_cached("rank", {"a": 2, "b": 1}), ({"status": "ok", "results": [1]}, True))
-        self.assertEqual(ex.call_count, 2)
+        results = [{"status": "error"}, {"status": "ok", "results": [1]}, {"status": "ok", "results": [1]}]
+        cache = qloo.LRUCache()
+        with mock.patch.object(qloo, "exec_workflow", side_effect=lambda *a: results.pop(0)) as ex:
+            self.assertEqual(qloo.exec_cached("rank", {"b": 1, "a": 2}, cache), ({"status": "error"}, False))
+            self.assertEqual(qloo.exec_cached("rank", {"a": 2, "b": 1}, cache)[1], False)
+            self.assertEqual(qloo.exec_cached("rank", {"a": 2, "b": 1}, cache), ({"status": "ok", "results": [1]}, True))
+            self.assertEqual(qloo.exec_cached("rank", {"a": 2, "b": 1}, qloo.LRUCache())[1], False)
+        self.assertEqual(ex.call_count, 3)
 
 
 class Builders(unittest.TestCase):

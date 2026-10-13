@@ -31,7 +31,7 @@ class FakeQloo:
     def __init__(self, fail=()):
         self.calls, self.fail = [], set(fail)
 
-    def __call__(self, op, params, timeout=90):
+    def __call__(self, op, params, cache=None, timeout=90):
         self.calls.append((op, params))
         if op in self.fail:
             return {"status": "error", "error": {"code": "QLOO_UPSTREAM"}}, False
@@ -206,6 +206,14 @@ class PipelineTest(unittest.TestCase):
 
 
 class LedgerTest(unittest.TestCase):
+    def test_cache_is_scoped_to_one_run(self):
+        a, b = tenant.Ledger(), tenant.Ledger()
+        with mock.patch.object(qloo, "exec_workflow", return_value=ok()) as ex:
+            self.assertFalse(a.call("find_tags", {"query": "x"}, "p")[1]["cached"])
+            self.assertTrue(a.call("find_tags", {"query": "x"}, "p")[1]["cached"])
+            self.assertFalse(b.call("find_tags", {"query": "x"}, "p")[1]["cached"])
+        self.assertEqual(ex.call_count, 2)
+
     def test_budget_and_cache_hits(self):
         led = tenant.Ledger(budget=2)
         with mock.patch.object(qloo, "exec_cached", side_effect=[(ok(), True), (ok(), False), (ok(), False)]):

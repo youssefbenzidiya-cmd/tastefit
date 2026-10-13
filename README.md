@@ -72,9 +72,9 @@ The API keys stay on the server; the browser only receives the streamed steps an
 
 CLI: `python agent.py "Korean fried chicken counter" "Austin, TX"`
 
-**Tenant match** (`GET /tenant?lat=41.9088&lon=-87.6796&rent=4000`, or `?city=Paris&location=Le%20Marais`): for a vacant unit, which food concepts the local audience wants that nobody nearby serves, and whether each can pay the rent. A fixed pipeline of at most 25 Qloo calls (8 workflows, in-memory cache) streams each step, then a scored shortlist, a "without Qloo" comparison and a memo (`tenant.py`).
+**Tenant match** (`GET /tenant?lat=41.9088&lon=-87.6796&rent=4000`, or `?city=Paris&location=Le%20Marais`): for a vacant unit, which food concepts the local audience wants that nobody nearby serves, and whether each can pay the rent. A fixed pipeline of at most 25 Qloo calls (8 workflows; a cache that lives for one request only, so repeated calls within a run are free and nothing Qloo returns outlives the request) streams each step, then a scored shortlist, a "without Qloo" comparison and a memo (`tenant.py`).
 
-Tests: `python -m unittest discover -s tests -t . -v` (201 tests).
+Tests: `python -m unittest discover -s tests -t . -v` (203 tests).
 
 ## Deploy
 

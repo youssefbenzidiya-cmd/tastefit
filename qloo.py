@@ -8,7 +8,6 @@ import os
 import shutil
 import subprocess
 import threading
-import time
 from pathlib import Path
 
 _LOCAL_BIN = Path(__file__).parent / "node_modules" / ".bin" / "qloo"
@@ -16,44 +15,37 @@ QLOO_BIN = os.environ.get("QLOO_BIN") or (str(_LOCAL_BIN) if _LOCAL_BIN.exists()
 
 
 class LRUCache:
-    """Thread-safe in-memory LRU with a TTL. Process memory only: Qloo results never reach disk (AGENTS.md rule 2)."""
+    """Thread-safe in-memory LRU for ONE request: create one per run and drop it when the run ends.
+    AGENTS.md rule 2 allows Qloo results during a request only, so never share an instance across requests."""
 
-    def __init__(self, maxsize=256, ttl=6 * 3600, clock=time.monotonic):
-        self.maxsize, self.ttl, self.clock = maxsize, ttl, clock
+    def __init__(self, maxsize=64):
+        self.maxsize = maxsize
         self.data, self.lock = collections.OrderedDict(), threading.Lock()
 
     def get(self, key):
         with self.lock:
-            hit = self.data.get(key)
-            if hit is None:
-                return None
-            stamp, value = hit
-            if self.clock() - stamp >= self.ttl:
-                del self.data[key]
-                return None
-            self.data.move_to_end(key)
+            value = self.data.get(key)
+            if value is not None:
+                self.data.move_to_end(key)
             return value
 
     def put(self, key, value):
         with self.lock:
-            self.data[key] = (self.clock(), value)
+            self.data[key] = value
             self.data.move_to_end(key)
             while len(self.data) > self.maxsize:
                 self.data.popitem(last=False)
 
 
-CACHE = LRUCache()
-
-
-def exec_cached(operation, params, timeout=90):
-    """(result, from_cache). Only ok/empty results are cached, so failures are retried on the next run."""
+def exec_cached(operation, params, cache, timeout=90):
+    """(result, from_cache) using a request-scoped `cache`. Only ok/empty results are cached, so failures are retried."""
     key = operation + json.dumps(params, sort_keys=True)
-    hit = CACHE.get(key)
+    hit = cache.get(key)
     if hit is not None:
         return hit, True
     result = exec_workflow(operation, params, timeout)
     if isinstance(result, dict) and result.get("status") in ("ok", "empty"):
-        CACHE.put(key, result)
+        cache.put(key, result)
     return result, False
 
 
