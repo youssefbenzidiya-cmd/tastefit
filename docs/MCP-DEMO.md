@@ -5,9 +5,10 @@ The process is local. It reads `QLOO_API_KEY` from the environment you set in th
 write Qloo responses to disk.
 
 A `tenant_match` call runs the same pipeline as the website: at most 25 Qloo calls. At 230 seconds,
-later LLM calls are cut short so the memo can still finish inside a 300 second host limit. The
-process is not killed, and a Qloo call already started is not cancelled. `city_scan` and
-`city_scan_unit` read the committed City Scan packs and make no Qloo call.
+later LLM calls are cut short. If fewer than 8 seconds remain, the run skips the LLM and uses the
+template memo, which includes the Limits section. The process is not killed, and a Qloo call already
+started is not cancelled. `city_scan` and `city_scan_unit` read the committed City Scan packs and
+make no Qloo call.
 
 The client's chat can keep the tool JSON after the call. TasteFit does not write that JSON to disk.
 Do not paste it into the repository.
@@ -38,17 +39,23 @@ Quit Claude Desktop. Edit the config file:
 - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 
-Use the absolute path to `mcp_server.py` and to the Python that can import the TasteFit modules
-(run it from the repository, so the `args` path is enough if that Python's working directory is the
-repo; Claude starts the process with the repo as cwd only if you set it). The reliable form is a
-one-line shell command:
+Claude Desktop does not start the process in the TasteFit directory, so `import tenant` fails if
+`command` is `python3` and `args` points only at `mcp_server.py`. Save this wrapper and mark it
+executable:
+
+```bash
+#!/bin/sh
+cd /absolute/path/to/tastefit
+exec python3 mcp_server.py
+```
+
+Point `command` at that wrapper. Do not also pass `mcp_server.py` in `args`.
 
 ```json
 {
   "mcpServers": {
     "tastefit": {
-      "command": "python3",
-      "args": ["/absolute/path/to/tastefit/mcp_server.py"],
+      "command": "/absolute/path/to/tastefit/run-mcp.sh",
       "env": {
         "QLOO_API_KEY": "your hackathon key",
         "QLOO_BASE_URL": "https://hackathon.api.qloo.com"
@@ -56,15 +63,6 @@ one-line shell command:
     }
   }
 }
-```
-
-`python3` must be the interpreter that can `import tenant` when its current directory is the
-repository. If the client starts the process somewhere else, set the args to a wrapper:
-
-```bash
-#!/bin/sh
-cd /absolute/path/to/tastefit
-exec python3 mcp_server.py
 ```
 
 Save the config. Open Claude Desktop. In the tool list, TasteFit should show three tools.
@@ -88,7 +86,7 @@ section stays. The fingerprint in the memo is a hash, not a promise that the for
 
 ## 3. Cursor
 
-Open Cursor Settings, then MCP. Add a server with the same command, args and env as the JSON above.
+Open Cursor Settings, then MCP. Add a server with the same command and env as the JSON above.
 Put that config in your user-level MCP settings. Do not put `QLOO_API_KEY` in the project's
 `.cursor/mcp.json`. That path is gitignored so a local copy is not committed. The key still belongs
 in the user-level config or the client's environment, never in the repository.
