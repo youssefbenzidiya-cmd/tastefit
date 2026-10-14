@@ -66,7 +66,7 @@ class ShareMath(unittest.TestCase):
         self.assertIn("at or below", e["note"])
         over = market_share.estimate("chicago", 41.0, -87.0, asking_rent=501, tracts=[TRACT], venue_rows=venues)
         self.assertFalse(over["pays_rent"])
-        self.assertIn("above this upper bound", over["note"])
+        self.assertIn("above this rough ceiling", over["note"])
 
     def test_outside_the_us_is_not_available_and_other_us_cities_say_so(self):
         self.assertEqual(market_share.estimate("paris", 48.86, 2.35)["note"], "not available")
@@ -81,7 +81,7 @@ class ShareMath(unittest.TestCase):
 class ShippedPoints(unittest.TestCase):
     def test_chicago_and_philadelphia_return_a_share_in_range(self):
         for city, lat, lon in (("chicago", 41.884, -87.632), ("philadelphia", 39.9526, -75.1652)):
-            e = market_share.estimate(city, lat, lon, asking_rent=4000)
+            e = market_share.estimate(city, lat, lon, asking_rent=4000, gate_passed=(city == "chicago"))
             self.assertTrue(e["available"], city)
             self.assertGreater(e["annual_fafh_usd"], 0)
             self.assertGreater(e["monthly_spend_usd"], 0)
@@ -91,8 +91,14 @@ class ShippedPoints(unittest.TestCase):
             self.assertLessEqual(e["share"], 1)
             self.assertEqual(e["monthly_spend_usd"], market_share.monthly_dollars(e["annual_fafh_usd"], e["venues"]))
             self.assertIn("no measurable gain", e["note"])
+            self.assertIn("Rough ceiling", e["note"])
+            self.assertIn("Missing mapped venues", e["note"])
             self.assertIn("ACS 2024", e["note"])
             self.assertIn("Table 1203", e["note"])
+            if city == "chicago":
+                self.assertNotIn("failed the map-quality check", e["note"])
+            else:
+                self.assertIn("failed the map-quality check", e["note"])
 
     def test_scan_unit_attaches_it_and_leaves_errors_as_text(self):
         code, body = scan.unit("chicago", "41.884", "-87.632")
@@ -105,11 +111,13 @@ class ShippedPoints(unittest.TestCase):
         self.assertTrue(body["data_thin"])
         self.assertNotIn("rent_ceiling", body)
         self.assertTrue(body["market_share"]["available"])
+        self.assertIn("failed the map-quality check", body["market_share"]["note"])
         code, body = scan.scan("philadelphia", "specialty coffee")
         self.assertTrue(body["data_thin"])
         self.assertNotIn("top", body)
         self.assertTrue(body["market_share"]["available"])
-        self.assertIn("not profit", body["market_share"]["note"])
+        self.assertIn("failed the map-quality check", body["market_share"]["note"])
+        self.assertNotIn("rent_ceiling", body)
         code, body = scan.scan("casablanca", "specialty coffee")
         self.assertEqual(body["market_share"]["note"], "not available")
         code, body = scan.unit("chicago", "0", "0")

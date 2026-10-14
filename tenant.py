@@ -655,9 +655,11 @@ def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None,
         else:
             unit["rent_note"] = body.get("note") or body.get("error") or "Rent ceiling not calibrated for this city."
         pack = scan.pack(city)
+        quality = (pack or {}).get("quality") or {}
         unit["market_share"] = market_share.estimate(
             city, point[0], point[1], asking_rent=asking_rent,
-            display_name=((pack or {}).get("city") or {}).get("display_name") or "")
+            display_name=((pack or {}).get("city") or {}).get("display_name") or "",
+            gate_passed=bool(quality.get("gate_passed", True)))
     yield "unit", unit
 
     # 1-2. Local taste profile.

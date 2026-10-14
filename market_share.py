@@ -119,7 +119,7 @@ def _outside(display_name):
     return None
 
 
-def estimate(city, lat, lon, asking_rent=None, display_name="", tracts=None, venue_rows=None):
+def estimate(city, lat, lon, asking_rent=None, display_name="", tracts=None, venue_rows=None, gate_passed=True):
     """A share estimate, or a note. `note` is the sentence the page shows."""
     slug = _slug(city)
     try:
@@ -152,7 +152,7 @@ def estimate(city, lat, lon, asking_rent=None, display_name="", tracts=None, ven
     monthly = monthly_dollars(annual, n)
     rent = _asking(asking_rent)
     covers = None if rent is None else monthly >= rent
-    note = _note(annual, households, unassigned, n, monthly, rent, covers)
+    note = _note(annual, households, unassigned, n, monthly, rent, covers, gate_passed)
     out = {"available": True, "city": slug, "radius_km": RADIUS_KM, "tracts": len(caught),
            "population": population, "households": households, "unassigned_households": unassigned,
            "annual_fafh_usd": annual, "venues": n, "share": 1 / (1 + n), "monthly_spend_usd": monthly,
@@ -179,20 +179,24 @@ def _unavailable(slug, display_name):
     return {"available": False, "note": OUTSIDE_US}
 
 
-def _note(annual, households, unassigned, venues, monthly, rent, covers):
+def _note(annual, households, unassigned, venues, monthly, rent, covers, gate_passed):
     choice = 1 + venues
     venue_bit = (f"{venues} mapped food venues" if venues else "no mapped food venue within the disc, so the share is 1")
     text = (
         f"Estimate, not a forecast: about {_dollars(monthly)} a month of food-away-from-home spend "
         f"from census tracts whose centroids sit within {RADIUS_KM} km "
         f"({_dollars(annual)} a year across {households:,} households, equal-utility share 1/{choice} "
-        f"with {venue_bit}). Upper bound before costs, so this is not profit. "
+        f"with {venue_bit}). Rough ceiling under these assumptions, before costs, so this is not profit. "
+        f"Missing mapped venues would push it up. Households are residents only: workers and visitors are not counted, which pushes it down. "
         f"The ACS $60,000 to $74,999 bin ({unassigned:,} households) is excluded because it crosses the CEX $70,000 line. "
         f"One household stands in for one consumer unit. Monthly figures, no discounting. "
         f"Sources: ACS 2024 5-year tables B19001 and B01003; BLS CEX 2024 Table 1203, Food away from home. "
         f"A Chicago backtest of 2023-2024 openings found no measurable gain over a citywide baseline."
     )
+    if not gate_passed:
+        text += (" This city's OpenStreetMap food venues failed the map-quality check, so the venue count is unreliable "
+                 "and a missing venue would overstate the share.")
     if rent is not None:
         side = "at or below" if covers else "above"
-        text += f" The asking rent of {_dollars(rent)} a month is {side} this upper bound."
+        text += f" The asking rent of {_dollars(rent)} a month is {side} this rough ceiling."
     return text

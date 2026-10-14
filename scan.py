@@ -57,7 +57,8 @@ def scan(city, concept, top=None):
         center = (p.get("city") or {}).get("center") or []
         if len(center) == 2:
             thin["market_share"] = market_share.estimate(
-                city, center[0], center[1], display_name=(p.get("city") or {}).get("display_name") or "")
+                city, center[0], center[1], display_name=(p.get("city") or {}).get("display_name") or "",
+                gate_passed=False)
         return 200, thin
     try:
         top = TOP_DEFAULT if top in (None, "") else max(1, min(TOP_MAX, int(top)))
@@ -96,7 +97,8 @@ def viable(row):
 
 def _with_share(payload, city, lat, lon, p):
     payload["market_share"] = market_share.estimate(
-        city, lat, lon, display_name=(p.get("city") or {}).get("display_name") or "")
+        city, lat, lon, display_name=(p.get("city") or {}).get("display_name") or "",
+        gate_passed=bool((p.get("quality") or {}).get("gate_passed")))
     return payload
 
 
