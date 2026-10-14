@@ -70,3 +70,14 @@ No database.
 Do not claim that Qloo predicts which concept will survive. The backtest says it did not beat the
 citywide baseline. Do not call the suggested spot a vetted address. Do not treat the unscored
 Chicago batch as a probability.
+
+
+## Screenshots
+
+The evidence page, served locally from the committed backtest files. Qloo's top-3 hit rate is 29%. The citywide baseline is 68%.
+
+![Evidence page with the Chicago backtest](evidence-page.webp)
+
+The prediction ledger. The Chicago batch is unscored, so the Brier score is not defined. The first listed concept is not a ranking.
+
+![Prediction ledger for the unscored Chicago batch](prediction-ledger.webp)
