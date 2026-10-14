@@ -226,6 +226,15 @@ class Server(unittest.TestCase):
         self.assertIn("GET /street", log)
         self.assertNotIn("overlap", log)
         self.assertNotIn("payload", log)
+        units = payload["units"]
+        for bad in ({"id": "ramen", "fit": float("nan"), "overlap": 10},
+                    {"id": "ramen", "fit": 80, "overlap": float("inf")},
+                    {"id": "ramen", "fit": 101, "overlap": 10}):
+            raw = json.dumps({"units": units, "concepts": [bad], "add": "noodles"})
+            code, body = self.get("/street?payload=" + urllib.parse.quote(raw))
+            self.assertEqual(code, 400, bad)
+            self.assertNotIn("NaN", body)
+            self.assertNotIn("Infinity", body)
 
     def test_wrong_methods_get_plain_405(self):
         for method, path, allow in (("POST", "/", "GET, HEAD"), ("DELETE", "/health", "GET, HEAD"),

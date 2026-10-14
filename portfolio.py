@@ -8,6 +8,7 @@ reports when fixed rents have no stable assignment, and counts the moves in the 
 Standard library only. No extra Qloo call.
 """
 import itertools
+import math
 
 import decision
 
@@ -389,19 +390,25 @@ def _clean_name(value):
     return name
 
 
+def _finite_score(value, name):
+    if not math.isfinite(value) or not 0 <= value <= 100:
+        raise ValueError(f"{name} must be a finite number from 0 to 100")
+    return value
+
+
 def _clean_concept(raw):
     if not isinstance(raw, dict):
         raise ValueError("each concept needs an id")
     try:
-        fit = float(0 if raw.get("fit") is None else raw.get("fit"))
+        fit = _finite_score(float(0 if raw.get("fit") is None else raw.get("fit")), "fit")
     except (TypeError, ValueError):
-        raise ValueError("fit must be a number") from None
+        raise ValueError("fit must be a finite number from 0 to 100") from None
     overlap = raw.get("overlap")
     if overlap is not None:
         try:
-            overlap = float(overlap)
+            overlap = _finite_score(float(overlap), "overlap")
         except (TypeError, ValueError):
-            raise ValueError("overlap must be a number") from None
+            raise ValueError("overlap must be a finite number from 0 to 100") from None
     rent_row = raw.get("rent_row") if isinstance(raw.get("rent_row"), dict) else None
     return {"id": _clean_name(raw.get("id")), "category": str(raw.get("category") or "other")[:40],
             "fit": fit, "overlap": overlap, "strong": bool(raw.get("strong")), "avoid": bool(raw.get("avoid")),
