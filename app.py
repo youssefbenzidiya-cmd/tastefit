@@ -12,6 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import agent
+import ledger
 import scan
 import tenant
 
@@ -45,6 +46,8 @@ CSP_PAGE = ("default-src 'self'; script-src 'self' 'nonce-{nonce}' https://unpkg
             "font-src 'self'; img-src 'self' data: https://tile.openstreetmap.org; "
             "connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
 CSP_OTHER = "default-src 'none'; frame-ancestors 'none'"
+CSP_LEDGER = ("default-src 'self'; style-src 'self'; img-src 'self'; object-src 'none'; "
+              "base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 STREAMS = ("/run", "/tenant", "/demo")
 
 BUSY_MSG = ("TasteFit is already running as many analyses as it can. Try again in a minute, "
@@ -117,6 +120,8 @@ class Handler(BaseHTTPRequestHandler):
             return 200, "text/html; charset=utf-8", render_index(nonce), CSP_PAGE.format(nonce=nonce)
         if path == "/health":
             return 200, "text/plain", f"ok {os.environ.get('RENDER_GIT_COMMIT', '')}".strip().encode(), None
+        if path == "/ledger":
+            return 200, "text/html; charset=utf-8", ledger.page().encode(), CSP_LEDGER
         if path in _STATIC_BODIES:
             body, ctype = _STATIC_BODIES[path]
             return 200, ctype, body, None

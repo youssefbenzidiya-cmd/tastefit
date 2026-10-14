@@ -18,6 +18,7 @@ import time
 
 import decision
 import geo
+import ledger
 import llm
 import market_share
 import qloo
@@ -855,6 +856,10 @@ def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None,
             raise ValueError("memo too short")
     except Exception:  # noqa: BLE001  the template memo always works
         memo, author = template_memo(area, city, shortlist, profile, voi), "template"
-    yield "memo", {"markdown": ensure_limits(memo), "author": author}
+    area_label = area if city.lower() in (area or "").lower() else f"{area}, {city}"
+    stamped = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    fp = ledger.from_shortlist(area_label, [{"concept": s.get("concept"), "verdict": s.get("call")} for s in shortlist], stamped)
+    yield "memo", {"markdown": ledger.ensure_fingerprint(ensure_limits(memo), fp), "author": author,
+                   "fingerprint": fp["sha256"]}
     yield "budget", {"qloo_calls": led.network, "cache_hits": led.cached, "budget": led.budget,
                      "workflows": led.workflows()}

@@ -221,6 +221,12 @@ class PipelineTest(unittest.TestCase):
             ev = self.run_all()
         self.assertEqual(ev, [("error", "Could not name that point; type the neighborhood instead.")])
 
+    def test_memo_carries_a_prediction_fingerprint(self):
+        memo = self.kinds(self.run_all(), "memo")[0]
+        self.assertIn("Prediction fingerprint", memo["markdown"])
+        self.assertRegex(memo["fingerprint"], r"^[0-9a-f]{64}$")
+        self.assertIn(memo["fingerprint"], memo["markdown"])
+
     def test_unit_event_includes_the_spend_estimate(self):
         with mock.patch("tenant.market_share.estimate", return_value={"available": True, "note": "estimate", "pays_rent": False}) as est:
             ev = self.run_all(asking_rent=2800)
