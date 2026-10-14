@@ -36,7 +36,7 @@ const ERRORS = {
 const state = {
   mode: 'broker', unit: null, phase: 'empty', tab: 'shortlist', run: null,
   steps: [], unitInfo: null, shortlist: null, baseline: null, budget: null, memo: null, scorecard: null, geo: null,
-  competitors: [], error: null, asking: null, streetRents: '', concept: '', startedAt: 0, endedAt: 0, demo: null, portfolio: null,
+  competitors: [], error: null, asking: null, streetRents: '', streetShort: false, concept: '', startedAt: 0, endedAt: 0, demo: null, portfolio: null,
 };
 
 const COPY = {
@@ -427,6 +427,7 @@ function cardHTML(c, i) {
 }
 function portfolioHTML() {
   const p = state.portfolio;
+  if (!p && state.streetShort) return `<section class="compare" aria-labelledby="port-title"><h3 id="port-title">Stable Street</h3><p id="port-proof">A street certificate needs 3 to 5 rents in total. This run had fewer, so no certificate was computed. No extra Qloo call.</p></section>`;
   if (!p) return '';
   const cur = state.shortlist && state.shortlist.currency;
   const rows = (p.matches || []).map(m => `<li>${esc(m.unit)} at ${esc(money(m.rent, cur))}/month: ${m.concept ? `${esc(m.concept)} (${esc(m.verdict)})` : 'unmatched'}</li>`).join('');
@@ -616,7 +617,7 @@ function drawFounderGeo(g) {
 let clockTimer;
 function resetRun() {
   if (state.run) { state.run.stopped = true; state.run.ctrl.abort(); }
-  Object.assign(state, { phase: state.unit ? 'selected' : 'empty', run: null, steps: [], unitInfo: null, shortlist: null, portfolio: null, baseline: null, budget: null, memo: null, scorecard: null, geo: null, competitors: [], error: null, demo: null, tab: 'shortlist', endedAt: 0 });
+  Object.assign(state, { phase: state.unit ? 'selected' : 'empty', run: null, steps: [], unitInfo: null, shortlist: null, portfolio: null, streetShort: false, baseline: null, budget: null, memo: null, scorecard: null, geo: null, competitors: [], error: null, demo: null, tab: 'shortlist', endedAt: 0 });
   clearInterval(clockTimer);
   if (layerHeat) layerHeat.clearLayers();
 }
@@ -661,6 +662,7 @@ async function startRun({ demo } = {}) {
     const q = { lat: state.unit.lat.toFixed(6), lon: state.unit.lon.toFixed(6) };
     if (state.asking) q.rent = String(state.asking);
     const rents = [...(state.asking ? [state.asking] : []), ...extras.map(Number)];
+    state.streetShort = Boolean(streetRaw) && rents.length < 3;
     if (rents.length >= 3) q.portfolio = extras.join(',');
     url = '/tenant?' + new URLSearchParams(q);
   } else {

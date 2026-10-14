@@ -256,7 +256,8 @@ def _proof(replacements, swaps, needs_flexibility):
         "Units are treated as a line of neighbours, about 100 m apart or on one mall floor; "
         "that distance is not measured. "
         "With negotiable rent only the symmetric part of those effects changes the total. "
-        "The 2023-2024 Chicago backtest found no measurable gain, so this is not a survival forecast."
+        "The 2023-2024 Chicago backtest found no measurable gain, so this is not a survival forecast. "
+        "Empty units are not part of those checks: this search does not move a tenant into a vacant unit."
     )
     if needs_flexibility:
         text += " " + RENT_FLEXIBILITY

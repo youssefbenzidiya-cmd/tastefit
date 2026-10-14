@@ -14,21 +14,20 @@ Replaces the plain Gale–Shapley item in the darkhorse round.
   - The mapping from Qloo signals to a must be stated and labelled uncalibrated.
 - Tenant t's value at u, given the assignment μ: U_t(u) = v(t,u) + Σ over occupied neighbours w of a(t, μ(w)).
 
-## Results (each checked on the stated test set before writing this spec)
+## Results
+The existence argument is prior work. The counts 25 of 400 and 96.4% below come from an external simulation that is not in this repository. This build's tests use their own generator and do not reproduce those two figures.
 1. **Existence and convergence with negotiable rent.** If rent can be renegotiated (transferable utility), total street surplus S(μ) is an exact potential.
    - S only increases under two moves: an outsider replacing an occupant, or two occupants swapping units, in each case only when the whole affected group gains after compensation.
    - The assignment set is finite, so local search always stops at a stable assignment.
    - Classical argument: Monderer & Shapley 1996; Bogomolnaia & Jackson 2002.
 2. **Only the symmetric part of taste effects matters when rent is negotiable.** In any pair's joint surplus, a(t,s) and a(s,t) always appear together, so the one-sided part cancels.
 3. **Without rent negotiation, stability can fail.**
-   - With asymmetric neighbour effects and fixed rents, 25 of 400 random 3-unit streets (≈6%) had no stable assignment at all: every assignment was blocked by a profitable swap or replacement.
-   - With symmetric effects this happened in 0 of 400.
+   - An external simulation, not reproduced by this repository, reported that with asymmetric neighbour effects and fixed rents, 25 of 400 random 3-unit streets (≈6%) had no stable assignment: every assignment was blocked by a profitable swap or replacement.
+   - That same external simulation reported 0 of 400 when the effects were symmetric.
    - Product diagnostic: "This street needs rent flexibility to settle."
 4. **Quality (empirical, 300 random 4-unit / 6-tenant streets).**
-   - Stable assignments reached on average 96.4% of the best possible total surplus; the worst case was 72.4%.
-   - 56% were exactly optimal.
-   - Local search converged in at most 6 improving steps.
-   - This is a simulation, not a proven bound.
+   - An external simulation, not reproduced by this repository, reported stable assignments at an average of 96.4% of the best possible total surplus, a worst case of 72.4%, 56% exactly optimal, and at most 6 improving steps.
+   - This is a simulation, not a proven bound, and it is not a measurement from this build.
 5. **Certificate.** Anyone can verify stability in O(units × tenants + units²) by checking every replacement and swap. The UI shows "No improving move: N replacements and M swaps checked".
 
 ## Prior work (cite it; this is NOT a new theorem)
