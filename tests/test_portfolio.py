@@ -166,6 +166,47 @@ class RentSplit(unittest.TestCase):
         self.assertEqual(got, [2800.0, 4200.0, 5100.0])
 
 
+class WhatIf(unittest.TestCase):
+    def street(self):
+        units = [{"id": "A", "rent": 2000}, {"id": "B", "rent": 2000}, {"id": "C", "rent": 2000}]
+        concepts = [
+            {"id": "ramen", "category": "restaurant", "fit": 90, "overlap": 100},
+            {"id": "pho", "category": "restaurant", "fit": 90, "overlap": 100},
+        ]
+        return units, concepts
+
+    def test_removing_a_cannibal_raises_the_neighbour_and_makes_no_qloo_call(self):
+        units, concepts = self.street()
+        out = portfolio.what_if(units, concepts, remove="pho")
+        self.assertEqual(out["qloo_calls"], 0)
+        by_name = {row["concept"]: row for row in out["changes"]}
+        self.assertIsNone(by_name["pho"]["after"])
+        self.assertGreater(by_name["ramen"]["delta"], 0)
+        self.assertIn("No improving move:", out["after"]["proof"])
+        self.assertFalse(out["after"]["needs_rent_flexibility"])
+
+    def test_an_unknown_name_has_no_taste_data(self):
+        units, concepts = self.street()
+        out = portfolio.what_if(units, concepts, add="supermarket at the corner")
+        self.assertIn("No taste data in this run", out["added_note"])
+        self.assertIn("No extra Qloo call", out["added_note"])
+        self.assertEqual(out["qloo_calls"], 0)
+        added = next(row for row in out["changes"] if row["concept"] == "supermarket at the corner")
+        self.assertIsNone(added["before"])
+
+    def test_the_flexibility_line_is_the_stability_result(self):
+        units, concepts = self.street()
+        with mock.patch("portfolio.ntu_stable_exists", return_value=False):
+            out = portfolio.what_if(units, concepts, remove="pho")
+        self.assertTrue(out["after"]["needs_rent_flexibility"])
+        self.assertIn("This street needs rent flexibility to settle.", out["after"]["proof"])
+
+    def test_add_and_remove_together_are_rejected(self):
+        units, concepts = self.street()
+        with self.assertRaises(ValueError):
+            portfolio.what_if(units, concepts, remove="pho", add="supermarket")
+
+
 class ReferenceSimulation(unittest.TestCase):
     """Re-implementation of the missing reference script. Integer draws, line adjacency.
 

@@ -377,3 +377,120 @@ def _split_note(applied_scale):
     if applied_scale < POINT_TO_RENT:
         note += " Shrunk to keep every rent positive."
     return note
+
+
+MAX_CONCEPTS = 8
+
+
+def _clean_name(value):
+    name = str(value or "").strip()
+    if not name or len(name) > 80 or any(ord(ch) < 32 for ch in name):
+        raise ValueError("each concept needs an id")
+    return name
+
+
+def _clean_concept(raw):
+    if not isinstance(raw, dict):
+        raise ValueError("each concept needs an id")
+    try:
+        fit = float(0 if raw.get("fit") is None else raw.get("fit"))
+    except (TypeError, ValueError):
+        raise ValueError("fit must be a number") from None
+    overlap = raw.get("overlap")
+    if overlap is not None:
+        try:
+            overlap = float(overlap)
+        except (TypeError, ValueError):
+            raise ValueError("overlap must be a number") from None
+    rent_row = raw.get("rent_row") if isinstance(raw.get("rent_row"), dict) else None
+    return {"id": _clean_name(raw.get("id")), "category": str(raw.get("category") or "other")[:40],
+            "fit": fit, "overlap": overlap, "strong": bool(raw.get("strong")), "avoid": bool(raw.get("avoid")),
+            "rent_first": bool(raw.get("rent_first")), "rent_row": rent_row}
+
+
+def _clean_units(raw):
+    if not isinstance(raw, list) or not MIN_UNITS <= len(raw) <= MAX_UNITS:
+        raise ValueError("a street needs 3 to 5 rents")
+    units = []
+    for item in raw:
+        if not isinstance(item, dict):
+            raise ValueError("each unit needs an id and a rent")
+        try:
+            rent = float(item.get("rent"))
+        except (TypeError, ValueError):
+            raise ValueError("each unit needs a positive monthly rent") from None
+        if not (0 < rent < 1e7):
+            raise ValueError("each unit needs a positive monthly rent")
+        units.append({"id": _clean_name(item.get("id")), "rent": rent})
+    return units
+
+
+def placed_utilities(units, concepts, matches):
+    """Utility of each placed concept under the published assignment. No Qloo call."""
+    if not concepts or not matches or len(matches) != len(units):
+        return {}
+    index = {concept["id"]: i for i, concept in enumerate(concepts)}
+    assignment = []
+    for match in matches:
+        concept = match.get("concept")
+        assignment.append(index[concept] if concept in index else None)
+    values = [[standalone(concept, unit["rent"]) for unit in units] for concept in concepts]
+    effects = effect_matrix(concepts)
+    edges = line_edges(len(units))
+    out = {}
+    for unit, tenant in enumerate(assignment):
+        if tenant is None:
+            continue
+        out[concepts[tenant]["id"]] = utility(tenant, unit, assignment, values, effects, edges)
+    return out
+
+
+def what_if(units, concepts, remove=None, add=None):
+    """Re-solve the street after adding or removing one tenant. Uses only the concepts passed in."""
+    if not isinstance(concepts, list):
+        raise ValueError("concepts must be a list")
+    units = _clean_units(units)
+    concepts = [_clean_concept(concept) for concept in concepts]
+    if len(concepts) > MAX_CONCEPTS:
+        raise ValueError("at most 8 concepts")
+    remove = _clean_name(remove) if remove else ""
+    if isinstance(add, dict):
+        add_name = _clean_name(add.get("id")) if add.get("id") else ""
+    else:
+        add_name = _clean_name(add) if add else ""
+    if bool(remove) == bool(add_name):
+        raise ValueError("add or remove one tenant")
+    before = assign(units, concepts)
+    added_note = ""
+    if remove:
+        if remove not in {concept["id"] for concept in concepts}:
+            raise ValueError("that tenant is not in this run")
+        nxt = [concept for concept in concepts if concept["id"] != remove]
+    else:
+        if add_name in {concept["id"] for concept in concepts}:
+            raise ValueError("that tenant is already in this run")
+        if len(concepts) >= MAX_CONCEPTS:
+            raise ValueError("at most 8 concepts")
+        fresh = dict(add) if isinstance(add, dict) else {"id": add_name}
+        fresh["id"] = add_name
+        if fresh.get("fit") is None and fresh.get("overlap") is None:
+            fresh["fit"] = 0
+            fresh["overlap"] = None
+            fresh.setdefault("category", "other")
+            added_note = ("No taste data in this run, so this concept's fit and neighbour effects are 0. "
+                          "No extra Qloo call.")
+        nxt = concepts + [_clean_concept(fresh)]
+    after = assign(units, nxt)
+    before_values = placed_utilities(units, concepts, before.get("matches") or [])
+    after_values = placed_utilities(units, nxt, after.get("matches") or [])
+    names = set(before_values) | set(after_values)
+    if add_name:
+        names.add(add_name)
+    if remove:
+        names.add(remove)
+    changes = []
+    for name in sorted(names):
+        old, new = before_values.get(name), after_values.get(name)
+        changes.append({"concept": name, "before": old, "after": new,
+                        "delta": None if old is None or new is None else new - old})
+    return {"before": before, "after": after, "changes": changes, "qloo_calls": 0, "added_note": added_note}
