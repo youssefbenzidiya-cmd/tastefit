@@ -105,6 +105,69 @@ class Certificate(unittest.TestCase):
         self.assertEqual(len(out["matches"]), 5)
 
 
+class RentSplit(unittest.TestCase):
+    def test_anchors_pay_less_and_the_landlord_total_stays_fixed(self):
+        # Symmetric contributions 10, 6 and -4 on equal asking rents.
+        # The anchor at unit 0 pays less. The free-rider at unit 2 pays more. The sum is 9000.
+        rents = [3000, 3000, 3000]
+        contributions = [10.0, 6.0, -4.0]
+        got, scale = portfolio.suggested_rents(rents, contributions)
+        self.assertEqual(scale, portfolio.POINT_TO_RENT)
+        self.assertEqual(sum(got), 9000)
+        self.assertLess(got[0], 3000)
+        self.assertGreater(got[2], 3000)
+        self.assertEqual(portfolio.roles_for(contributions), ["anchor", "anchor", "free-rider"])
+
+    def test_the_role_follows_the_street_average_not_the_raw_sign(self):
+        # 2 is positive, but it is below the average of 6, so that tenant pays more.
+        contributions = [2.0, 8.0, 8.0]
+        got, scale = portfolio.suggested_rents([3000, 3000, 3000], contributions)
+        self.assertEqual(scale, portfolio.POINT_TO_RENT)
+        self.assertEqual(portfolio.roles_for(contributions), ["free-rider", "anchor", "anchor"])
+        self.assertGreater(got[0], 3000)
+        self.assertLess(got[1], 3000)
+        self.assertEqual(sum(got), 9000)
+
+    def test_a_low_rent_shrinks_the_scale(self):
+        got, scale = portfolio.suggested_rents([1, 1, 1], [0.0, 0.0, 1000.0])
+        self.assertLess(scale, portfolio.POINT_TO_RENT)
+        self.assertEqual(sum(got), 3)
+        self.assertTrue(all(value > 0 for value in got))
+        self.assertIn("Shrunk to keep every rent positive.", portfolio._split_note(scale))
+
+    def test_the_symmetric_part_is_what_the_contribution_uses(self):
+        effects = [[0, 8, 0], [2, 0, -6], [0, -2, 0]]
+        edges = portfolio.line_edges(3)
+        assignment = [0, 1, 2]
+        direct = portfolio.neighbour_contributions(assignment, effects, edges)
+        folded = portfolio.neighbour_contributions(assignment, portfolio.symmetric_part(effects), edges)
+        self.assertEqual(direct, folded)
+        # Edge (0, 1) contributes (8+2)/2 = 5 to each end. Edge (1, 2) contributes (-6 + -2)/2 = -4.
+        self.assertEqual(direct, [5.0, 1.0, -4.0])
+
+    def test_a_certified_mix_is_labelled_suggested_uncalibrated(self):
+        units = [{"id": "A", "rent": 3000}, {"id": "B", "rent": 4000}, {"id": "C", "rent": 5000}]
+        concepts = [
+            {"id": "ramen", "category": "restaurant", "fit": 80, "overlap": 80},
+            {"id": "coffee", "category": "cafe", "fit": 60, "overlap": 80},
+            {"id": "books", "category": "retail", "fit": 40, "overlap": 80},
+        ]
+        out = portfolio.assign(units, concepts, k=1)
+        split = out["rent_split"]
+        self.assertEqual(split["label"], "suggested, uncalibrated")
+        self.assertEqual(split["total_asking"], split["total_suggested"])
+        self.assertIn("no interest", split["note"])
+        self.assertIn("no discounting", split["note"])
+        self.assertEqual(len(split["rows"]), 3)
+        roles = {row["concept"]: row["role"] for row in split["rows"]}
+        self.assertTrue(set(roles.values()) <= {"anchor", "free-rider", "neutral"})
+
+    def test_equal_contributions_leave_the_asking_rents_unchanged(self):
+        got, scale = portfolio.suggested_rents([2800, 4200, 5100], [0.0, 0.0, 0.0])
+        self.assertEqual(scale, portfolio.POINT_TO_RENT)
+        self.assertEqual(got, [2800.0, 4200.0, 5100.0])
+
+
 class ReferenceSimulation(unittest.TestCase):
     """Re-implementation of the missing reference script. Integer draws, line adjacency.
 

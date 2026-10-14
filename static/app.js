@@ -425,13 +425,25 @@ function cardHTML(c, i) {
     ${calls.length ? `<details class="card-more"><summary class="btn btn-quiet btn-sm">${icon('chev')}Evidence: ${calls.length} Qloo ${calls.length === 1 ? 'call' : 'calls'}</summary><div class="receipts">${calls.map((x, j) => receiptHTML(x, j, calls.length)).join('')}</div></details>` : ''}
   </li>`;
 }
+function cents(n, cur) {
+  if (n == null) return '–';
+  const opts = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+  return cur ? new Intl.NumberFormat('en', { style: 'currency', currency: cur, ...opts }).format(n)
+    : new Intl.NumberFormat('en', opts).format(n);
+}
 function portfolioHTML() {
   const p = state.portfolio;
   if (!p && state.streetShort) return `<section class="compare" aria-labelledby="port-title"><h3 id="port-title">Stable Street</h3><p id="port-proof">A street certificate needs 3 to 5 rents in total. This run had fewer, so no certificate was computed. No extra Qloo call.</p></section>`;
   if (!p) return '';
   const cur = state.shortlist && state.shortlist.currency;
   const rows = (p.matches || []).map(m => `<li>${esc(m.unit)} at ${esc(money(m.rent, cur))}/month: ${m.concept ? `${esc(m.concept)} (${esc(m.verdict)})` : 'unmatched'}</li>`).join('');
-  return `<section class="compare" aria-labelledby="port-title"><h3 id="port-title">Stable Street</h3><p id="port-proof">${esc(p.proof)}</p>${rows ? `<ul>${rows}</ul>` : ''}</section>`;
+  const split = p.rent_split;
+  const splitRows = split && split.rows ? split.rows.map(r => {
+    const sign = r.contribution > 0 ? '+' : '';
+    return `<li>${esc(r.unit)}${r.concept ? `, ${esc(r.concept)}` : ''}: neighbour contribution ${sign}${Number(r.contribution).toFixed(1)} (${esc(r.role)}). Asking ${esc(cents(r.asking, cur))}. Suggested ${esc(cents(r.suggested, cur))}.</li>`;
+  }).join('') : '';
+  const splitHTML = splitRows ? `<h4 id="rent-split-title">Suggested rent split</h4><p id="rent-split-label">${esc(split.label)}</p><p>${esc(split.note)}</p><ul>${splitRows}</ul><p>Landlord total ${esc(cents(split.total_asking, cur))} a month. Suggested total ${esc(cents(split.total_suggested, cur))}.</p>` : '';
+  return `<section class="compare" aria-labelledby="port-title"><h3 id="port-title">Stable Street</h3><p id="port-proof">${esc(p.proof)}</p>${rows ? `<ul>${rows}</ul>` : ''}${splitHTML}</section>`;
 }
 function shortlistHTML() {
   const sl = state.shortlist, scored = sl.concepts.filter(c => c.call), rest = sl.concepts.filter(c => !c.call);
