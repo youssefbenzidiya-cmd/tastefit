@@ -3,6 +3,7 @@ import unittest
 
 import cityscan_breakeven as cb
 import ledger
+import tenant
 import trial
 
 
@@ -33,6 +34,13 @@ class Threshold(unittest.TestCase):
         self.assertEqual(trial.weeks_for(one), 4)
         self.assertEqual(trial.weeks_for(two), 8)
 
+    def test_the_range_line_uses_covers_days_percent_and_currency(self):
+        self.assertEqual(trial._format_value("covers_day", 42.5, "USD"), "42.5 covers/day")
+        self.assertEqual(trial._format_value("days", 22.0, "USD"), "22.0 days/month")
+        self.assertEqual(trial._format_value("cogs", 0.312, "USD"), "31.2%")
+        self.assertEqual(trial._format_value("other_var", 0.08, "USD"), "8.0%")
+        self.assertEqual(trial._format_value("ticket", 18, "USD"), "18 USD")
+
 
 class Plan(unittest.TestCase):
     def test_plan_and_outcome_are_separate_from_the_chicago_fingerprint(self):
@@ -44,6 +52,13 @@ class Plan(unittest.TestCase):
         self.assertEqual(plan["weeks"], 4)
         self.assertIn("no interest and no discounting", plan["sentence"])
         self.assertIn("stated cost assumptions, not your figures", plan["sentence"])
+        self.assertIn("covers/day", plan["sentence"])
+        self.assertIn("90% range would move that line to", plan["sentence"])
+        self.assertRegex(plan["sentence"], r"to [\d.]+ covers/day")
+        memo = tenant.ensure_trial("# Memo\n## Limits\n- Taste.\n" + tenant.BACKTEST_NOTE, plan)
+        self.assertIn(plan["sentence"], memo)
+        self.assertTrue(memo.endswith(tenant.BACKTEST_NOTE))
+        self.assertIn(plan["sentence"], tenant.template_memo("Sample Park", "Chicago", [], {}, trial_sentence=plan["sentence"]))
         self.assertIn("not a vetted address", plan["sentence"])
         self.assertEqual(plan["sha256"], ledger.trial_fingerprint(plan))
         outcome = trial.judge(plan, plan["threshold"], 4)

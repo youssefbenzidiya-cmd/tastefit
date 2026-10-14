@@ -139,21 +139,27 @@ def recommend(area, concept, city_key, rent_row, asking, voi, ts):
         return None
 
 
+def _format_value(check, shown, currency):
+    """Same units for the success line and the 90% range line."""
+    if check in ("cogs", "other_var"):
+        return f"{float(shown):.1%}"
+    if check == "covers_day":
+        return f"{shown} covers/day"
+    if check == "days":
+        return f"{shown} days/month"
+    return f"{float(shown):.0f} {currency}".strip()
+
+
 def sentence(plan):
     word = "at least" if plan["direction"] == "at_least" else "at most"
     unit = plan.get("currency") or ""
-    shown = plan["threshold"]
-    if plan["check"] in ("cogs", "other_var"):
-        value = f"{shown:.1%}" if isinstance(shown, float) else str(shown)
-    elif plan["check"] in ("covers_day", "days"):
-        value = str(shown)
-    else:
-        value = f"{shown:.0f} {unit}".strip()
+    value = _format_value(plan["check"], plan["threshold"], unit)
     text = (f"Test before you lease: a {plan['weeks']}-week pop-up for {plan['concept']}. "
             f"Success is {plan.get('label') or plan['check']} {word} {value}, "
             f"the mode break-even at the rent-first ceiling of {plan['rent']:.0f} {unit}/month.")
     if plan.get("range_threshold") is not None:
-        text += f" The top of the ceiling's 90% range would move that line to {plan['range_threshold']}."
+        text += (" The top of the ceiling's 90% range would move that line to "
+                 f"{_format_value(plan['check'], plan['range_threshold'], unit)}.")
     text += (" From TasteFit's stated cost assumptions, not your figures. "
              "Monthly figures, no interest and no discounting. "
              f"Trial plan `{plan['sha256']}`. "
