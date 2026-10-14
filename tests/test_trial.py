@@ -32,7 +32,6 @@ class Threshold(unittest.TestCase):
             {"input": "ticket", "evppi": 30, "above_noise": True}]}
         self.assertEqual(trial.weeks_for(one), 4)
         self.assertEqual(trial.weeks_for(two), 8)
-        self.assertNotIn("npv", trial.sentence.__doc__ or "")
 
 
 class Plan(unittest.TestCase):
@@ -44,6 +43,7 @@ class Plan(unittest.TestCase):
         plan = trial.recommend("Wicker Park, Chicago", concept, "chicago", rent_row, 7000, voi, "2026-10-14T22:00:00Z")
         self.assertEqual(plan["weeks"], 4)
         self.assertIn("no interest and no discounting", plan["sentence"])
+        self.assertIn("stated cost assumptions, not your figures", plan["sentence"])
         self.assertIn("not a vetted address", plan["sentence"])
         self.assertEqual(plan["sha256"], ledger.trial_fingerprint(plan))
         outcome = trial.judge(plan, plan["threshold"], 4)
@@ -58,8 +58,27 @@ class Plan(unittest.TestCase):
         self.assertEqual(defaults["currency"], "USD")
 
     def test_a_missing_ceiling_has_no_plan(self):
-        concept = {"concept": "ramen shop", "rent_group": "restaurant"}
+        concept = {"concept": "ramen shop", "rent_group": "restaurant", "call": "GO"}
         self.assertIsNone(trial.recommend("X", concept, "chicago", None, None, None, "2026-10-14T22:00:00Z"))
+
+    def test_no_go_and_a_negative_line_and_another_concepts_voi_do_not_make_a_plan(self):
+        concept = {"concept": "ramen shop", "rent_group": "restaurant", "call": "NO-GO"}
+        rent_row = {"viable": True, "rent_max": 6000, "relative_demand": 1.0, "group": "restaurant"}
+        self.assertIsNone(trial.recommend("X", concept, "chicago", rent_row, None, None, "2026-10-14T22:00:00Z"))
+        concept = {"concept": "ramen shop", "rent_group": "restaurant", "call": "ADJUST"}
+        huge = {"viable": True, "rent_max": 10_000_000, "relative_demand": 1.0, "group": "restaurant"}
+        staff_voi = {"evpi": 100, "concept": "ramen shop", "checks": [
+            {"input": "staff", "evppi": 80, "above_noise": True}]}
+        self.assertIsNone(trial.recommend("X", concept, "chicago", huge, None, staff_voi, "2026-10-14T22:00:00Z"))
+        staff = trial.threshold_for("staff", cb.defaults("chicago", "restaurant")["inputs"], 1.0, 10_000_000)
+        self.assertEqual(staff[1], "at_most")
+        self.assertLessEqual(staff[0], 0)
+        other = {"evpi": 10, "concept": "bakery", "checks": [
+            {"input": "ticket", "evppi": 9, "above_noise": True}]}
+        plan = trial.recommend("X", concept, "chicago", rent_row, None, other, "2026-10-14T22:00:00Z")
+        self.assertEqual(plan["check"], "covers_day")
+        self.assertIsNone(trial.recommend("X", concept, "chicago", {"viable": True, "rent_max": "nope"}, None, None,
+                                          "2026-10-14T22:00:00Z"))
 
 
 if __name__ == "__main__":

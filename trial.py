@@ -9,8 +9,6 @@ import decision
 import ledger
 
 WEEKS = (4, 6, 8)
-AT_LEAST = {"covers_day", "ticket", "days"}
-AT_MOST = {"staff", "other_fixed", "cogs", "other_var"}
 
 
 def central(spec):
@@ -83,8 +81,12 @@ def _check_name(voi):
     return "covers_day"
 
 
-def recommend(area, concept, city_key, rent_row, asking, voi, ts):
-    """Plan for the top concept, or None when the ceiling or the stated inputs are missing."""
+def _recommend(area, concept, city_key, rent_row, asking, voi, ts):
+    """Plan for one concept, or None when there is no positive success line."""
+    if not concept or concept.get("call") == "NO-GO":
+        return None
+    if voi and voi.get("concept") and voi.get("concept") != concept.get("concept"):
+        voi = None
     if not rent_row or not rent_row.get("viable") or rent_row.get("relative_demand") is None:
         return None
     if rent_row.get("rent_max") is None:
@@ -102,16 +104,22 @@ def recommend(area, concept, city_key, rent_row, asking, voi, ts):
     if solved is None:
         return None
     raw, direction = solved
+    if raw <= 0:
+        return None
     threshold = _round_threshold(check, raw)
+    if threshold <= 0:
+        return None
     hi = (rent_row.get("ci90") or [None, rent])[1]
     range_threshold = None
     if isinstance(hi, (int, float)) and hi != rent:
         solved_hi = threshold_for(check, defaults["inputs"], rent_row["relative_demand"], float(hi))
-        if solved_hi is not None:
-            range_threshold = _round_threshold(check, solved_hi[0])
+        if solved_hi is not None and solved_hi[0] > 0:
+            rounded = _round_threshold(check, solved_hi[0])
+            if rounded > 0:
+                range_threshold = rounded
     weeks = weeks_for(voi)
     if weeks not in WEEKS:
-        raise ValueError("trial length is outside 4 to 8 weeks")
+        return None
     plan = {"area": area, "concept": concept["concept"], "check": check, "direction": direction,
             "rent": rent, "threshold": threshold, "weeks": weeks, "ts": ts}
     plan["sha256"] = ledger.trial_fingerprint(plan)
@@ -121,6 +129,14 @@ def recommend(area, concept, city_key, rent_row, asking, voi, ts):
     plan["afford"] = decision.affordability(rent_row, asking)
     plan["sentence"] = sentence(plan)
     return plan
+
+
+def recommend(area, concept, city_key, rent_row, asking, voi, ts):
+    """Never raises. A bad ceiling or a negative line means no pop-up, and the run continues."""
+    try:
+        return _recommend(area, concept, city_key, rent_row, asking, voi, ts)
+    except (TypeError, ValueError, KeyError, ZeroDivisionError, OverflowError):
+        return None
 
 
 def sentence(plan):
@@ -138,7 +154,8 @@ def sentence(plan):
             f"the mode break-even at the rent-first ceiling of {plan['rent']:.0f} {unit}/month.")
     if plan.get("range_threshold") is not None:
         text += f" The top of the ceiling's 90% range would move that line to {plan['range_threshold']}."
-    text += (" Monthly figures, no interest and no discounting. "
+    text += (" From TasteFit's stated cost assumptions, not your figures. "
+             "Monthly figures, no interest and no discounting. "
              f"Trial plan `{plan['sha256']}`. "
              "When the pop-up ends, log the observed value, the weeks run and whether it cleared. "
              "That log is not the five-field prediction fingerprint. "

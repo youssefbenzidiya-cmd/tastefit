@@ -171,7 +171,7 @@ and the UTC time. No Qloo payload is stored. The committed Chicago batch is """,
 <h2>Test before you lease</h2>
 <p>The top concept can be checked with a 4 to 8 week pop-up. The success line is the mode break-even at the
 rent-first ceiling, on the check that value of information ranks first. The length is a stated rule in that
-band. Monthly figures, no interest and no discounting. The plan has its own SHA-256. It is not part of the
+band. The figures use TasteFit's stated cost assumptions, not yours. Monthly figures, no interest and no discounting. The plan has its own SHA-256. It is not part of the
 five-field prediction fingerprint, so the committed Chicago batch hash does not change. A pop-up is not a
 vetted address. Logging the observed value, the weeks run and whether it cleared does not rewrite that hash.</p>
 <h2>Street match</h2>

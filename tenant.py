@@ -853,9 +853,12 @@ def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None,
                             for s in shortlist if s.get("call")) if v), None)
     area_label = area if city.lower() in (area or "").lower() else f"{area}, {city}"
     stamped = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    top = next((s for s in shortlist if s.get("call")), None)
-    place_trial = trial.recommend(area_label, top, scan.slugify(city), rent_of.get(top["concept"]) if top else None,
-                                  asking_rent, voi, stamped) if top else None
+    top = next((s for s in shortlist if s.get("call") and s.get("call") != "NO-GO"), None)
+    own_voi = voi if top and voi and voi.get("concept") == top.get("concept") else None
+    place_trial = None
+    if top:
+        place_trial = trial.recommend(area_label, top, scan.slugify(city), rent_of.get(top["concept"]),
+                                      asking_rent, own_voi, stamped)
     yield "shortlist", {"area": area, "city": city, "currency": unit.get("currency"), "asking_rent": asking_rent,
                         "trial": place_trial,
                         "weights": WEIGHTS, "concepts": shortlist, "heat": heat[:8], "voi": voi,
