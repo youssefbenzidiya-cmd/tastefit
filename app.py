@@ -12,6 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import agent
+import evidence
 import ledger
 import scan
 import tenant
@@ -122,6 +123,8 @@ class Handler(BaseHTTPRequestHandler):
             return 200, "text/plain", f"ok {os.environ.get('RENDER_GIT_COMMIT', '')}".strip().encode(), None
         if path == "/ledger":
             return 200, "text/html; charset=utf-8", ledger.page().encode(), CSP_LEDGER
+        if path == "/evidence":
+            return 200, "text/html; charset=utf-8", evidence.page().encode(), CSP_LEDGER
         if path in _STATIC_BODIES:
             body, ctype = _STATIC_BODIES[path]
             return 200, ctype, body, None
