@@ -119,7 +119,7 @@ and the UTC time. No Qloo payload is stored. The committed Chicago batch is """,
         """. The first listed concept is not a ranking. No probability was registered, so the Brier score
 (Brier 1950) is not defined for that batch. A later scored batch would be a new fingerprint.</p>
 <h2>Street match</h2>
-<p>When a run has at least two monthly rents, Gale and Shapley (1962) match up to five units to the concepts
+<p>Baseline: ignores neighbours. When a run has at least two monthly rents, Gale and Shapley (1962) match up to five units to the concepts
 already scored in that run. Landlords rank by the rent-first verdict, then fit. Tenants rank by fit, then a
 lower rent. At most one concept of each rent category is matched unless the request sets k from 1 to 5.
 The page states when there is no blocking pair. The match makes no extra Qloo call. Stability is not a

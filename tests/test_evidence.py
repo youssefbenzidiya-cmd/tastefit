@@ -11,6 +11,7 @@ class Page(unittest.TestCase):
         self.assertIn("Heckman (1979)", html)
         self.assertIn("not defined", html.lower())
         self.assertIn('href="/ledger"', html)
+        self.assertIn("Baseline: ignores neighbours", html)
         self.assertIn("Gale and Shapley (1962)", html)
         self.assertIn("mcp_server.py", html)
         self.assertIn("$0", html)

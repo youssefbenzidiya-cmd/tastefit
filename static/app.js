@@ -430,7 +430,7 @@ function portfolioHTML() {
   if (!p) return '';
   const cur = state.shortlist && state.shortlist.currency;
   const rows = (p.matches || []).map(m => `<li>${esc(m.unit)} at ${esc(money(m.rent, cur))}/month: ${m.concept ? `${esc(m.concept)} (${esc(m.verdict)})` : 'unmatched'}</li>`).join('');
-  return `<section class="compare" aria-labelledby="port-title"><h3 id="port-title">Street match</h3><p id="port-proof">${esc(p.proof)}</p>${rows ? `<ul>${rows}</ul>` : ''}</section>`;
+  return `<section class="compare" aria-labelledby="port-title"><h3 id="port-title">Baseline: ignores neighbours</h3><p id="port-proof">${esc(p.proof)}</p>${rows ? `<ul>${rows}</ul>` : ''}</section>`;
 }
 function shortlistHTML() {
   const sl = state.shortlist, scored = sl.concepts.filter(c => c.call), rest = sl.concepts.filter(c => !c.call);
