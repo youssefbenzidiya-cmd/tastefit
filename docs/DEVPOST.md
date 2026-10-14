@@ -3,8 +3,9 @@
 The only location tool you can prove wrong.
 
 TasteFit tells a restaurant founder or a broker whether a concept fits a street, and it publishes the
-checks that can show the answer is wrong. A run makes at most 25 Qloo calls and stops itself at 230
-seconds so the memo arrives inside a 300 second host limit. No discounting and no interest.
+checks that can show the answer is wrong. A run makes at most 25 Qloo calls. At 230 seconds, later
+LLM calls are cut short so the memo can still finish inside a 300 second host limit. The process is
+not killed. No discounting and no interest.
 
 ## Surprise ladder
 
@@ -28,7 +29,8 @@ when utilities are tied (McFadden 1974). It is not profit.
 ### 3. Building-wide stable matching
 
 Two or more asking rents on the same street are matched to the concepts that run already scored.
-Gale and Shapley (1962), unit-proposing. At most one of each rent category, and at most five units.
+Gale and Shapley (1962), unit-proposing. At most k concepts of one rent category are matched; k is 1
+unless the request sets it, from 1 to 5. At most five units.
 No extra Qloo call. The page says when there is no blocking pair. Stability is not a survival forecast.
 The score breakdown on a single concept is an exact Shapley split (Shapley 1953) of TasteFit's own
 weights, not a cause.
@@ -51,14 +53,14 @@ listed concept is not a ranking.
 
 ### 6. Agent-native
 
-`mcp_server.py` exposes `tenant_match`, `city_scan` and `city_scan_unit` over stdio. The steps for
-Claude Desktop and Cursor are in `docs/MCP-DEMO.md`. A tool result is not written to disk.
+`mcp_server.py` exposes `tenant_match`, `city_scan` and `city_scan_unit` over stdio. A tool result is
+not written to disk. The click-by-click client steps are a separate change. This commit does not add
+`docs/MCP-DEMO.md`.
 
 ### 7. Evidence page
 
-`/evidence` is linked from the landing page. It shows the backtest table, including the negative
-results, the claim ledger's rule (agreement, not accuracy), the ledger, the Gale–Shapley rule, the
-MCP snippet, the $0 infrastructure, and the limits.
+A separate change adds `/evidence`, linked from the landing page, quoting the committed backtests.
+This commit does not add that route.
 
 ## Infrastructure
 
@@ -74,7 +76,7 @@ Chicago batch as a probability.
 
 ## Screenshots
 
-The evidence page, served locally from the committed backtest files. Qloo's top-3 hit rate is 29%. The citywide baseline is 68%.
+Screenshot from the separate evidence change, served locally from the committed backtest files. This commit does not add `/evidence`. Qloo's top-3 hit rate is 29%. The citywide baseline is 68%.
 
 ![Evidence page with the Chicago backtest](evidence-page.webp)
 
@@ -89,6 +91,6 @@ Not built. Nothing in this section is in the product.
 - **Street Exchange.** One match day a month for a city, in the spirit of the medical residency match: vacant units and concepts are matched together on that day.
 - **Street health score.** One public number for a block, read off a street certificate.
 - **Casablanca pilot.** A first on-the-ground pilot. The Casablanca map pack is already in the repository. The pilot is not.
-- **Agent-to-agent leasing.** A broker's agent and a landlord's agent hand a lease across the MCP tools in `docs/MCP-DEMO.md`.
+- **Agent-to-agent leasing.** A broker's agent and a landlord's agent hand a lease across the MCP tools `tenant_match`, `city_scan` and `city_scan_unit`.
 
 These four are a vision. They are not implemented, not certified, and not a claim about Qloo.
