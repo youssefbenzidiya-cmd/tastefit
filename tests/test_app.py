@@ -1,4 +1,6 @@
+import contextlib
 import http.client
+import io
 import json
 import os
 import re
@@ -201,6 +203,65 @@ class Server(unittest.TestCase):
         self.assertGreater(int(headers["Content-Length"]), 1000)
         code, headers, body = self.request("HEAD", "/health")
         self.assertEqual((code, body, headers["Content-Length"]), (200, "", "2"))
+
+    def test_street_whatif_makes_no_qloo_call(self):
+        payload = {"units": [{"id": "A", "rent": 2000}, {"id": "B", "rent": 2000}, {"id": "C", "rent": 2000}],
+                   "concepts": [{"id": "ramen", "category": "restaurant", "fit": 80, "overlap": 10},
+                                {"id": "coffee", "category": "cafe", "fit": 70, "overlap": 10},
+                                {"id": "books", "category": "retail", "fit": 60, "overlap": 10}],
+                   "remove": "books", "add": None}
+        path = "/street?payload=" + urllib.parse.quote(json.dumps(payload))
+        with mock.patch("qloo.exec_cached", side_effect=AssertionError("qloo")):
+            code, body = self.get(path)
+        self.assertEqual(code, 200)
+        data = json.loads(body)
+        self.assertEqual(data["qloo_calls"], 0)
+        self.assertIn("No improving move:", data["after"]["proof"])
+        code, body = self.get("/street?payload=" + urllib.parse.quote(json.dumps({"units": [], "concepts": []})))
+        self.assertEqual(code, 400)
+        code, body = self.get("/street?payload=" + urllib.parse.quote(json.dumps({"units": payload["units"], "concepts": None})))
+        self.assertEqual(code, 400)
+        self.assertNotIn("<html", body.lower())
+        handler = app.Handler.__new__(app.Handler)
+        handler.command = "GET"
+        handler.client_address = ("127.0.0.1", 0)
+        handler.path = "/street?payload=" + urllib.parse.quote(json.dumps({"fit": 80, "overlap": 10}))
+        handler.requestline = "GET " + handler.path + " HTTP/1.1"
+        buf = io.StringIO()
+        with contextlib.redirect_stderr(buf):
+            handler.log_request(200, 3)
+        log = buf.getvalue()
+        self.assertIn("GET /street", log)
+        self.assertNotIn("overlap", log)
+        self.assertNotIn("payload", log)
+        units = payload["units"]
+        for bad in ({"id": "ramen", "fit": float("nan"), "overlap": 10},
+                    {"id": "ramen", "fit": 80, "overlap": float("inf")},
+                    {"id": "ramen", "fit": 101, "overlap": 10}):
+            raw = json.dumps({"units": units, "concepts": [bad], "add": "noodles"})
+            code, body = self.get("/street?payload=" + urllib.parse.quote(raw))
+            self.assertEqual(code, 400, bad)
+            self.assertNotIn("NaN", body)
+            self.assertNotIn("Infinity", body)
+        huge = json.dumps({"units": [{"id": "A", "rent": 10 ** 400}, {"id": "B", "rent": 2000},
+                                     {"id": "C", "rent": 2000}],
+                           "concepts": [{"id": "ramen", "fit": 10 ** 400, "overlap": 10 ** 400}],
+                           "add": "noodles"})
+        code, body = self.get("/street?payload=" + urllib.parse.quote(huge))
+        self.assertEqual(code, 400)
+        self.assertNotIn("Traceback", body)
+        for rent_row in ({"viable": True}, {"viable": True, "rent_max": 2800, "ci90": "nope"}):
+            raw = json.dumps({"units": units, "concepts": [{"id": "ramen", "fit": 80, "overlap": 10,
+                                                            "rent_row": rent_row}], "add": "noodles"})
+            code, body = self.get("/street?payload=" + urllib.parse.quote(raw))
+            self.assertEqual(code, 400, rent_row)
+            self.assertNotIn("Traceback", body)
+        good = json.dumps({"units": units, "concepts": [{"id": "ramen", "fit": 80, "overlap": 10,
+                                                         "rent_row": {"viable": True, "rent_max": 2800,
+                                                                      "ci90": [2000, 3200]}}],
+                           "add": "noodles"})
+        code, body = self.get("/street?payload=" + urllib.parse.quote(good))
+        self.assertEqual(code, 200)
 
     def test_wrong_methods_get_plain_405(self):
         for method, path, allow in (("POST", "/", "GET, HEAD"), ("DELETE", "/health", "GET, HEAD"),

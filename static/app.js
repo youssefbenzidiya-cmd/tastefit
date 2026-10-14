@@ -443,7 +443,48 @@ function portfolioHTML() {
     return `<li>${esc(r.unit)}${r.concept ? `, ${esc(r.concept)}` : ''}: neighbour contribution ${sign}${Number(r.contribution).toFixed(1)} (${esc(r.role)}). Asking ${esc(cents(r.asking, cur))}. Suggested ${esc(cents(r.suggested, cur))}.</li>`;
   }).join('') : '';
   const splitHTML = splitRows ? `<h4 id="rent-split-title">Suggested rent split</h4><p id="rent-split-label">${esc(split.label)}</p><p>${esc(split.note)}</p><ul>${splitRows}</ul><p>Landlord total ${esc(cents(split.total_asking, cur))} a month. Suggested total ${esc(cents(split.total_suggested, cur))}.</p>` : '';
-  return `<section class="compare" aria-labelledby="port-title"><h3 id="port-title">Stable Street</h3><p id="port-proof">${esc(p.proof)}</p>${rows ? `<ul>${rows}</ul>` : ''}${splitHTML}</section>`;
+  return `<section class="compare" aria-labelledby="port-title"><h3 id="port-title">Stable Street</h3><p id="port-proof">${esc(p.proof)}</p>${rows ? `<ul>${rows}</ul>` : ''}${splitHTML}${whatIfHTML(p)}</section>`;
+}
+function whatIfHTML(p) {
+  if (!p || !(p.matches || []).length) return '';
+  const options = (p.inputs || []).map(c => `<option value="${esc(c.id)}">${esc(c.id)}</option>`).join('');
+  return `<form id="what-if"><h4 id="what-title">What if</h4>
+    <p class="hint-line" id="what-help">Add or remove one tenant and re-run this street. A new name has no taste data in this run. No extra Qloo call.</p>
+    <div class="field"><label for="what-remove">Remove a tenant</label>
+      <select class="input" id="what-remove"><option value="">Keep the current tenants</option>${options}</select></div>
+    <div class="field"><label for="what-add">Or add a tenant</label>
+      <input class="input" id="what-add" maxlength="80" autocomplete="off" placeholder="supermarket at the corner"></div>
+    <button type="submit" class="btn btn-ink btn-sm">Re-run this street</button>
+    <div id="what-result"></div></form>`;
+}
+function whatIfResultHTML(data) {
+  const lines = (data.changes || []).map(c => {
+    if (c.before == null && c.after == null) return `<li>${esc(c.concept)}: not assigned.</li>`;
+    if (c.before == null) return `<li>${esc(c.concept)}: added, value ${Number(c.after).toFixed(1)}.</li>`;
+    if (c.after == null) return `<li>${esc(c.concept)}: removed. Previous value ${Number(c.before).toFixed(1)}.</li>`;
+    const word = c.delta > 0 ? 'gains' : c.delta < 0 ? 'loses' : 'unchanged';
+    return `<li>${esc(c.concept)}: ${Number(c.before).toFixed(1)} to ${Number(c.after).toFixed(1)} (${word} ${Math.abs(c.delta).toFixed(1)}).</li>`;
+  }).join('');
+  const stable = (data.after && data.after.proof) || '';
+  return `${data.added_note ? `<p>${esc(data.added_note)}</p>` : ''}<ul>${lines}</ul><p id="what-stable">${esc(stable)}</p>`;
+}
+async function runWhatIf() {
+  const p = state.portfolio;
+  const add = ($('#what-add') && $('#what-add').value || '').trim();
+  const remove = ($('#what-remove') && $('#what-remove').value) || '';
+  const box = $('#what-result');
+  if (!p || !box) return;
+  if (Boolean(add) === Boolean(remove)) { toast('Add or remove one tenant'); return; }
+  const payload = { units: (p.matches || []).map(m => ({ id: m.unit, rent: m.rent })), concepts: p.inputs || [], remove: remove || null, add: add || null };
+  box.textContent = 'Re-running this street.';
+  try {
+    const res = await fetch('/street?' + new URLSearchParams({ payload: JSON.stringify(payload) }));
+    const text = await res.text();
+    if (!res.ok) { box.textContent = text; return; }
+    box.innerHTML = whatIfResultHTML(JSON.parse(text));
+  } catch (err) {
+    box.textContent = 'The street could not be re-run.';
+  }
 }
 function shortlistHTML() {
   const sl = state.shortlist, scored = sl.concepts.filter(c => c.call), rest = sl.concepts.filter(c => !c.call);
@@ -785,6 +826,7 @@ document.addEventListener('click', e => {
   }
 });
 document.addEventListener('submit', e => {
+  if (e.target.id === 'what-if') { e.preventDefault(); runWhatIf(); return; }
   if (e.target.id !== 'run-form') return;
   e.preventDefault();
   startRun();

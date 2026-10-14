@@ -14,6 +14,7 @@ from pathlib import Path
 import agent
 import evidence
 import ledger
+import portfolio
 import scan
 import tenant
 
@@ -140,6 +141,8 @@ class Handler(BaseHTTPRequestHandler):
             self._demo()
         elif url.path in ("/scan", "/scan/unit"):
             self._scan(url.path, urllib.parse.parse_qs(url.query))
+        elif url.path == "/street":
+            self._street(urllib.parse.parse_qs(url.query))
         else:
             self._send(*self._page(url.path))
 
@@ -249,6 +252,30 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(400, "text/plain", b"a map point (lat, lon) or a city and location are required")
         self._stream_agent(lambda: tenant.run(city, location or None, lat, lon, rent,
                                                portfolio_rents=extras, portfolio_k=k))
+
+    def _street(self, q):
+        """Re-solve a street from concepts the page already has. This makes no Qloo call."""
+        raw = (q.get("payload") or [""])[0]
+        if len(raw) > 20000:
+            return self._send(400, "text/plain", b"street payload is too large")
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            return self._send(400, "text/plain", b"street payload must be JSON")
+        if not isinstance(payload, dict):
+            return self._send(400, "text/plain", b"street payload must be JSON")
+        try:
+            out = portfolio.what_if(payload.get("units"), payload.get("concepts"),
+                                    remove=payload.get("remove"), add=payload.get("add"))
+        except (ValueError, TypeError) as exc:
+            return self._send(400, "text/plain", str(exc).encode())
+        self._send(200, "application/json", json.dumps(out).encode())
+
+    def log_request(self, code="-", size="-"):
+        """Keep /street query strings, which carry this run's fit and overlap, out of the access log."""
+        path = urllib.parse.urlparse(self.path).path
+        line = f"{self.command} {path}" if path == "/street" else self.requestline
+        self.log_message('"%s" %s %s', line, str(code), str(size))
 
     def _stream_agent(self, start):
         if not os.environ.get("QLOO_API_KEY"):

@@ -634,6 +634,18 @@ def deadline_chat(started, clock=time.monotonic, chat=None):
     return call
 
 
+def _public_concept(concept):
+    """Fields the what-if re-run needs. No Qloo payload."""
+    row = concept.get("rent_row") or {}
+    rent_row = None
+    if row:
+        rent_row = {"rent_max": row.get("rent_max"), "ci90": row.get("ci90"), "viable": row.get("viable")}
+    return {"id": concept.get("id"), "category": concept.get("category"), "fit": concept.get("fit"),
+            "overlap": concept.get("overlap"), "strong": bool(concept.get("strong")),
+            "avoid": bool(concept.get("avoid")), "rent_first": bool(concept.get("rent_first")),
+            "rent_row": rent_row}
+
+
 def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None, today=None, clock=time.monotonic,
         portfolio_rents=None, portfolio_k=1):
     """Yields (kind, data): unit, step*, profile, candidates, shortlist, baseline, memo, budget; or error.
@@ -855,6 +867,7 @@ def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None,
         port = portfolio.assign(
             [{"id": f"Unit {i + 1}", "rent": rent} for i, rent in enumerate(rents[:portfolio.MAX_UNITS])],
             concepts, k=portfolio_k)
+        port["inputs"] = [_public_concept(concept) for concept in concepts]
         yield "portfolio", port
 
     try:
