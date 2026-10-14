@@ -175,8 +175,8 @@ lower rent. At most one concept of each rent category is matched unless the requ
 The page states when there is no blocking pair. The match makes no extra Qloo call. Stability is not a
 survival forecast.</p>
 <h2>Call it from an agent</h2>
-<p>The MCP server is <code>mcp_server.py</code> on stdio. Nothing is written to disk. Steps for Claude Desktop
-and Cursor are in <code>docs/MCP-DEMO.md</code>.</p>
+<p>The MCP server is <code>mcp_server.py</code> on stdio. Nothing is written to disk. The snippet below is the
+client shape. This change does not add a step-by-step client guide.</p>
 <pre>{"mcpServers": {"tastefit": {"command": "python3", "args": ["/path/to/tastefit/mcp_server.py"],
   "env": {"QLOO_API_KEY": "...", "QLOO_BASE_URL": "https://hackathon.api.qloo.com"}}}}</pre>
 <h2>Infrastructure</h2>

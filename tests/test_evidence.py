@@ -14,6 +14,7 @@ class Page(unittest.TestCase):
         self.assertIn("Baseline: ignores neighbours", html)
         self.assertIn("Gale and Shapley (1962)", html)
         self.assertIn("mcp_server.py", html)
+        self.assertNotIn("MCP-DEMO.md", html)
         self.assertIn("$0", html)
         self.assertIn("not a vetted address", html)
         self.assertIn("Vovk", html)
