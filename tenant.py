@@ -19,6 +19,7 @@ import time
 import decision
 import geo
 import llm
+import market_share
 import qloo
 import scan
 import tgi
@@ -653,6 +654,10 @@ def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None,
             unit.update(currency=body.get("currency"), rent_note=body.get("note"), cell=body.get("cell"))
         else:
             unit["rent_note"] = body.get("note") or body.get("error") or "Rent ceiling not calibrated for this city."
+        pack = scan.pack(city)
+        unit["market_share"] = market_share.estimate(
+            city, point[0], point[1], asking_rent=asking_rent,
+            display_name=((pack or {}).get("city") or {}).get("display_name") or "")
     yield "unit", unit
 
     # 1-2. Local taste profile.

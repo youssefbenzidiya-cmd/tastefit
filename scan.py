@@ -8,6 +8,8 @@ import json
 import re
 from pathlib import Path
 
+import market_share
+
 PACKS = Path(__file__).parent / "packs"
 SLUG = re.compile(r"[a-z0-9-]{1,40}")
 TOP_DEFAULT, TOP_MAX = 10, 25
@@ -51,7 +53,12 @@ def scan(city, concept, top=None):
     if p is None:
         return _no_pack(city[:120])
     if not p["quality"]["gate_passed"]:
-        return 200, _thin(p)
+        thin = _thin(p)
+        center = (p.get("city") or {}).get("center") or []
+        if len(center) == 2:
+            thin["market_share"] = market_share.estimate(
+                city, center[0], center[1], display_name=(p.get("city") or {}).get("display_name") or "")
+        return 200, thin
     try:
         top = TOP_DEFAULT if top in (None, "") else max(1, min(TOP_MAX, int(top)))
     except ValueError:
@@ -87,6 +94,12 @@ def viable(row):
                   "note": "Not viable at any rent here: below the city's 3-year survival rate even rent-free."}
 
 
+def _with_share(payload, city, lat, lon, p):
+    payload["market_share"] = market_share.estimate(
+        city, lat, lon, display_name=(p.get("city") or {}).get("display_name") or "")
+    return payload
+
+
 def unit(city, lat, lon):
     if not city or lat in (None, "") or lon in (None, ""):
         return 400, {"error": "city, lat and lon are required"}
@@ -100,7 +113,7 @@ def unit(city, lat, lon):
     if p is None:
         return _no_pack(city[:120])
     if not p["quality"]["gate_passed"]:
-        return 200, _thin(p)
+        return 200, _with_share(_thin(p), city, lat, lon, p)
     j = cell_of(p["grid"], lat, lon)
     if j is None or j not in p["study"]:
         return 400, {"error": f"That point is outside the scanned area of {p['city']['name']}."}
@@ -108,16 +121,17 @@ def unit(city, lat, lon):
            "built_at": p["built_at"], "attribution": p["attribution"]}
     units = p.get("units")
     if not units:
-        return 200, out | {"calibrated": False, "rent_ceiling": None,
-                           "note": "Rent ceiling not calibrated for this city yet."}
+        return 200, _with_share(out | {"calibrated": False, "rent_ceiling": None,
+                                       "note": "Rent ceiling not calibrated for this city yet."}, city, lat, lon, p)
     rows = [viable(r) for r in units["cells"].get(str(j), [])]
     if not rows:
-        return 200, out | {"calibrated": True, "rent_ceiling": None,
-                           "note": "No rent ceiling was computed for this cell."}
+        return 200, _with_share(out | {"calibrated": True, "rent_ceiling": None,
+                                       "note": "No rent ceiling was computed for this cell."}, city, lat, lon, p)
     src = units.get("survival_source")
     note = ("Highest monthly rent at which each tenant type still reaches its city's official 3-year survival rate"
             + (f" ({src})." if src else ".")
             + ("" if units.get("location_specific", True) else
                " Same figure in every cell of this city: location did not predict survival in held-out data here.")
             + " A model, not a forecast.")
-    return 200, out | {"calibrated": True, "currency": units["currency"], "rent_ceiling": rows, "note": note}
+    return 200, _with_share(out | {"calibrated": True, "currency": units["currency"], "rent_ceiling": rows, "note": note},
+                            city, lat, lon, p)

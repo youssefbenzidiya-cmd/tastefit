@@ -221,6 +221,12 @@ class PipelineTest(unittest.TestCase):
             ev = self.run_all()
         self.assertEqual(ev, [("error", "Could not name that point; type the neighborhood instead.")])
 
+    def test_unit_event_includes_the_spend_estimate(self):
+        with mock.patch("tenant.market_share.estimate", return_value={"available": True, "note": "estimate", "pays_rent": False}) as est:
+            ev = self.run_all(asking_rent=2800)
+        self.assertEqual(self.kinds(ev, "unit")[0]["market_share"]["note"], "estimate")
+        self.assertEqual(est.call_args.kwargs["asking_rent"], 2800)
+
 
 class TasteGapPipelineTest(unittest.TestCase):
     """The same run with an OSM venue file: one extra city rank call, no Qloo local-supply calls."""

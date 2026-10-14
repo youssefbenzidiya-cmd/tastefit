@@ -34,7 +34,8 @@ class ScanPanel(unittest.TestCase):
         self.assertEqual(sorted(fetched), ["/scan/unit?", "/scan?"])
 
     def test_api_text_is_escaped(self):
-        for field in ("d.reason", "d.attribution", "u.note", "r.note", "r.label_en", "t.neighborhood", "why", "watch"):
+        for field in ("d.reason", "d.attribution", "u.note", "r.note", "r.label_en", "t.neighborhood", "why", "watch",
+                      "u.market_share.note"):
             self.assertRegex(self.script, r"esc\(" + re.escape(field), field)
 
 
