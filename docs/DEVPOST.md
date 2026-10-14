@@ -81,3 +81,14 @@ The evidence page, served locally from the committed backtest files. Qloo's top-
 The prediction ledger. The Chicago batch is unscored, so the Brier score is not defined. The first listed concept is not a ranking.
 
 ![Prediction ledger for the unscored Chicago batch](prediction-ledger.webp)
+
+## What's next
+
+Not built. Nothing in this section is in the product.
+
+- **Street Exchange.** One match day a month for a city, in the spirit of the medical residency match: vacant units and concepts are matched together on that day.
+- **Street health score.** One public number for a block, read off a street certificate.
+- **Casablanca pilot.** A first on-the-ground pilot. The Casablanca map pack is already in the repository. The pilot is not.
+- **Agent-to-agent leasing.** A broker's agent and a landlord's agent hand a lease across the MCP tools in `docs/MCP-DEMO.md`.
+
+These four are a vision. They are not implemented, not certified, and not a claim about Qloo.
