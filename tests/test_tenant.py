@@ -4,6 +4,7 @@ import json
 import unittest
 from unittest import mock
 
+import ledger
 import qloo
 import tenant
 
@@ -227,11 +228,19 @@ class PipelineTest(unittest.TestCase):
         self.assertEqual(self.kinds(base, "budget")[0]["qloo_calls"], self.kinds(street, "budget")[0]["qloo_calls"])
         port = self.kinds(street, "portfolio")[0]
         self.assertEqual(port["blocking"], [])
-        self.assertIn("No blocking pair", port["proof"])
-        self.assertIn("Gale and Shapley (1962)", port["proof"])
+        self.assertIn("No improving move:", port["proof"])
+        self.assertIn("replacements and", port["proof"])
+        self.assertIn("swaps checked", port["proof"])
         self.assertLessEqual(len(port["matches"]), 5)
         self.assertEqual(len(port["matches"]), 3)
         self.assertFalse(self.kinds(base, "portfolio"))
+        memo = self.kinds(street, "memo")[0]["markdown"]
+        self.assertIn(ledger.street_fingerprint(port), memo)
+        body = json.loads(ledger.street_canonical(port))
+        self.assertEqual(set(body), {"needs_rent_flexibility", "replacements", "swaps", "units"})
+        self.assertEqual(set(body["units"][0]), {"concept", "id", "rent"})
+        self.assertIn("Prediction fingerprint", memo)
+        self.assertNotIn("Street certificate", self.kinds(base, "memo")[0]["markdown"])
 
     def test_memo_carries_a_prediction_fingerprint(self):
         memo = self.kinds(self.run_all(), "memo")[0]

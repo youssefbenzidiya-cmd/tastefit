@@ -83,6 +83,39 @@ def ensure_fingerprint(memo, entry):
     return memo.rstrip() + "\n" + memo_line(entry) + "\n"
 
 
+def _public_rent(value):
+    number = float(value or 0)
+    return int(number) if number.is_integer() else number
+
+
+def street_canonical(outcome):
+    """Street certificate. Unit ids, rents, assigned concepts, move counts, and the flexibility flag only."""
+    units = [{"concept": match.get("concept") or "", "id": match.get("unit") or "",
+              "rent": _public_rent(match.get("rent"))}
+             for match in (outcome.get("matches") or [])]
+    payload = {"needs_rent_flexibility": bool(outcome.get("needs_rent_flexibility")),
+               "replacements": int(outcome.get("replacements") or 0),
+               "swaps": int(outcome.get("swaps") or 0),
+               "units": units}
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def street_fingerprint(outcome):
+    return hashlib.sha256(street_canonical(outcome).encode("utf-8")).hexdigest()
+
+
+def street_line(outcome):
+    return ("- Street certificate `" + street_fingerprint(outcome) + "` "
+            "(SHA-256 of the unit ids, the rents, the assigned concepts, the moves checked "
+            "and whether the street needs rent flexibility; no Qloo payload).")
+
+
+def ensure_street(memo, outcome):
+    if not outcome or not outcome.get("matches") or "Street certificate" in (memo or ""):
+        return memo
+    return (memo or "").rstrip() + "\n" + street_line(outcome) + "\n"
+
+
 def load():
     with FILE.open(encoding="utf-8") as f:
         return json.load(f)

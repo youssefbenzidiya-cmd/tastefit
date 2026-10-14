@@ -1,93 +1,29 @@
-"""Stable matching of vacant units to concepts. Gale and Shapley 1962. Standard library only.
+"""Stable Street: a tenant mix whose negotiable-rent surplus is an exact potential.
 
-Landlords (units) propose. A unit prefers a better rent-first verdict, then a higher fit score.
-A concept prefers a higher fit score, then a lower asking rent. Fit scores are reused from one
-run, so this makes no Qloo call. At most k concepts of one category may be matched on the street.
+Monderer and Shapley 1996; Bogomolnaia and Jackson 2002. Existence with externalities is prior
+work (Pycia and Yenmez, UZH econ WP 392), as are mall deferred acceptance with transfers, Osawa
+et al. (arXiv 2011.06778) and Prendergast, Gould and Pashigian (CEPR DP3598). This file does not
+claim that theory. It estimates an uncalibrated neighbour matrix from this run's audience overlap,
+reports when fixed rents have no stable assignment, and counts the moves in the certificate.
+Standard library only. No extra Qloo call.
 """
+import itertools
+
 import decision
 
-CALL_RANK = {"GO": 0, "ADJUST": 1, "NO-GO": 2}
+# Stated, uncalibrated map. Same category cannibalises; a different category is the complement proxy.
+EFFECT_SCALE = 25.0
+COMPLEMENT_SHARE = 0.5
+VERDICT_SHIFT = {"GO": 0.0, "ADJUST": -15.0, "NO-GO": -40.0}
 MAX_UNITS = 5
+MIN_UNITS = 3
+EPS = 1e-9
+RENT_FLEXIBILITY = "This street needs rent flexibility to settle."
 
 
-def deferred_acceptance(unit_prefs, concept_prefs, category=None, k=1):
-    """{unit: concept or None}. Unit-proposing deferred acceptance with a per-category cap."""
-    category = category or {}
-    k = max(1, int(k))
-    free = [u for u, prefs in unit_prefs.items() if prefs]
-    nxt = {u: 0 for u in unit_prefs}
-    hold = {}
-    matched = {u: None for u in unit_prefs}
-    rank = {c: {u: i for i, u in enumerate(prefs)} for c, prefs in concept_prefs.items()}
-
-    def counts():
-        out = {}
-        for c in hold:
-            cat = category.get(c, "")
-            out[cat] = out.get(cat, 0) + 1
-        return out
-
-    steps = sum(len(p) for p in unit_prefs.values()) + 1
-    while free and steps:
-        steps -= 1
-        u = free.pop(0)
-        prefs = unit_prefs[u]
-        i = nxt[u]
-        if i >= len(prefs):
-            continue
-        nxt[u] = i + 1
-        c = prefs[i]
-        if c not in rank or u not in rank[c]:
-            free.append(u)
-            continue
-        current = hold.get(c)
-        cat = category.get(c, "")
-        if current is None and counts().get(cat, 0) >= k:
-            free.append(u)
-            continue
-        if current is None or rank[c][u] < rank[c][current]:
-            if current is not None:
-                matched[current] = None
-                free.append(current)
-            hold[c] = u
-            matched[u] = c
-        else:
-            free.append(u)
-    return matched
-
-
-def blocking_pairs(matched, unit_prefs, concept_prefs, category=None, k=1):
-    """Pairs that both prefer each other to their match without breaking the category cap."""
-    category = category or {}
-    k = max(1, int(k))
-    concept_match = {c: u for u, c in matched.items() if c}
-    counts = {}
-    for c in concept_match:
-        cat = category.get(c, "")
-        counts[cat] = counts.get(cat, 0) + 1
-    rank_c = {c: {u: i for i, u in enumerate(prefs)} for c, prefs in concept_prefs.items()}
-    blocks = []
-    for u, prefs in unit_prefs.items():
-        current = matched.get(u)
-        for c in prefs:
-            if c == current:
-                break
-            order = rank_c.get(c) or {}
-            if u not in order:
-                continue
-            other = concept_match.get(c)
-            if other is not None and order[u] > order[other]:
-                continue
-            cat = category.get(c, "")
-            new = counts.get(cat, 0)
-            if other is None:
-                new += 1
-            if current and category.get(current, "") == cat:
-                new -= 1
-            if new > k:
-                continue
-            blocks.append((u, c))
-    return blocks
+def line_edges(n):
+    """Typed rent order, as a line. About 100 m, or one mall floor: the distance is not measured."""
+    return [(i, i + 1) for i in range(max(0, n - 1))]
 
 
 def _call(concept, rent):
@@ -103,38 +39,254 @@ def _call(concept, rent):
     return call
 
 
+def standalone(concept, rent):
+    """v(t, u): this run's fit score plus the rent-first shift at that unit's asking rent."""
+    return float(concept.get("fit") or 0) + VERDICT_SHIFT.get(_call(concept, rent), 0.0)
+
+
+def neighbour_effect(tenant, other):
+    """Uncalibrated a(t, s). Scales with the neighbour's fit, so a(t, s) and a(s, t) can differ.
+
+    p = min(overlap_t, overlap_s) / 100, or 0 when either overlap is missing.
+    f_s = fit_s / 100.
+    Same category: -EFFECT_SCALE * p * f_s. Different category: +EFFECT_SCALE * COMPLEMENT_SHARE * p * f_s.
+    """
+    left, right = tenant.get("overlap"), other.get("overlap")
+    if left is None or right is None:
+        return 0.0
+    share = min(float(left), float(right)) / 100.0
+    neighbour_fit = float(other.get("fit") or 0) / 100.0
+    magnitude = EFFECT_SCALE * share * neighbour_fit
+    same = (tenant.get("category") or "other") == (other.get("category") or "other")
+    return -magnitude if same else magnitude * COMPLEMENT_SHARE
+
+
+def effect_matrix(concepts):
+    n = len(concepts)
+    matrix = [[0.0] * n for _ in range(n)]
+    for i, tenant in enumerate(concepts):
+        for j, other in enumerate(concepts):
+            if i != j:
+                matrix[i][j] = neighbour_effect(tenant, other)
+    return matrix
+
+
+def symmetric_part(matrix):
+    n = len(matrix)
+    out = [[0.0] * n for _ in range(n)]
+    for i in range(n):
+        for j in range(n):
+            out[i][j] = (matrix[i][j] + matrix[j][i]) / 2.0
+    return out
+
+
+def surplus(assign, values, effects, edges):
+    """S(μ) = Σ v + Σ_{occupied edges} (a(t,s) + a(s,t)). The one-sided part cancels."""
+    total = 0.0
+    for unit, tenant in enumerate(assign):
+        if tenant is not None:
+            total += values[tenant][unit]
+    for left, right in edges:
+        tenant, other = assign[left], assign[right]
+        if tenant is not None and other is not None:
+            total += effects[tenant][other] + effects[other][tenant]
+    return total
+
+
+def utility(tenant, unit, assign, values, effects, edges):
+    """U_t(u) given μ. Neighbours are the other occupied units, not the occupant of u."""
+    total = values[tenant][unit]
+    for left, right in edges:
+        other_unit = right if left == unit else left if right == unit else None
+        if other_unit is None:
+            continue
+        other = assign[other_unit]
+        if other is not None:
+            total += effects[tenant][other]
+    return total
+
+
+def total_utility(assign, values, effects, edges):
+    return sum(utility(tenant, unit, assign, values, effects, edges)
+               for unit, tenant in enumerate(assign) if tenant is not None)
+
+
+def _replace(assign, unit, tenant):
+    nxt = list(assign)
+    nxt[unit] = tenant
+    return nxt
+
+
+def _swap(assign, left, right):
+    nxt = list(assign)
+    nxt[left], nxt[right] = nxt[right], nxt[left]
+    return nxt
+
+
+def improving_moves(assign, values, effects, edges):
+    """Replacements and swaps that strictly raise street surplus. Empty means the certificate holds."""
+    base = surplus(assign, values, effects, edges)
+    used = {tenant for tenant in assign if tenant is not None}
+    occupied = [unit for unit, tenant in enumerate(assign) if tenant is not None]
+    moves = []
+    for tenant in range(len(values)):
+        if tenant in used:
+            continue
+        for unit in occupied:
+            nxt = _replace(assign, unit, tenant)
+            if surplus(nxt, values, effects, edges) > base + EPS:
+                moves.append(("replace", unit, tenant))
+    for index, left in enumerate(occupied):
+        for right in occupied[index + 1:]:
+            nxt = _swap(assign, left, right)
+            if surplus(nxt, values, effects, edges) > base + EPS:
+                moves.append(("swap", left, right))
+    return moves
+
+
+def check_counts(assign, n_tenants):
+    """How many replacements and swaps a verifier has to look at. O(units x tenants + units^2)."""
+    occupied = sum(1 for tenant in assign if tenant is not None)
+    unmatched = n_tenants - len({tenant for tenant in assign if tenant is not None})
+    return unmatched * occupied, occupied * (occupied - 1) // 2
+
+
+def greedy(values):
+    """Each unit, in order, takes the free tenant with the highest stand-alone value."""
+    n_units = len(values[0]) if values else 0
+    used = set()
+    assign = [None] * n_units
+    for unit in range(n_units):
+        best, best_value = None, None
+        for tenant in range(len(values)):
+            if tenant in used:
+                continue
+            value = values[tenant][unit]
+            if best is None or value > best_value:
+                best, best_value = tenant, value
+        if best is not None:
+            assign[unit] = best
+            used.add(best)
+    return assign
+
+
+def local_search(values, effects, edges):
+    """Stop when surplus cannot rise. Each accepted move is a strict increase, and the set is finite."""
+    assign = greedy(values)
+    history = [surplus(assign, values, effects, edges)]
+    for _ in range(1000):
+        moves = improving_moves(assign, values, effects, edges)
+        if not moves:
+            break
+        kind, left, right = moves[0]
+        assign = _replace(assign, left, right) if kind == "replace" else _swap(assign, left, right)
+        history.append(surplus(assign, values, effects, edges))
+    replacements, swaps = check_counts(assign, len(values))
+    return {"assignment": assign, "history": history, "replacements": replacements, "swaps": swaps}
+
+
+def _fillings(n_units, n_tenants):
+    width = min(n_units, n_tenants)
+    if width == 0:
+        yield [None] * n_units
+        return
+    for slots in itertools.combinations(range(n_units), width):
+        for tenants in itertools.permutations(range(n_tenants), width):
+            assign = [None] * n_units
+            for unit, tenant in zip(slots, tenants):
+                assign[unit] = tenant
+            yield assign
+
+
+def swap_blocks(assign, left, right, values, effects, edges):
+    """Fixed rents: both movers must strictly gain. Neighbours do not have to consent."""
+    tenant, other = assign[left], assign[right]
+    if tenant is None or other is None:
+        return False
+    before_tenant = utility(tenant, left, assign, values, effects, edges)
+    before_other = utility(other, right, assign, values, effects, edges)
+    nxt = _swap(assign, left, right)
+    return (utility(other, left, nxt, values, effects, edges) > before_other + EPS
+            and utility(tenant, right, nxt, values, effects, edges) > before_tenant + EPS)
+
+
+def replacement_blocks(assign, unit, tenant, values, effects, edges):
+    """Fixed rents: an outsider blocks when their utility at the unit beats the incumbent's."""
+    incumbent = assign[unit]
+    if incumbent is None or tenant in assign:
+        return False
+    before = utility(incumbent, unit, assign, values, effects, edges)
+    nxt = _replace(assign, unit, tenant)
+    return utility(tenant, unit, nxt, values, effects, edges) > before + EPS
+
+
+def ntu_stable(assign, values, effects, edges):
+    occupied = [unit for unit, tenant in enumerate(assign) if tenant is not None]
+    for index, left in enumerate(occupied):
+        for right in occupied[index + 1:]:
+            if swap_blocks(assign, left, right, values, effects, edges):
+                return False
+    used = {tenant for tenant in assign if tenant is not None}
+    for tenant in range(len(values)):
+        if tenant in used:
+            continue
+        for unit in occupied:
+            if replacement_blocks(assign, unit, tenant, values, effects, edges):
+                return False
+    return True
+
+
+def ntu_stable_exists(values, effects, edges):
+    n_units = len(values[0]) if values else 0
+    return any(ntu_stable(assign, values, effects, edges) for assign in _fillings(n_units, len(values)))
+
+
+def fixed_rent_note(values, effects, edges):
+    if ntu_stable_exists(values, effects, edges):
+        return ""
+    return RENT_FLEXIBILITY
+
+
+def _proof(replacements, swaps, needs_flexibility):
+    text = (
+        f"No improving move: {replacements} replacements and {swaps} swaps checked. "
+        "Neighbour effects are an uncalibrated map of this run's audience overlap "
+        "(same category cannibalises, a different category is treated as complementary footfall, "
+        "and the effect scales with the neighbour's fit); no extra Qloo call. "
+        "Units are treated as a line of neighbours, about 100 m apart or on one mall floor; "
+        "that distance is not measured. "
+        "With negotiable rent only the symmetric part of those effects changes the total. "
+        "The 2023-2024 Chicago backtest found no measurable gain, so this is not a survival forecast."
+    )
+    if needs_flexibility:
+        text += " " + RENT_FLEXIBILITY
+    return text
+
+
 def assign(units, concepts, k=1):
-    """Match up to 5 units. Returns matches, the proof line, and any blocking pairs (none when stable)."""
+    """Certificate for 3 to 5 units. k is accepted and is not a diversity cap; cannibalisation is a(t, s)."""
     units = list(units)[:MAX_UNITS]
     k = max(1, int(k))
-    if len(units) < 2 or not concepts:
-        return {"matches": [], "k": k, "blocking": [],
-                "proof": "No matching: a street needs at least two rents and one scored concept. No extra Qloo call."}
-    category = {c["id"]: c.get("category") or "other" for c in concepts}
-    unit_prefs = {}
-    for u in units:
-        ranked = sorted(concepts, key=lambda c: (CALL_RANK[_call(c, u["rent"])], -(c.get("fit") or 0), c["id"]))
-        unit_prefs[u["id"]] = [c["id"] for c in ranked]
-    concept_prefs = {}
-    for c in concepts:
-        ranked_units = sorted(units, key=lambda u: (-(c.get("fit") or 0), u["rent"], u["id"]))
-        concept_prefs[c["id"]] = [u["id"] for u in ranked_units]
-    matched = deferred_acceptance(unit_prefs, concept_prefs, category, k)
-    blocks = blocking_pairs(matched, unit_prefs, concept_prefs, category, k)
-    by_id = {c["id"]: c for c in concepts}
-    rent_of = {u["id"]: u["rent"] for u in units}
+    empty = {"matches": [], "k": k, "blocking": [], "needs_rent_flexibility": False,
+             "replacements": 0, "swaps": 0, "steps": [],
+             "proof": "No street certificate: a street needs at least three rents and one scored concept. No extra Qloo call."}
+    if len(units) < MIN_UNITS or not concepts:
+        return empty
+    values = [[standalone(concept, unit["rent"]) for unit in units] for concept in concepts]
+    effects = effect_matrix(concepts)
+    edges = line_edges(len(units))
+    found = local_search(values, effects, edges)
+    needs = fixed_rent_note(values, effects, edges) == RENT_FLEXIBILITY
     rows = []
-    for u in units:
-        cid = matched.get(u["id"])
-        concept = by_id.get(cid) if cid else None
-        rows.append({"unit": u["id"], "rent": u["rent"], "concept": cid,
-                     "verdict": _call(concept, u["rent"]) if concept else None,
-                     "category": category.get(cid) if cid else None,
+    for index, unit in enumerate(units):
+        tenant = found["assignment"][index]
+        concept = concepts[tenant] if tenant is not None else None
+        rows.append({"unit": unit["id"], "rent": unit["rent"],
+                     "concept": concept["id"] if concept else None,
+                     "verdict": _call(concept, unit["rent"]) if concept else None,
+                     "category": (concept.get("category") or "other") if concept else None,
                      "fit": concept.get("fit") if concept else None})
-    proof = ("No blocking pair under Gale and Shapley (1962), with at most "
-             f"{k} of one category on this street. Fit scores are reused from this run; no extra Qloo call. "
-             "The 2023-2024 Chicago backtest found no measurable gain, so stability is not a survival forecast."
-             if not blocks else
-             "Blocking pair remains: " + ", ".join(f"{u} with {c}" for u, c in blocks) + ".")
-    return {"matches": rows, "k": k, "blocking": [{"unit": u, "concept": c} for u, c in blocks], "proof": proof,
-            "rents": rent_of}
+    return {"matches": rows, "k": k, "blocking": [], "needs_rent_flexibility": needs,
+            "replacements": found["replacements"], "swaps": found["swaps"], "steps": found["history"],
+            "proof": _proof(found["replacements"], found["swaps"], needs),
+            "rents": {unit["id"]: unit["rent"] for unit in units}}

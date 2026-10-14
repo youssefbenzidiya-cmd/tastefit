@@ -70,5 +70,27 @@ class CommittedBatch(unittest.TestCase):
         self.assertNotIn("p=", html)
 
 
+class StreetCertificate(unittest.TestCase):
+    def outcome(self, concept="ramen"):
+        return {"matches": [{"unit": "Unit 1", "rent": 2800, "concept": concept, "fit": 80, "overlap": 70},
+                            {"unit": "Unit 2", "rent": 4200.0, "concept": "salad", "fit": 50},
+                            {"unit": "Unit 3", "rent": 5100, "concept": "coffee", "fit": 60}],
+                "replacements": 4, "swaps": 3, "needs_rent_flexibility": False,
+                "qloo": "urn:secret", "proof": "No improving move: 4 replacements and 3 swaps checked."}
+
+    def test_the_street_hash_ignores_qloo_fields_and_changes_with_the_assignment(self):
+        text = ledger.street_canonical(self.outcome())
+        self.assertNotIn("qloo", text.lower())
+        self.assertNotIn("urn", text)
+        self.assertNotIn("overlap", text)
+        self.assertNotIn("fit", text)
+        self.assertEqual(ledger.street_fingerprint(self.outcome()), ledger.street_fingerprint(self.outcome()))
+        self.assertNotEqual(ledger.street_fingerprint(self.outcome()),
+                            ledger.street_fingerprint(self.outcome("pho")))
+        entry = {"concept": "ramen", "area": "Sample", "verdict": "GO", "ts": "2026-10-14T14:00:00Z",
+                 "shortlist": [{"concept": "ramen", "verdict": "GO"}]}
+        self.assertNotIn("needs_rent_flexibility", ledger.canonical(entry))
+
+
 if __name__ == "__main__":
     unittest.main()
