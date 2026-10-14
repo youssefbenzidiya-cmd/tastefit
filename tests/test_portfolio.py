@@ -109,12 +109,29 @@ class RentSplit(unittest.TestCase):
         # The anchor at unit 0 pays less. The free-rider at unit 2 pays more. The sum is 9000.
         rents = [3000, 3000, 3000]
         contributions = [10.0, 6.0, -4.0]
-        got = portfolio.suggested_rents(rents, contributions)
+        got, scale = portfolio.suggested_rents(rents, contributions)
+        self.assertEqual(scale, portfolio.POINT_TO_RENT)
         self.assertEqual(sum(got), 9000)
         self.assertLess(got[0], 3000)
         self.assertGreater(got[2], 3000)
-        self.assertEqual(portfolio._role(10), "anchor")
-        self.assertEqual(portfolio._role(-4), "free-rider")
+        self.assertEqual(portfolio.roles_for(contributions), ["anchor", "anchor", "free-rider"])
+
+    def test_the_role_follows_the_street_average_not_the_raw_sign(self):
+        # 2 is positive, but it is below the average of 6, so that tenant pays more.
+        contributions = [2.0, 8.0, 8.0]
+        got, scale = portfolio.suggested_rents([3000, 3000, 3000], contributions)
+        self.assertEqual(scale, portfolio.POINT_TO_RENT)
+        self.assertEqual(portfolio.roles_for(contributions), ["free-rider", "anchor", "anchor"])
+        self.assertGreater(got[0], 3000)
+        self.assertLess(got[1], 3000)
+        self.assertEqual(sum(got), 9000)
+
+    def test_a_low_rent_shrinks_the_scale(self):
+        got, scale = portfolio.suggested_rents([1, 1, 1], [0.0, 0.0, 1000.0])
+        self.assertLess(scale, portfolio.POINT_TO_RENT)
+        self.assertEqual(sum(got), 3)
+        self.assertTrue(all(value > 0 for value in got))
+        self.assertIn("Shrunk to keep every rent positive.", portfolio._split_note(scale))
 
     def test_the_symmetric_part_is_what_the_contribution_uses(self):
         effects = [[0, 8, 0], [2, 0, -6], [0, -2, 0]]
@@ -144,7 +161,8 @@ class RentSplit(unittest.TestCase):
         self.assertTrue(set(roles.values()) <= {"anchor", "free-rider", "neutral"})
 
     def test_equal_contributions_leave_the_asking_rents_unchanged(self):
-        got = portfolio.suggested_rents([2800, 4200, 5100], [0.0, 0.0, 0.0])
+        got, scale = portfolio.suggested_rents([2800, 4200, 5100], [0.0, 0.0, 0.0])
+        self.assertEqual(scale, portfolio.POINT_TO_RENT)
         self.assertEqual(got, [2800.0, 4200.0, 5100.0])
 
 

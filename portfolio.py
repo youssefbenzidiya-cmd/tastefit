@@ -244,12 +244,19 @@ def ntu_stable_exists(values, effects, edges):
     return any(ntu_stable(assign, values, effects, edges) for assign in _fillings(n_units, len(values)))
 
 
-def _role(contribution):
-    if contribution > EPS:
+def _role(deviation):
+    """Above the street average pays less (anchor). Below it pays more (free-rider)."""
+    if deviation > EPS:
         return "anchor"
-    if contribution < -EPS:
+    if deviation < -EPS:
         return "free-rider"
     return "neutral"
+
+
+def roles_for(contributions):
+    occupied = [value for value in contributions if value is not None]
+    mean = sum(occupied) / len(occupied) if occupied else 0.0
+    return [None if value is None else _role(value - mean) for value in contributions]
 
 
 def neighbour_contributions(assignment, effects, edges):
@@ -279,8 +286,9 @@ def suggested_rents(rents, contributions):
     """
     cents = [int(round(float(rent) * 100)) for rent in rents]
     occupied = [i for i, value in enumerate(contributions) if value is not None]
+    unchanged = [cents[i] / 100.0 for i in range(len(cents))]
     if len(occupied) < 2:
-        return [cents[i] / 100.0 for i in range(len(cents))]
+        return unchanged, POINT_TO_RENT
     mean = sum(contributions[i] for i in occupied) / len(occupied)
     scale = POINT_TO_RENT
     for _ in range(24):
@@ -290,9 +298,9 @@ def suggested_rents(rents, contributions):
         shifts[occupied[-1]] = -sum(shifts[i] for i in occupied[:-1])
         trial = [cents[i] + shifts[i] for i in range(len(cents))]
         if all(trial[i] > 0 for i in occupied):
-            return [value / 100.0 for value in trial]
+            return [value / 100.0 for value in trial], scale
         scale /= 2.0
-    return [cents[i] / 100.0 for i in range(len(cents))]
+    return unchanged, 0.0
 
 
 def fixed_rent_note(values, effects, edges):
@@ -333,7 +341,8 @@ def assign(units, concepts, k=1):
     needs = fixed_rent_note(values, effects, edges) == RENT_FLEXIBILITY
     contributions = neighbour_contributions(found["assignment"], effects, edges)
     asking = [unit["rent"] for unit in units]
-    suggested = suggested_rents(asking, contributions)
+    suggested, applied_scale = suggested_rents(asking, contributions)
+    roles = roles_for(contributions)
     rows = []
     split_rows = []
     for index, unit in enumerate(units):
@@ -347,7 +356,7 @@ def assign(units, concepts, k=1):
         if contributions[index] is None:
             continue
         split_rows.append({"unit": unit["id"], "concept": concept["id"] if concept else None,
-                           "contribution": contributions[index], "role": _role(contributions[index]),
+                           "contribution": contributions[index], "role": roles[index],
                            "asking": float(unit["rent"]), "suggested": suggested[index]})
     return {"matches": rows, "k": k, "blocking": [], "needs_rent_flexibility": needs,
             "replacements": found["replacements"], "swaps": found["swaps"], "steps": found["history"],
@@ -356,7 +365,15 @@ def assign(units, concepts, k=1):
             "rent_split": {"label": RENT_SPLIT_LABEL, "rows": split_rows,
                            "total_asking": sum(float(rent) for rent in asking),
                            "total_suggested": sum(suggested),
-                           "note": "Each figure is the symmetric part of the neighbour effect on the tenants next door. "
-                                   "An anchor pays less and a free-rider pays more. "
-                                   "The shift is one currency unit per surplus point, recentered so the monthly total "
-                                   "stays the asking total. Fixed rents only: no interest and no discounting."}}
+                           "applied_scale": applied_scale,
+                           "note": _split_note(applied_scale)}}
+
+
+def _split_note(applied_scale):
+    note = ("Each figure is the symmetric part of the neighbour effect on the tenants next door. "
+            "An anchor is above the street average and pays less. A free-rider is below it and pays more. "
+            "The shift starts at one currency unit per surplus point and is recentered so the monthly total "
+            "stays the asking total. Fixed rents only: no interest and no discounting.")
+    if applied_scale < POINT_TO_RENT:
+        note += " Shrunk to keep every rent positive."
+    return note
