@@ -19,6 +19,9 @@ MAX_UNITS = 5
 MIN_UNITS = 3
 EPS = 1e-9
 RENT_FLEXIBILITY = "This street needs rent flexibility to settle."
+# One currency unit per surplus point per month. Stated and uncalibrated. Not a market rent.
+POINT_TO_RENT = 1.0
+RENT_SPLIT_LABEL = "suggested, uncalibrated"
 
 
 def line_edges(n):
@@ -241,6 +244,57 @@ def ntu_stable_exists(values, effects, edges):
     return any(ntu_stable(assign, values, effects, edges) for assign in _fillings(n_units, len(values)))
 
 
+def _role(contribution):
+    if contribution > EPS:
+        return "anchor"
+    if contribution < -EPS:
+        return "free-rider"
+    return "neutral"
+
+
+def neighbour_contributions(assignment, effects, edges):
+    """Symmetric part of a, summed over occupied neighbours. Positive means the tenant raises their value."""
+    sym = symmetric_part(effects)
+    out = [None] * len(assignment)
+    for unit, tenant in enumerate(assignment):
+        if tenant is None:
+            continue
+        total = 0.0
+        for left, right in edges:
+            other_unit = right if left == unit else left if right == unit else None
+            if other_unit is None:
+                continue
+            other = assignment[other_unit]
+            if other is not None:
+                total += sym[tenant][other]
+        out[unit] = total
+    return out
+
+
+def suggested_rents(rents, contributions):
+    """Fixed monthly rents. Anchors pay less, free-riders more, and the sum stays the asking total.
+
+    The shift is POINT_TO_RENT currency units per surplus point above or below the street average.
+    It shrinks if a suggested rent would not stay positive. There is no interest and no discounting.
+    """
+    cents = [int(round(float(rent) * 100)) for rent in rents]
+    occupied = [i for i, value in enumerate(contributions) if value is not None]
+    if len(occupied) < 2:
+        return [cents[i] / 100.0 for i in range(len(cents))]
+    mean = sum(contributions[i] for i in occupied) / len(occupied)
+    scale = POINT_TO_RENT
+    for _ in range(24):
+        shifts = [0] * len(cents)
+        for i in occupied[:-1]:
+            shifts[i] = int(round(-(contributions[i] - mean) * scale * 100))
+        shifts[occupied[-1]] = -sum(shifts[i] for i in occupied[:-1])
+        trial = [cents[i] + shifts[i] for i in range(len(cents))]
+        if all(trial[i] > 0 for i in occupied):
+            return [value / 100.0 for value in trial]
+        scale /= 2.0
+    return [cents[i] / 100.0 for i in range(len(cents))]
+
+
 def fixed_rent_note(values, effects, edges):
     if ntu_stable_exists(values, effects, edges):
         return ""
@@ -277,7 +331,11 @@ def assign(units, concepts, k=1):
     edges = line_edges(len(units))
     found = local_search(values, effects, edges)
     needs = fixed_rent_note(values, effects, edges) == RENT_FLEXIBILITY
+    contributions = neighbour_contributions(found["assignment"], effects, edges)
+    asking = [unit["rent"] for unit in units]
+    suggested = suggested_rents(asking, contributions)
     rows = []
+    split_rows = []
     for index, unit in enumerate(units):
         tenant = found["assignment"][index]
         concept = concepts[tenant] if tenant is not None else None
@@ -286,7 +344,19 @@ def assign(units, concepts, k=1):
                      "verdict": _call(concept, unit["rent"]) if concept else None,
                      "category": (concept.get("category") or "other") if concept else None,
                      "fit": concept.get("fit") if concept else None})
+        if contributions[index] is None:
+            continue
+        split_rows.append({"unit": unit["id"], "concept": concept["id"] if concept else None,
+                           "contribution": contributions[index], "role": _role(contributions[index]),
+                           "asking": float(unit["rent"]), "suggested": suggested[index]})
     return {"matches": rows, "k": k, "blocking": [], "needs_rent_flexibility": needs,
             "replacements": found["replacements"], "swaps": found["swaps"], "steps": found["history"],
             "proof": _proof(found["replacements"], found["swaps"], needs),
-            "rents": {unit["id"]: unit["rent"] for unit in units}}
+            "rents": {unit["id"]: unit["rent"] for unit in units},
+            "rent_split": {"label": RENT_SPLIT_LABEL, "rows": split_rows,
+                           "total_asking": sum(float(rent) for rent in asking),
+                           "total_suggested": sum(suggested),
+                           "note": "Each figure is the symmetric part of the neighbour effect on the tenants next door. "
+                                   "An anchor pays less and a free-rider pays more. "
+                                   "The shift is one currency unit per surplus point, recentered so the monthly total "
+                                   "stays the asking total. Fixed rents only: no interest and no discounting."}}
