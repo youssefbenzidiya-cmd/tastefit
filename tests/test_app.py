@@ -123,7 +123,8 @@ class Server(unittest.TestCase):
 
     def test_tenant_validates_inputs(self):
         for q in ("", "city=Chicago", "lat=41.9", "lat=x&lon=1", "lat=91&lon=0", "lat=41.9&lon=-87.6&rent=-5",
-                  "lat=41.9&lon=-87.6&rent=abc"):
+                  "lat=41.9&lon=-87.6&rent=abc", "lat=41.9&lon=-87.6&portfolio=nope",
+                  "lat=41.9&lon=-87.6&portfolio=100&k=9"):
             self.assertEqual(self.get("/tenant?" + q)[0], 400, q)
 
     def test_tenant_without_key_reports_offline(self):
@@ -134,8 +135,9 @@ class Server(unittest.TestCase):
         self.assertIn('event: error\ndata: "offline"', body)
 
     def test_tenant_streams_pipeline_events(self):
-        def fake_run(city, location, lat, lon, rent):
-            yield "unit", {"city": city, "location": location, "lat": lat, "lon": lon, "rent": rent}
+        def fake_run(city, location, lat, lon, rent, portfolio_rents=None, portfolio_k=1):
+            yield "unit", {"city": city, "location": location, "lat": lat, "lon": lon, "rent": rent,
+                           "portfolio_rents": portfolio_rents, "k": portfolio_k}
             yield "budget", {"qloo_calls": 3}
         with mock.patch.dict(os.environ, {"QLOO_API_KEY": "k"}), mock.patch.object(app.tenant, "run", fake_run):
             code, body = self.get("/tenant?city=Paris&location=Le%20Marais&rent=4000")

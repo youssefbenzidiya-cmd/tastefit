@@ -218,9 +218,34 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(400, "text/plain", b"lat and lon must both be valid coordinates")
         if rent is not None and not (0 < rent < 1e7):
             return self._send(400, "text/plain", b"rent must be a positive monthly amount")
+        extras, k = None, 1
+        raw_portfolio = arg("portfolio")
+        if raw_portfolio:
+            extras = []
+            for part in raw_portfolio.split(","):
+                part = part.strip()
+                if not part:
+                    continue
+                try:
+                    value = float(part)
+                except ValueError:
+                    return self._send(400, "text/plain", b"portfolio rents must be positive monthly amounts")
+                if not (0 < value < 1e7):
+                    return self._send(400, "text/plain", b"portfolio rents must be positive monthly amounts")
+                extras.append(value)
+            if len(extras) > 5:
+                return self._send(400, "text/plain", b"portfolio accepts at most 5 rents")
+        if arg("k"):
+            try:
+                k = int(arg("k"))
+            except ValueError:
+                return self._send(400, "text/plain", b"k must be a whole number from 1 to 5")
+            if not 1 <= k <= 5:
+                return self._send(400, "text/plain", b"k must be a whole number from 1 to 5")
         if lat is None and not (city and location):
             return self._send(400, "text/plain", b"a map point (lat, lon) or a city and location are required")
-        self._stream_agent(lambda: tenant.run(city, location or None, lat, lon, rent))
+        self._stream_agent(lambda: tenant.run(city, location or None, lat, lon, rent,
+                                               portfolio_rents=extras, portfolio_k=k))
 
     def _stream_agent(self, start):
         if not os.environ.get("QLOO_API_KEY"):

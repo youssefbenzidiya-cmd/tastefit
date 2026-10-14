@@ -21,6 +21,7 @@ import geo
 import ledger
 import llm
 import market_share
+import portfolio
 import qloo
 import scan
 import tgi
@@ -633,8 +634,13 @@ def deadline_chat(started, clock=time.monotonic, chat=None):
     return call
 
 
-def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None, today=None, clock=time.monotonic):
-    """Yields (kind, data): unit, step*, profile, candidates, shortlist, baseline, memo, budget; or error."""
+def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None, today=None, clock=time.monotonic,
+        portfolio_rents=None, portfolio_k=1):
+    """Yields (kind, data): unit, step*, profile, candidates, shortlist, baseline, memo, budget; or error.
+
+    portfolio_rents, when set, adds a Gale-Shapley match of this unit plus those rents. It reuses this run's
+    fit scores and makes no extra Qloo call.
+    """
     started = clock()
     chat_fn = chat_fn or deadline_chat(started, clock)
     today = today or datetime.date.today()
@@ -835,6 +841,18 @@ def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None,
                                      "the rent fits and taste is strong (white space, or a positive over-index in the "
                                      "run's top third by Taste Gap Index); else ADJUST. The score still ranks."
                                      if venues else "")}
+    if portfolio_rents is not None:
+        rents = []
+        if asking_rent is not None:
+            rents.append(asking_rent)
+        rents.extend(portfolio_rents)
+        concepts = [{"id": s["concept"], "category": s.get("rent_group") or "other", "fit": s.get("score"),
+                     "strong": bool(s.get("strong_taste")), "avoid": s.get("tgi_label") == "avoid",
+                     "rent_first": s.get("call_rule") == "rent-first", "rent_row": rent_of.get(s["concept"])}
+                    for s in shortlist if s.get("call") and s.get("score") is not None]
+        yield "portfolio", portfolio.assign(
+            [{"id": f"Unit {i + 1}", "rent": rent} for i, rent in enumerate(rents[:portfolio.MAX_UNITS])],
+            concepts, k=portfolio_k)
 
     try:
         base_result = base_future.result(timeout=max(1, DEADLINE - (clock() - started)))

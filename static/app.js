@@ -36,7 +36,7 @@ const ERRORS = {
 const state = {
   mode: 'broker', unit: null, phase: 'empty', tab: 'shortlist', run: null,
   steps: [], unitInfo: null, shortlist: null, baseline: null, budget: null, memo: null, scorecard: null, geo: null,
-  competitors: [], error: null, asking: null, concept: '', startedAt: 0, endedAt: 0, demo: null,
+  competitors: [], error: null, asking: null, streetRents: '', concept: '', startedAt: 0, endedAt: 0, demo: null, portfolio: null,
 };
 
 const COPY = {
@@ -243,6 +243,10 @@ function unitCardHTML(withForm) {
           <input class="input num" id="asking" name="asking" inputmode="numeric" autocomplete="off" value="${esc(state.asking ?? '')}" placeholder="e.g. 4200" aria-describedby="asking-help">
           <span class="help" id="asking-help">In the city's currency. Used to check each concept against the rent ceiling.</span>
           <span class="field-error" id="asking-err" hidden>Enter the rent as a number, for example 4200.</span></div>
+        <div class="field"><label for="street">Other rents on this street <span style="font-weight:400">(optional)</span></label>
+          <input class="input" id="street" name="street" autocomplete="off" value="${esc(state.streetRents)}" placeholder="e.g. 3800, 5100" aria-describedby="street-help">
+          <span class="help" id="street-help">Up to four more monthly rents. TasteFit matches them to this run's concepts with no extra Qloo call. At most one of each rent category.</span>
+          <span class="field-error" id="street-err" hidden>Enter monthly rents separated by commas, for example 3800, 5100.</span></div>
         <button class="btn btn-hl btn-lg btn-block" type="submit">Find tenants for this unit</button></form>`
     : `<form id="run-form" novalidate>
         <div class="field"><label for="concept">Your concept</label>
@@ -421,12 +425,19 @@ function cardHTML(c, i) {
     ${calls.length ? `<details class="card-more"><summary class="btn btn-quiet btn-sm">${icon('chev')}Evidence: ${calls.length} Qloo ${calls.length === 1 ? 'call' : 'calls'}</summary><div class="receipts">${calls.map((x, j) => receiptHTML(x, j, calls.length)).join('')}</div></details>` : ''}
   </li>`;
 }
+function portfolioHTML() {
+  const p = state.portfolio;
+  if (!p) return '';
+  const cur = state.shortlist && state.shortlist.currency;
+  const rows = (p.matches || []).map(m => `<li>${esc(m.unit)} at ${esc(money(m.rent, cur))}/month: ${m.concept ? `${esc(m.concept)} (${esc(m.verdict)})` : 'unmatched'}</li>`).join('');
+  return `<section class="compare" aria-labelledby="port-title"><h3 id="port-title">Street match</h3><p id="port-proof">${esc(p.proof)}</p>${rows ? `<ul>${rows}</ul>` : ''}</section>`;
+}
 function shortlistHTML() {
   const sl = state.shortlist, scored = sl.concepts.filter(c => c.call), rest = sl.concepts.filter(c => !c.call);
-  if (!scored.length) return `<div class="state state-warn"><h3>No concept could be scored here</h3><p>Qloo did not return enough benchmarks for this area. Try a better-known neighbourhood.</p></div>`;
+  if (!scored.length) return `<div class="state state-warn"><h3>No concept could be scored here</h3><p>Qloo did not return enough benchmarks for this area. Try a better-known neighbourhood.</p></div>${portfolioHTML()}`;
   return `<ol class="cards" aria-label="Ranked tenant shortlist">${scored.map(cardHTML).join('')}</ol>
     ${rest.length ? `<p class="unscored">Also tested: ${rest.map(c => `${esc(c.concept)}${c.position ? ` (rank ${esc(c.position)} of ${esc(c.of)})` : ''}`).join(', ')}. Only the top concepts by demand get the supply and audience checks.</p>` : ''}
-    <p class="hint-line">${esc(sl.method)}</p>`;
+    <p class="hint-line">${esc(sl.method)}</p>${portfolioHTML()}`;
 }
 const LEDGER_STATUS = { confirmed: ['status-ok', 'Confirmed'], contradicted: ['status-bad', 'Contradicted'], partly: ['status-mid', 'Partly'], 'not tested': ['status-none', 'Not tested'], excluded: ['status-none', 'Excluded'] };
 const VENUE_STATUS = { exists: ['status-ok', 'Found in OSM'], ambiguous: ['status-mid', 'Ambiguous'], 'not found': ['status-none', 'Not found in OSM'] };
@@ -573,6 +584,7 @@ const HANDLERS = {
   },
   candidates: d => pushTraceRow('candidates', { kind: d.source === 'catalog' ? 'local' : 'llm', out: (d.source === 'catalog' ? 'From the built-in catalog (no model available): ' : '') + d.concepts.map(c => c.concept).join(', ') + '. Alcohol-led concepts excluded.' }),
   shortlist: d => { state.shortlist = d; drawHeat(d.heat); pushTraceRow('score', { kind: 'local', out: `${d.concepts.filter(c => c.call).length} concepts scored${d.currency ? ', rent joined from the City Scan model' : ''}` }); },
+  portfolio: d => { state.portfolio = d; pushTraceRow('score', { kind: 'local', out: d.proof }); },
   baseline: d => { state.baseline = d; pushTraceRow('baseline', { kind: 'llm', out: d.unavailable ? 'No answer in time' : `${d.candidates.length} picks, checked against this run's evidence` }); },
   geo: g => { state.geo = g; drawFounderGeo(g); },
   scorecard: d => { state.scorecard = d; },
@@ -604,7 +616,7 @@ function drawFounderGeo(g) {
 let clockTimer;
 function resetRun() {
   if (state.run) { state.run.stopped = true; state.run.ctrl.abort(); }
-  Object.assign(state, { phase: state.unit ? 'selected' : 'empty', run: null, steps: [], unitInfo: null, shortlist: null, baseline: null, budget: null, memo: null, scorecard: null, geo: null, competitors: [], error: null, demo: null, tab: 'shortlist', endedAt: 0 });
+  Object.assign(state, { phase: state.unit ? 'selected' : 'empty', run: null, steps: [], unitInfo: null, shortlist: null, portfolio: null, baseline: null, budget: null, memo: null, scorecard: null, geo: null, competitors: [], error: null, demo: null, tab: 'shortlist', endedAt: 0 });
   clearInterval(clockTimer);
   if (layerHeat) layerHeat.clearLayers();
 }
@@ -642,8 +654,14 @@ async function startRun({ demo } = {}) {
     const raw = $('#asking').value.replace(/[\s,€$]/g, '');
     if (raw && !(+raw > 0)) return invalid('asking');
     state.asking = raw ? +raw : null;
+    const streetRaw = $('#street').value.trim();
+    const extras = streetRaw ? streetRaw.split(',').map(s => s.replace(/[\s€$]/g, '')).filter(Boolean) : [];
+    if (extras.some(s => !(+s > 0))) return invalid('street');
+    state.streetRents = streetRaw;
     const q = { lat: state.unit.lat.toFixed(6), lon: state.unit.lon.toFixed(6) };
     if (state.asking) q.rent = String(state.asking);
+    const rents = [...(state.asking ? [state.asking] : []), ...extras.map(Number)];
+    if (rents.length >= 2) q.portfolio = extras.join(',');
     url = '/tenant?' + new URLSearchParams(q);
   } else {
     const c = $('#concept').value.trim(), loc = $('#location').value.trim();
@@ -653,7 +671,7 @@ async function startRun({ demo } = {}) {
     url = '/run?' + new URLSearchParams({ concept: c, location: loc });
   }
   const run = { stopped: false, ctrl: new AbortController() };
-  Object.assign(state, { run, phase: 'running', steps: [], startedAt: Date.now(), endedAt: 0, error: null });
+  Object.assign(state, { run, phase: 'running', steps: [], portfolio: null, startedAt: Date.now(), endedAt: 0, error: null });
   clearInterval(clockTimer);
   clockTimer = setInterval(() => { const el = $('#clock'); if (el) { const t = Math.round((Date.now() - state.startedAt) / 1000); el.textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; } }, 1000);
   paintRun();
