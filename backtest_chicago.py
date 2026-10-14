@@ -30,6 +30,7 @@ import time
 import urllib.parse
 import urllib.request
 
+import backtest_bias
 import qloo
 import tenant
 import tgi
@@ -339,10 +340,30 @@ def main(argv=None):
     ap.add_argument("--json")
     ap.add_argument("--no-llm", action="store_true")
     ap.add_argument("--food", help="OSM food-venue snapshot from before the window (tgi.py build chicago 2023-01-01 OUT)")
+    ap.add_argument("--public-only", action="store_true",
+                    help="Chicago register only: IPW and conformal on the citywide share. No Qloo call.")
     args = ap.parse_args(argv)
 
     opened, alive = load_register()
     table = outcomes(opened, alive)
+    if args.public_only:
+        orders = {"prior": {a[0]: prior_order(table, a[0]) for a in AREAS}}
+        areas = common_areas(table, orders)
+        result = {
+            "window": WINDOW, "survival_seen": SURVIVAL_SEEN, "openings": len(opened),
+            "classified": sum(classify(o["name"]) is not None for o in opened.values()),
+            "heckman": backtest_bias.heckman(),
+            "areas_scored": areas,
+            "methods": backtest_bias.add_ipw(score(table, orders), table, orders, areas),
+            "conformal": backtest_bias.split_conformal(backtest_bias.prior_pairs(table, CONCEPTS)),
+            "qloo_calls": 0,
+        }
+        text = json.dumps(result, indent=1)
+        print(text)
+        if args.json:
+            with open(args.json, "w") as f:
+                f.write(text + "\n")
+        return
     led = tenant.Ledger(budget=45)
     q_orders, n_bench, q_failures, overindex = qloo_orders(AREAS, led, city_rank=bool(args.food))
     orders = {"qloo": q_orders, "prior": {a[0]: prior_order(table, a[0]) for a in AREAS}}
