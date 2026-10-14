@@ -257,7 +257,8 @@ def _proof(replacements, swaps, needs_flexibility):
         "that distance is not measured. "
         "With negotiable rent only the symmetric part of those effects changes the total. "
         "The 2023-2024 Chicago backtest found no measurable gain, so this is not a survival forecast. "
-        "Empty units are not part of those checks: this search does not move a tenant into a vacant unit."
+        "Empty units are not part of those checks: this search does not move a tenant into a vacant unit. "
+        "Only the concepts that received an audience-overlap check carry a neighbour effect, and a run checks at most two, so other concepts contribute 0."
     )
     if needs_flexibility:
         text += " " + RENT_FLEXIBILITY

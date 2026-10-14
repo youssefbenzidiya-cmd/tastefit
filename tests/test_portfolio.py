@@ -83,6 +83,7 @@ class Certificate(unittest.TestCase):
         self.assertIn("uncalibrated", out["proof"])
         self.assertIn("no measurable gain", out["proof"])
         self.assertIn("does not move a tenant into a vacant unit", out["proof"])
+        self.assertIn("at most two", out["proof"])
         self.assertNotIn("This street needs rent flexibility to settle.", out["proof"])
         with mock.patch("portfolio.ntu_stable_exists", return_value=False):
             flagged = portfolio.assign(units, concepts, k=1)
