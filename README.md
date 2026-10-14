@@ -143,6 +143,7 @@ Three additions turn the evidence into a decision. None of them uses an extra Ql
   - A check is shown only when its value exceeds twice a noise floor, measured with a random input.
   - The figures are monthly, with no discounting and no interest.
   - They come from TasteFit's stated assumptions, not the user's own numbers. For example, a Chicago restaurant at 6,000/month: covers per day dominates.
+- **Prediction fingerprint.** Every memo ends with the SHA-256 of the concept, the area, the shortlist verdicts and the UTC time. The hash does not cover Qloo payloads. Committed batches are on `/ledger` (`data/ledger.json`). The pre-registered score is the Brier score (Brier 1950): the mean of (p - o) squared, where p would be the fit score divided by 100 (not a calibrated probability of opening) and o is 1 only when a new Chicago food licence matching the frozen keyword appears before the check date. Skill is the Brier score of one constant citywide rate, computed on the check date from the same public file, minus TasteFit's Brier score. The 2023-2024 backtest found no measurable gain, so a negative skill score stays a possible result. The Chicago batch registered on 2026-10-14 has verdict `unscored`: the rank call returned a rate limit, so no fit score and no probability were published, and the Brier score is not defined for that batch. The registered point is a map point, not a vetted address.
 
 ### Limits
 
