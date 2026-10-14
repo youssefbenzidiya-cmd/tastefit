@@ -31,6 +31,27 @@ class Page(unittest.TestCase):
         self.assertIn("A &amp; B", html)
         self.assertIn("29%", html)
 
+    def test_no_gain_is_the_committed_interval(self):
+        html = evidence.page()
+        self.assertIn("Qloo's top-3 hit rate is 29%", html)
+        self.assertIn("citywide baseline is 68%", html)
+        self.assertIn("\u221266 to \u22124 points", html)
+        self.assertIn("\u221236 to \u22126 points", html)
+
+    def test_a_positive_interval_is_not_called_no_gain(self):
+        html = evidence.page(
+            chicago={"methods": {"qloo": {"hit_at_k": 0.8}, "prior": {"hit_at_k": 0.4}},
+                     "qloo_minus_prior_ci90": [0.1, 0.5]},
+            tgi={"methods": {"qloo": {"hit_at_k": 0.8, "spearman": 0, "survivors": 1},
+                             "prior": {"hit_at_k": 0.4, "spearman": 0, "survivors": 1},
+                             "tgi": {"hit_at_k": 0.9, "spearman": 0, "survivors": 1}},
+                  "tgi_minus_prior_ci90": [0.2, 0.6]},
+            bias={},
+            ledger_doc={"batches": [{}]},
+        )
+        self.assertNotIn("No measurable gain", html)
+        self.assertIn("do not support a gain claim", html)
+
 
 if __name__ == "__main__":
     unittest.main()

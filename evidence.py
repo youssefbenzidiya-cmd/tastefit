@@ -32,6 +32,58 @@ def _pct(value):
     return f"{round(100 * value)}%"
 
 
+def _rate(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _interval_below_zero(interval):
+    if not isinstance(interval, (list, tuple)) or len(interval) != 2:
+        return False
+    lo, hi = interval
+    return _rate(lo) and _rate(hi) and hi < 0
+
+
+def _signed_points(value):
+    points = round(100 * value)
+    if points < 0:
+        return f"\u2212{abs(points)}"
+    if points > 0:
+        return f"+{points}"
+    return "0"
+
+
+def _span(interval):
+    return f"{_signed_points(interval[0])} to {_signed_points(interval[1])} points"
+
+
+def _comparison(source, chicago):
+    """The gain sentence is true only when the committed rates and intervals say so."""
+    methods = (source or {}).get("methods") or {}
+    qloo = (methods.get("qloo") or {}).get("hit_at_k")
+    prior = (methods.get("prior") or {}).get("hit_at_k")
+    tgi_hit = (methods.get("tgi") or {}).get("hit_at_k")
+    q_ci = None
+    for doc in (chicago, source):
+        if isinstance(doc, dict) and doc.get("qloo_minus_prior_ci90") is not None:
+            q_ci = doc.get("qloo_minus_prior_ci90")
+            break
+    t_ci = source.get("tgi_minus_prior_ci90") if isinstance(source, dict) else None
+    qloo_below = _rate(qloo) and _rate(prior) and qloo < prior and _interval_below_zero(q_ci)
+    tgi_known = _rate(tgi_hit)
+    tgi_below = tgi_known and _rate(prior) and tgi_hit < prior and _interval_below_zero(t_ci)
+    tail = (" Read both as taste and supply evidence, not as a survival forecast. "
+            "Qloo describes today's taste, after these places opened.")
+    if qloo_below and (not tgi_known or tgi_below):
+        text = (f"No measurable gain. Qloo's top-3 hit rate is {_pct(qloo)} and the citywide baseline "
+                f"is {_pct(prior)}. The 90% interval for Qloo minus that baseline, {_span(q_ci)}, "
+                "stays below zero.")
+        if tgi_below:
+            text += (f" The Taste Gap Index hit rate is {_pct(tgi_hit)}. Its 90% interval versus the "
+                     f"baseline, {_span(t_ci)}, stays below zero.")
+        return text + tail, True
+    return ("The committed hit rates and intervals do not support a gain claim." + tail), False
+
+
 def _table(doc):
     methods = (doc or {}).get("methods") or {}
     rows = []
@@ -55,6 +107,7 @@ def page(chicago=None, tgi=None, bias=None, ledger_doc=None):
     bias = _load("backtest_bias.json") if bias is None else bias
     ledger_doc = _load("data/ledger.json") if ledger_doc is None else ledger_doc
     source = tgi or chicago or {}
+    comparison, no_gain = _comparison(source, chicago if isinstance(chicago, dict) else source)
     heckman = (bias or {}).get("heckman") or {}
     prior = ((bias or {}).get("methods") or {}).get("prior") or {}
     conformal = (bias or {}).get("conformal") or {}
@@ -77,12 +130,9 @@ ordering. The Qloo-minus-baseline difference has a 90% bootstrap interval of """
         diff_text,
         ".</p>",
         _table(source),
-        """
-<p>No measurable gain. Qloo's rank did not beat the citywide baseline. The Taste Gap Index did not either.
-Read both as taste and supply evidence, not as a survival forecast. Qloo describes today's taste, after
-these places opened.</p>
-<h2>Survivorship and intervals</h2>
-<p>""",
+        "<p>",
+        comparison,
+        "</p><h2>Survivorship and intervals</h2><p>",
         reason,
         "</p><p>Inverse-probability weights (Horvitz and Thompson 1952) on a later register pull with no Qloo call: "
         "citywide top-3 hit rate ",
@@ -139,7 +189,9 @@ beyond the hackathon keys already in the environment.</p>
 <li>The suggested spot is a block to scout, not a vetted address.</li>
 <li>Rent ceilings are a survival model for Paris and Chicago, not a forecast. No discounting and no interest.</li>
 <li>A run stops itself at 230 seconds so the memo arrives inside the host's 300 second limit, and it makes at most 25 Qloo calls.</li>
-<li>The Chicago backtest found no measurable gain. The conformal interval does not narrow that.</li>
+<li>""" + ("The Chicago backtest found no measurable gain. The conformal interval does not narrow that."
+          if no_gain else
+          "The Chicago table above is the comparison. The conformal interval does not add a gain the table does not show.") + """</li>
 </ul>
 </main></body></html>
 """,
