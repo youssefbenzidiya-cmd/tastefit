@@ -296,7 +296,7 @@ const scanError = e => e instanceof TypeError ? 'Could not reach TasteFit. Check
 const scanAttr = d => d.attribution ? '<p class="scan-attr">' + esc(d.attribution) + '</p>' : '';
 
 function scanHTML(d) {
-  if (d.data_thin) return '<div class="state state-warn"><h3>Not enough map data for ' + esc(d.city) + '</h3><p>' + esc(d.reason) + '</p></div>' + scanAttr(d);
+  if (d.data_thin) return '<div class="state state-warn"><h3>Not enough map data for ' + esc(d.city) + '</h3><p>' + esc(d.reason) + '</p></div>' + shareHTML(d) + scanAttr(d);
   const cells = d.top.map((t, i) => {
     const plain = s => s && s.replace(/^[+-]?\d+(\.\d+)?:\s*/, '');
     const o = t.opportunity || {}, why = plain((t.reasons_en || [])[0]), watch = plain((t.watch_out_en || [])[0]);
@@ -309,15 +309,18 @@ function scanHTML(d) {
     '<ol class="cells">' + cells + '</ol>' + scanAttr(d);
 }
 
+function shareHTML(u) {
+  return u.market_share && u.market_share.note ? '<p class="scan-attr">' + esc(u.market_share.note) + '</p>' : '';
+}
 function rentHTML(u) {
-  if (u.data_thin) return '<p class="scan-attr">' + esc(u.reason) + '</p>';
-  if (!u.rent_ceiling) return '<p class="scan-attr">' + esc(u.note) + '</p>';
+  if (u.data_thin) return '<p class="scan-attr">' + esc(u.reason) + '</p>' + shareHTML(u);
+  if (!u.rent_ceiling) return '<p class="scan-attr">' + esc(u.note) + '</p>' + shareHTML(u);
   const money = new Intl.NumberFormat('en', { style: 'currency', currency: u.currency, maximumFractionDigits: 0 });
   return '<table class="rent-table"><tr><th>Tenant type</th><th>Max monthly rent</th><th>90% interval</th></tr>' +
     u.rent_ceiling.map(r => '<tr><th scope="row">' + esc(r.label_en) + '</th>' + (r.rent_max == null
       ? '<td colspan="2">' + esc(r.note || 'Not viable at any rent here.') + '</td>'
       : '<td><b>' + esc(money.format(r.rent_max)) + '</b></td><td>' + (r.ci90 ? esc(money.format(r.ci90[0])) + ' to ' + esc(money.format(r.ci90[1])) : '–') + '</td>') + '</tr>').join('') +
-    '</table><p class="scan-attr">' + esc(u.note) + '</p>';
+    '</table><p class="scan-attr">' + esc(u.note) + '</p>' + shareHTML(u);
 }
 
 async function rentCeiling(btn) {

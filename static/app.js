@@ -158,10 +158,14 @@ function nearestScanCity() {
   const [slug, d] = Object.entries(SCAN_CITIES).map(([k, [la, lo]]) => [k, map.distance(c, [la, lo])]).sort((a, b) => a[1] - b[1])[0];
   return d < 60000 ? slug : null;
 }
+function shareNote(m) {
+  return m && m.note ? `<p class="hint-line">${esc(m.note)}</p>` : '';
+}
 function rentTable(u) {
-  if (!u.rent_ceiling) return `<p>${esc(u.note || u.reason || 'No rent ceiling for this cell.')}</p>`;
+  const share = shareNote(u.market_share);
+  if (!u.rent_ceiling) return `<p>${esc(u.note || u.reason || 'No rent ceiling for this cell.')}</p>${share}`;
   return `<table><tr><th>Tenant type</th><th>Max monthly rent</th></tr>${u.rent_ceiling.map(r => `<tr><td>${esc(r.label_en)}</td><td>${r.rent_max == null ? esc(r.note || 'Not viable') : esc(money(r.rent_max, u.currency))}</td></tr>`).join('')}</table>
-    <p style="margin:8px 0 0;font-size:12px">${esc(u.note || '')}</p>`;
+    <p style="margin:8px 0 0;font-size:12px">${esc(u.note || '')}</p>${share}`;
 }
 async function loadScan() {
   const slug = nearestScanCity(), concept = $('#scan-concept') ? $('#scan-concept').value : 'specialty coffee';
@@ -227,7 +231,7 @@ function emptyHTML() {
 function unitFactsHTML() {
   const i = state.unitInfo;
   const city = i ? `<span><b>${esc(i.city || '')}</b>${i.currency ? ', rent ceiling calibrated' : ', no rent ceiling'}</span>` : '';
-  return `<div class="unit-facts">${city}${state.mode === 'broker' && state.phase !== 'selected' && state.asking ? `<span>Asking <b>${esc(money(state.asking, i && i.currency))}</b> a month</span>` : ''}</div>`;
+  return `<div class="unit-facts">${city}${state.mode === 'broker' && state.phase !== 'selected' && state.asking ? `<span>Asking <b>${esc(money(state.asking, i && i.currency))}</b> a month</span>` : ''}</div>${shareNote(i && i.market_share)}`;
 }
 
 function unitCardHTML(withForm) {
