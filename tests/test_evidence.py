@@ -18,6 +18,8 @@ class Page(unittest.TestCase):
         self.assertIn("$0", html)
         self.assertIn("not a vetted address", html)
         self.assertIn("Vovk", html)
+        self.assertIn("Test before you lease", html)
+        self.assertIn("no interest and no discounting", html)
 
     def test_values_are_escaped(self):
         html = evidence.page(
