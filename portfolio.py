@@ -396,6 +396,35 @@ def _finite_score(value, name):
     return value
 
 
+def _clean_rent_row(raw):
+    """A bad ceiling must be a 400, not a KeyError inside the rent-first shift."""
+    if not isinstance(raw, dict):
+        return None
+    row = {"viable": bool(raw.get("viable"))}
+    if raw.get("rent_max") is not None:
+        try:
+            rent_max = float(raw.get("rent_max"))
+        except (TypeError, ValueError, OverflowError):
+            raise ValueError("rent_row.rent_max must be a finite number") from None
+        if not math.isfinite(rent_max):
+            raise ValueError("rent_row.rent_max must be a finite number")
+        row["rent_max"] = rent_max
+    elif row["viable"]:
+        raise ValueError("a viable rent_row needs rent_max")
+    ci = raw.get("ci90")
+    if ci is not None:
+        if not isinstance(ci, (list, tuple)) or len(ci) != 2:
+            raise ValueError("rent_row.ci90 must be two numbers")
+        try:
+            lo, hi = float(ci[0]), float(ci[1])
+        except (TypeError, ValueError, OverflowError):
+            raise ValueError("rent_row.ci90 must be two numbers") from None
+        if not (math.isfinite(lo) and math.isfinite(hi)):
+            raise ValueError("rent_row.ci90 must be two numbers")
+        row["ci90"] = [lo, hi]
+    return row
+
+
 def _clean_concept(raw):
     if not isinstance(raw, dict):
         raise ValueError("each concept needs an id")
@@ -409,7 +438,7 @@ def _clean_concept(raw):
             overlap = _finite_score(float(overlap), "overlap")
         except (TypeError, ValueError, OverflowError):
             raise ValueError("overlap must be a finite number from 0 to 100") from None
-    rent_row = raw.get("rent_row") if isinstance(raw.get("rent_row"), dict) else None
+    rent_row = _clean_rent_row(raw.get("rent_row")) if isinstance(raw.get("rent_row"), dict) else None
     return {"id": _clean_name(raw.get("id")), "category": str(raw.get("category") or "other")[:40],
             "fit": fit, "overlap": overlap, "strong": bool(raw.get("strong")), "avoid": bool(raw.get("avoid")),
             "rent_first": bool(raw.get("rent_first")), "rent_row": rent_row}

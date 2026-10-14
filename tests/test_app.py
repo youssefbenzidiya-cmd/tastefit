@@ -242,6 +242,18 @@ class Server(unittest.TestCase):
         code, body = self.get("/street?payload=" + urllib.parse.quote(huge))
         self.assertEqual(code, 400)
         self.assertNotIn("Traceback", body)
+        for rent_row in ({"viable": True}, {"viable": True, "rent_max": 2800, "ci90": "nope"}):
+            raw = json.dumps({"units": units, "concepts": [{"id": "ramen", "fit": 80, "overlap": 10,
+                                                            "rent_row": rent_row}], "add": "noodles"})
+            code, body = self.get("/street?payload=" + urllib.parse.quote(raw))
+            self.assertEqual(code, 400, rent_row)
+            self.assertNotIn("Traceback", body)
+        good = json.dumps({"units": units, "concepts": [{"id": "ramen", "fit": 80, "overlap": 10,
+                                                         "rent_row": {"viable": True, "rent_max": 2800,
+                                                                      "ci90": [2000, 3200]}}],
+                           "add": "noodles"})
+        code, body = self.get("/street?payload=" + urllib.parse.quote(good))
+        self.assertEqual(code, 200)
 
     def test_wrong_methods_get_plain_405(self):
         for method, path, allow in (("POST", "/", "GET, HEAD"), ("DELETE", "/health", "GET, HEAD"),
