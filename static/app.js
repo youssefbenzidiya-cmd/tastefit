@@ -511,13 +511,18 @@ function compareHTML() {
       ${venues}
     </div></section>`;
 }
+function trialHTML() {
+  const t = state.shortlist && state.shortlist.trial;
+  if (!t || !t.sentence) return '';
+  return `<p class="hint-line"><b>Test before you lease.</b> ${esc(t.sentence)}</p>`;
+}
 function leadHTML() {
   const top = state.shortlist.concepts.find(c => c.call);
   if (!top) return '';
   return `<section class="lead" aria-labelledby="lead-title"><div class="lead-row">${badge(top.call, 'badge-lg')}<span class="num" style="font-weight:700">${esc(top.score)}/100</span></div>
     <h3 id="lead-title">${esc(top.concept)} leads the shortlist for this unit.</h3>
     <p>Rank ${esc(top.position)} of ${esc(top.of)} for the ${esc(state.shortlist.area)} audience${top.local_supply != null ? `, ${esc(top.local_supply)} similar places nearby` : ''}${top.trend ? `, interest ${top.trend.change >= 3 ? 'rising' : top.trend.change <= -3 ? 'fading' : 'steady'}` : ''}. ${esc(top.rent_note)} ${esc(top.adjust_note || '')}</p>
-    ${voiHTML(state.shortlist.voi)}</section>`;
+    ${voiHTML(state.shortlist.voi)}${trialHTML()}</section>`;
 }
 function voiHTML(v) {
   const top = v && v.checks.filter(c => c.above_noise);

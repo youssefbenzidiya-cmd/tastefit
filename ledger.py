@@ -104,6 +104,34 @@ def street_fingerprint(outcome):
     return hashlib.sha256(street_canonical(outcome).encode("utf-8")).hexdigest()
 
 
+def _num(value):
+    number = float(value)
+    return int(number) if number.is_integer() else number
+
+
+def trial_canonical(plan):
+    """Pop-up plan. Separate from the five-field prediction fingerprint."""
+    payload = {"area": plan["area"], "check": plan["check"], "concept": plan["concept"],
+               "direction": plan["direction"], "rent": _num(plan["rent"]),
+               "threshold": _num(plan["threshold"]), "ts": plan["ts"], "weeks": int(plan["weeks"])}
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def trial_fingerprint(plan):
+    return hashlib.sha256(trial_canonical(plan).encode("utf-8")).hexdigest()
+
+
+def trial_outcome_canonical(outcome):
+    """What is hashed when the pop-up ends. observed is the measured check, not a Qloo score."""
+    payload = {"cleared": bool(outcome["cleared"]), "observed": _num(outcome["observed"]),
+               "plan_sha256": outcome["plan_sha256"], "weeks_run": int(outcome["weeks_run"])}
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def trial_outcome_fingerprint(outcome):
+    return hashlib.sha256(trial_outcome_canonical(outcome).encode("utf-8")).hexdigest()
+
+
 def street_line(outcome):
     return ("- Street certificate `" + street_fingerprint(outcome) + "` "
             "(SHA-256 of the unit ids, the rents, the assigned concepts, the moves checked "
