@@ -169,11 +169,12 @@ and the UTC time. No Qloo payload is stored. The committed Chicago batch is """,
         """. The first listed concept is not a ranking. No probability was registered, so the Brier score
 (Brier 1950) is not defined for that batch. A later scored batch would be a new fingerprint.</p>
 <h2>Street match</h2>
-<p>Baseline: ignores neighbours. When a run has at least two monthly rents, Gale and Shapley (1962) match up to five units to the concepts
-already scored in that run. Landlords rank by the rent-first verdict, then fit. Tenants rank by fit, then a
-lower rent. At most one concept of each rent category is matched unless the request sets k from 1 to 5.
-The page states when there is no blocking pair. The match makes no extra Qloo call. Stability is not a
-survival forecast.</p>
+<p>With 3 to 5 monthly rents, Stable Street certifies a mix from the concepts already scored in that run.
+Stand-alone value is this run's fit plus a rent-first shift. Neighbour effects are an uncalibrated map of
+audience overlap already in the run. The page states when no replacement or swap raises the surplus, and
+when fixed rents have no stable assignment. No extra Qloo call. The certificate is not a survival forecast.
+Baseline: ignores neighbours. Gale and Shapley (1962) matched on fit and the rent-first verdict and did not
+use neighbour effects.</p>
 <h2>Call it from an agent</h2>
 <p>The MCP server is <code>mcp_server.py</code> on stdio. Nothing is written to disk. The snippet below is the
 client shape. This change does not add a step-by-step client guide.</p>

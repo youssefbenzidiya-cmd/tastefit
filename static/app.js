@@ -36,7 +36,7 @@ const ERRORS = {
 const state = {
   mode: 'broker', unit: null, phase: 'empty', tab: 'shortlist', run: null,
   steps: [], unitInfo: null, shortlist: null, baseline: null, budget: null, memo: null, scorecard: null, geo: null,
-  competitors: [], error: null, asking: null, streetRents: '', concept: '', startedAt: 0, endedAt: 0, demo: null, portfolio: null,
+  competitors: [], error: null, asking: null, streetRents: '', streetShort: false, concept: '', startedAt: 0, endedAt: 0, demo: null, portfolio: null,
 };
 
 const COPY = {
@@ -245,7 +245,7 @@ function unitCardHTML(withForm) {
           <span class="field-error" id="asking-err" hidden>Enter the rent as a number, for example 4200.</span></div>
         <div class="field"><label for="street">Other rents on this street <span style="font-weight:400">(optional)</span></label>
           <input class="input" id="street" name="street" autocomplete="off" value="${esc(state.streetRents)}" placeholder="e.g. 3800, 5100" aria-describedby="street-help">
-          <span class="help" id="street-help">Up to four more monthly rents. TasteFit matches them to this run's concepts with no extra Qloo call. At most one of each rent category.</span>
+          <span class="help" id="street-help">Other monthly rents on this street, comma-separated. Stable Street needs 3 to 5 rents in total and reuses this run's concepts. No extra Qloo call.</span>
           <span class="field-error" id="street-err" hidden>Enter monthly rents separated by commas, for example 3800, 5100.</span></div>
         <button class="btn btn-hl btn-lg btn-block" type="submit">Find tenants for this unit</button></form>`
     : `<form id="run-form" novalidate>
@@ -427,10 +427,11 @@ function cardHTML(c, i) {
 }
 function portfolioHTML() {
   const p = state.portfolio;
+  if (!p && state.streetShort) return `<section class="compare" aria-labelledby="port-title"><h3 id="port-title">Stable Street</h3><p id="port-proof">A street certificate needs 3 to 5 rents in total. This run had fewer, so no certificate was computed. No extra Qloo call.</p></section>`;
   if (!p) return '';
   const cur = state.shortlist && state.shortlist.currency;
   const rows = (p.matches || []).map(m => `<li>${esc(m.unit)} at ${esc(money(m.rent, cur))}/month: ${m.concept ? `${esc(m.concept)} (${esc(m.verdict)})` : 'unmatched'}</li>`).join('');
-  return `<section class="compare" aria-labelledby="port-title"><h3 id="port-title">Baseline: ignores neighbours</h3><p id="port-proof">${esc(p.proof)}</p>${rows ? `<ul>${rows}</ul>` : ''}</section>`;
+  return `<section class="compare" aria-labelledby="port-title"><h3 id="port-title">Stable Street</h3><p id="port-proof">${esc(p.proof)}</p>${rows ? `<ul>${rows}</ul>` : ''}</section>`;
 }
 function shortlistHTML() {
   const sl = state.shortlist, scored = sl.concepts.filter(c => c.call), rest = sl.concepts.filter(c => !c.call);
@@ -616,7 +617,7 @@ function drawFounderGeo(g) {
 let clockTimer;
 function resetRun() {
   if (state.run) { state.run.stopped = true; state.run.ctrl.abort(); }
-  Object.assign(state, { phase: state.unit ? 'selected' : 'empty', run: null, steps: [], unitInfo: null, shortlist: null, portfolio: null, baseline: null, budget: null, memo: null, scorecard: null, geo: null, competitors: [], error: null, demo: null, tab: 'shortlist', endedAt: 0 });
+  Object.assign(state, { phase: state.unit ? 'selected' : 'empty', run: null, steps: [], unitInfo: null, shortlist: null, portfolio: null, streetShort: false, baseline: null, budget: null, memo: null, scorecard: null, geo: null, competitors: [], error: null, demo: null, tab: 'shortlist', endedAt: 0 });
   clearInterval(clockTimer);
   if (layerHeat) layerHeat.clearLayers();
 }
@@ -661,7 +662,8 @@ async function startRun({ demo } = {}) {
     const q = { lat: state.unit.lat.toFixed(6), lon: state.unit.lon.toFixed(6) };
     if (state.asking) q.rent = String(state.asking);
     const rents = [...(state.asking ? [state.asking] : []), ...extras.map(Number)];
-    if (rents.length >= 2) q.portfolio = extras.join(',');
+    state.streetShort = Boolean(streetRaw) && rents.length < 3;
+    if (rents.length >= 3) q.portfolio = extras.join(',');
     url = '/tenant?' + new URLSearchParams(q);
   } else {
     const c = $('#concept').value.trim(), loc = $('#location').value.trim();
