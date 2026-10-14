@@ -1,0 +1,50 @@
+{
+ "window": [
+  "2023-01-01",
+  "2024-12-31"
+ ],
+ "survival_seen": "2025-04-01",
+ "openings": 1751,
+ "classified": 200,
+ "heckman": {
+  "identified": false,
+  "reason": "Not identified. Heckman (1979) needs an exclusion restriction, and the Chicago inspections file has none: closing, a missing re-inspection, and a keyword miss are not separable from the survival outcome, and applications that never opened are not in the file."
+ },
+ "areas_scored": [
+  "Wicker Park",
+  "Logan Square",
+  "Lincoln Park",
+  "West Loop",
+  "Hyde Park",
+  "Andersonville",
+  "Lakeview",
+  "Bridgeport",
+  "Uptown",
+  "River North"
+ ],
+ "methods": {
+  "prior": {
+   "areas": 10,
+   "hit_at_k": 0.686,
+   "survivors": 35,
+   "survival_top": 0.462,
+   "opened_top": 52,
+   "survival_rest": 0.5,
+   "opened_rest": 22,
+   "spearman": 0.327,
+   "ipw_hit_at_k": 0.766,
+   "ipw_openings": 64.0,
+   "dropped_for_positivity": 10
+  }
+ },
+ "conformal": {
+  "alpha": 0.1,
+  "n_cal": 17,
+  "n_test": 18,
+  "quantile": 1.0,
+  "coverage": 1.0,
+  "mean_width": 2.0,
+  "note": "Split conformal interval (Vovk, Gammerman and Shafer 2005) around the leave-one-area citywide survivor share. This is not an interval for a stored Qloo fit score."
+ },
+ "qloo_calls": 0
+}
