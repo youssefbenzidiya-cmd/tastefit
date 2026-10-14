@@ -4,9 +4,13 @@ TasteFit's MCP server is `mcp_server.py`. It speaks newline-delimited JSON-RPC o
 The process is local. It reads `QLOO_API_KEY` from the environment you set in the client. It does not
 write Qloo responses to disk.
 
-A `tenant_match` call runs the same pipeline as the website: at most 25 Qloo calls, and the process
-stops itself at 230 seconds so it finishes inside a 300 second host limit. `city_scan` and
+A `tenant_match` call runs the same pipeline as the website: at most 25 Qloo calls. At 230 seconds,
+later LLM calls are cut short so the memo can still finish inside a 300 second host limit. The
+process is not killed, and a Qloo call already started is not cancelled. `city_scan` and
 `city_scan_unit` read the committed City Scan packs and make no Qloo call.
+
+The client's chat can keep the tool JSON after the call. TasteFit does not write that JSON to disk.
+Do not paste it into the repository.
 
 ## 1. Check the server before the client
 
@@ -85,8 +89,9 @@ section stays. The fingerprint in the memo is a hash, not a promise that the for
 ## 3. Cursor
 
 Open Cursor Settings, then MCP. Add a server with the same command, args and env as the JSON above.
-Or put the same `mcpServers` object in the project's `.cursor/mcp.json` if you keep secrets out of
-git: prefer the user-level MCP config, and do not commit the key.
+Put that config in your user-level MCP settings. Do not put `QLOO_API_KEY` in the project's
+`.cursor/mcp.json`. That path is gitignored so a local copy is not committed. The key still belongs
+in the user-level config or the client's environment, never in the repository.
 
 In a chat, Agent mode, ask the same `city_scan` sentence first. Then the `tenant_match` sentence.
 Cursor shows the tool call and the JSON result. The result is not written into the repository.
@@ -95,6 +100,6 @@ Cursor shows the tool call and the JSON result. The result is not written into t
 
 1. `tools/list` in a terminal, with the three names visible.
 2. Claude Desktop or Cursor calling `city_scan` and showing three Chicago blocks.
-3. One line of the reply that the block is a map cell, not a vetted address, if the tool result
-   includes the pack's note. Do not claim a survival forecast. The Chicago backtest found no
-   measurable gain.
+3. In the `city_scan` JSON, the `limits` list includes "A cell is a block to scout, not a vetted
+   address." `city_scan` does not return a separate note field. Do not claim a survival forecast.
+   The Chicago backtest found no measurable gain.
