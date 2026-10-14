@@ -49,7 +49,7 @@ def tenant_match(args):
             return {"error": data}, True
         if kind == "step":
             out["steps"].append({k: data.get(k) for k in ("workflow", "purpose", "error", "skipped") if data.get(k)})
-        elif kind in ("unit", "shortlist", "baseline", "budget"):
+        elif kind in ("unit", "shortlist", "baseline", "budget", "portfolio"):
             out[kind] = data
         elif kind == "memo":
             out["memo"] = data["markdown"]

@@ -221,6 +221,18 @@ class PipelineTest(unittest.TestCase):
             ev = self.run_all()
         self.assertEqual(ev, [("error", "Could not name that point; type the neighborhood instead.")])
 
+    def test_portfolio_reuses_this_run_and_adds_no_qloo_call(self):
+        base = self.run_all(asking_rent=2800)
+        street = self.run_all(asking_rent=2800, portfolio_rents=[4200, 5100], portfolio_k=1)
+        self.assertEqual(self.kinds(base, "budget")[0]["qloo_calls"], self.kinds(street, "budget")[0]["qloo_calls"])
+        port = self.kinds(street, "portfolio")[0]
+        self.assertEqual(port["blocking"], [])
+        self.assertIn("No blocking pair", port["proof"])
+        self.assertIn("Gale and Shapley (1962)", port["proof"])
+        self.assertLessEqual(len(port["matches"]), 5)
+        self.assertEqual(len(port["matches"]), 3)
+        self.assertFalse(self.kinds(base, "portfolio"))
+
     def test_memo_carries_a_prediction_fingerprint(self):
         memo = self.kinds(self.run_all(), "memo")[0]
         self.assertIn("Prediction fingerprint", memo["markdown"])
