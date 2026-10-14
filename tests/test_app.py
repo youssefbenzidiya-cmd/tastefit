@@ -115,6 +115,14 @@ class Server(unittest.TestCase):
     def test_footer_keeps_osm_attribution(self):
         self.assertIn("OpenStreetMap", self.get("/")[1])
 
+    def test_evidence_is_linked_and_quotes_the_negative_result(self):
+        self.assertIn('href="/evidence"', self.get("/")[1])
+        code, body = self.get("/evidence")
+        self.assertEqual(code, 200)
+        self.assertIn("No measurable gain", body)
+        self.assertIn("Heckman (1979)", body)
+        self.assertIn('href="/ledger"', body)
+
     def test_health(self):
         self.assertEqual(self.get("/health"), (200, "ok"))
 
