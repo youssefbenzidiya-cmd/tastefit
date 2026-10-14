@@ -1,5 +1,4 @@
 """Prediction fingerprints. The committed batch is public fields only; fixtures here are synthetic."""
-import json
 import unittest
 
 import ledger
@@ -41,6 +40,11 @@ class Fingerprint(unittest.TestCase):
         self.assertIn("&lt;script&gt;", html)
         self.assertIn("Ramen &amp; co", html)
         self.assertIn("2026-11-17", html)
+        self.assertIn("First listed concept", html)
+        self.assertIn("not a ranking", html)
+        self.assertIsNone(ledger.probabilities({"shortlist": [{"concept": "x", "verdict": "unscored"}]}))
+        mapped = ledger.probabilities({"shortlist": [{"concept": "x", "verdict": "GO"}, {"concept": "y", "verdict": "NO-GO"}]})
+        self.assertEqual([row["p"] for row in mapped], [0.66, 0.33])
 
 
 class CommittedBatch(unittest.TestCase):
@@ -61,6 +65,9 @@ class CommittedBatch(unittest.TestCase):
         html = ledger.page(doc)
         self.assertIn(batch["sha256"], html)
         self.assertIn("Brier score is not defined", html)
+        self.assertIn("not a ranking", html)
+        self.assertIsNone(ledger.probabilities(batch))
+        self.assertNotIn("p=", html)
 
 
 if __name__ == "__main__":

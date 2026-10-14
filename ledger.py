@@ -29,18 +29,35 @@ def fingerprint(entry):
     return hashlib.sha256(canonical(entry).encode("utf-8")).hexdigest()
 
 
+# Fixed labels for a future scored batch. These are protocol constants, not a fit score from Qloo.
+VERDICT_P = {"GO": 0.66, "ADJUST": 0.50, "NO-GO": 0.33}
+
+
+def probabilities(batch):
+    """Brier inputs from verdict labels already inside the fingerprint. None when any label is outside the map."""
+    rows = []
+    for item in batch.get("shortlist") or []:
+        p = VERDICT_P.get(item.get("verdict"))
+        if p is None or not item.get("concept"):
+            return None
+        rows.append({"concept": item["concept"], "verdict": item["verdict"], "p": p})
+    return rows or None
+
+
 def brier_canonical(batch):
-    """Locks the probabilities used for the later Brier score. Separate from the five-field fingerprint."""
-    payload = {
-        "check_on": batch["check_on"],
-        "forecasts": [{"concept": s["concept"], "p": s["p"], "verdict": s["verdict"]} for s in batch["forecasts"]],
-        "sha256": batch["sha256"],
-    }
+    """Locks the protocol probabilities. A batch with no complete verdict map has no canonical form."""
+    forecasts = probabilities(batch)
+    if forecasts is None:
+        return None
+    payload = {"check_on": batch["check_on"], "forecasts": forecasts, "sha256": batch["sha256"]}
     return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
 def brier_fingerprint(batch):
-    return hashlib.sha256(brier_canonical(batch).encode("utf-8")).hexdigest()
+    raw = brier_canonical(batch)
+    if raw is None:
+        return None
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def from_shortlist(area, concepts, ts):
@@ -83,15 +100,17 @@ def page(doc=None):
     for batch in doc.get("batches") or []:
         shown = batch.get("forecasts") or batch.get("shortlist") or []
         items = "".join(
-            "<li>" + _esc(s.get("concept")) + ": " + _esc(s.get("verdict"))
-            + ((" , p=" + _esc(s.get("p"))) if s.get("p") is not None else "") + "</li>"
+            "<li>" + _esc(s.get("concept")) + ": " + _esc(s.get("verdict")) + "</li>"
             for s in shown)
-        lock = batch.get("brier_sha256")
-        lock_line = ("<p>Brier lock <code>" + _esc(lock) + "</code></p>" if lock else
-                     "<p>No probability was registered, so the Brier score is not defined for this batch.</p>")
+        mapped = probabilities(batch)
+        if mapped is None:
+            lock_line = "<p>No probability was registered, so the Brier score is not defined for this batch.</p>"
+        else:
+            lock_line = ("<p>Brier inputs are the fixed verdict map (GO 0.66, ADJUST 0.50, NO-GO 0.33), "
+                         "not a fit score. Lock <code>" + _esc(brier_fingerprint(batch)) + "</code></p>")
         rows.append(
             "<article class=\"scan\"><h2>" + _esc(batch.get("area")) + "</h2>"
-            "<p>Top concept <b>" + _esc(batch.get("concept")) + "</b>, verdict <b>"
+            "<p>First listed concept <b>" + _esc(batch.get("concept")) + "</b> (not a ranking), verdict <b>"
             + _esc(batch.get("verdict")) + "</b>, registered " + _esc(batch.get("ts")) + ".</p>"
             "<p>Fingerprint <code>" + _esc(batch.get("sha256")) + "</code></p>"
             + lock_line
