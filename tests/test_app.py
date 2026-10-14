@@ -235,6 +235,13 @@ class Server(unittest.TestCase):
             self.assertEqual(code, 400, bad)
             self.assertNotIn("NaN", body)
             self.assertNotIn("Infinity", body)
+        huge = json.dumps({"units": [{"id": "A", "rent": 10 ** 400}, {"id": "B", "rent": 2000},
+                                     {"id": "C", "rent": 2000}],
+                           "concepts": [{"id": "ramen", "fit": 10 ** 400, "overlap": 10 ** 400}],
+                           "add": "noodles"})
+        code, body = self.get("/street?payload=" + urllib.parse.quote(huge))
+        self.assertEqual(code, 400)
+        self.assertNotIn("Traceback", body)
 
     def test_wrong_methods_get_plain_405(self):
         for method, path, allow in (("POST", "/", "GET, HEAD"), ("DELETE", "/health", "GET, HEAD"),

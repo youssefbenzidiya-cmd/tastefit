@@ -401,13 +401,13 @@ def _clean_concept(raw):
         raise ValueError("each concept needs an id")
     try:
         fit = _finite_score(float(0 if raw.get("fit") is None else raw.get("fit")), "fit")
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         raise ValueError("fit must be a finite number from 0 to 100") from None
     overlap = raw.get("overlap")
     if overlap is not None:
         try:
             overlap = _finite_score(float(overlap), "overlap")
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             raise ValueError("overlap must be a finite number from 0 to 100") from None
     rent_row = raw.get("rent_row") if isinstance(raw.get("rent_row"), dict) else None
     return {"id": _clean_name(raw.get("id")), "category": str(raw.get("category") or "other")[:40],
@@ -424,7 +424,7 @@ def _clean_units(raw):
             raise ValueError("each unit needs an id and a rent")
         try:
             rent = float(item.get("rent"))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             raise ValueError("each unit needs a positive monthly rent") from None
         if not (0 < rent < 1e7):
             raise ValueError("each unit needs a positive monthly rent")
