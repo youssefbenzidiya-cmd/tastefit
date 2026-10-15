@@ -100,12 +100,64 @@ def _table(doc):
             "<th>Survivors</th></tr></thead><tbody>" + "".join(rows) + "</tbody></table>")
 
 
-def page(chicago=None, tgi=None, bias=None, ledger_doc=None):
+def _interval_above_zero(interval):
+    if not isinstance(interval, (list, tuple)) or len(interval) != 2:
+        return False
+    lo, hi = interval
+    return _rate(lo) and _rate(hi) and lo > 0
+
+
+def _footfall_section(doc):
+    """Hit rates and intervals from the committed footfall backtest. No gain sentence unless the numbers say so."""
+    if not isinstance(doc, dict):
+        return ""
+    methods = doc.get("methods") or {}
+    labels = (("footfall", "Footfall alone"), ("footfall_tgi", "Footfall + Taste Gap supply"),
+              ("footfall_prior", "Footfall + citywide baseline"))
+    published = doc.get("published_citywide_hit_at_k")
+    prior = (methods.get("prior") or {}).get("hit_at_k")
+    bits, point_above, interval_above = [], False, False
+    for key, label in labels:
+        hit = (methods.get(key) or {}).get("hit_at_k")
+        if not _rate(hit):
+            continue
+        ci = doc.get(f"{key}_minus_prior_ci90")
+        span = _span(ci) if isinstance(ci, (list, tuple)) and len(ci) == 2 and _rate(ci[0]) and _rate(ci[1]) else "not in the file"
+        bits.append(f"{label} hit {_pct(hit)} (90% interval versus this run's citywide baseline, {span}).")
+        if _rate(published) and hit > published:
+            point_above = True
+        if _interval_above_zero(ci):
+            interval_above = True
+    if not bits:
+        return ""
+    text = " ".join(bits)
+    if _rate(prior):
+        text += f" This run's citywide baseline on the same areas is {_pct(prior)}."
+    if _rate(published):
+        text += f" The published nine-area citywide baseline is {_pct(published)}."
+    if interval_above and point_above:
+        text += " At least one variant's 90% interval versus the baseline sits above zero."
+    elif point_above:
+        text += " A higher point estimate is not a gain: no 90% interval versus the baseline sits entirely above zero."
+    else:
+        text += " No footfall variant beats the citywide 68%."
+    cited = [f"{s.get('id')} ({s.get('start')} to {s.get('end')})" for s in (doc.get("sources") or [])
+             if s.get("id") and s.get("start") and s.get("end")]
+    if cited:
+        text += " Sources: " + "; ".join(cited) + "."
+    text += (" The Taste Gap term is the supply leg only. Over-index D was not recomputed, so this is not the "
+             "published Taste Gap Index. Zero Qloo calls. The weights are stated priors, not fitted. "
+             "The counts are community-area totals from before 2023, not a door count and not a vetted address.")
+    return "<h2>Footfall, before the window</h2><p>" + _esc(text) + "</p>"
+
+
+def page(chicago=None, tgi=None, bias=None, ledger_doc=None, footfall=None):
     """HTML. Pass dicts in tests; otherwise the committed JSON files are read."""
     chicago = _load("backtest_chicago.json") if chicago is None else chicago
     tgi = _load("backtest_chicago_tgi.json") if tgi is None else tgi
     bias = _load("backtest_bias.json") if bias is None else bias
     ledger_doc = _load("data/ledger.json") if ledger_doc is None else ledger_doc
+    footfall = _load("backtest_chicago_footfall.json") if footfall is None else footfall
     source = tgi or chicago or {}
     comparison, no_gain = _comparison(source, chicago if isinstance(chicago, dict) else source)
     heckman = (bias or {}).get("heckman") or {}
@@ -132,7 +184,9 @@ ordering. The Qloo-minus-baseline difference has a 90% bootstrap interval of """
         _table(source),
         "<p>",
         comparison,
-        "</p><h2>Survivorship and intervals</h2><p>",
+        "</p>",
+        _footfall_section(footfall),
+        "<h2>Survivorship and intervals</h2><p>",
         reason,
         "</p><p>Inverse-probability weights (Horvitz and Thompson 1952) on a later register pull with no Qloo call: "
         "citywide top-3 hit rate ",
