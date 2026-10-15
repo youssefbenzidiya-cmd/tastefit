@@ -787,12 +787,15 @@ function memoHTML() {
   const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   const sl = state.shortlist, broker = !!sl, cur = sl && sl.currency;
   const title = broker ? `${state.unitInfo && state.unitInfo.area || state.unit.name}` : `${state.concept} in ${state.demo ? state.demo.location : state.location}`;
+  const saved = state.demo && state.demo.saved;
   const table = broker ? `<table class="memo-table"><thead><tr><th>Concept</th><th>Call</th><th>Score</th><th>Evidence</th><th>Rent</th></tr></thead><tbody>
       ${sl.concepts.filter(c => c.call).map(c => `<tr><td>${esc(c.concept)}</td><td>${badge(c.call, 'badge-xs')}</td><td>${esc(c.score)}</td>
-        <td>Rank ${esc(c.position)} of ${esc(c.of)} (Qloo)${c.local_supply != null ? `; ${esc(c.local_supply)} nearby (${esc(c.supply_source)})` : ''}${c.overlap != null ? `; overlap ${esc((c.overlap / 100).toFixed(2))}` : ''}${c.coverage === 'low' ? '; data coverage low' : ''}</td>
+        <td>Rank ${esc(c.position)} of ${esc(c.of)} (${saved ? 'stated example' : 'Qloo'})${c.local_supply != null ? `; ${esc(c.local_supply)} nearby (${esc(c.supply_source)})` : ''}${c.overlap != null ? `; overlap ${esc((c.overlap / 100).toFixed(2))}` : ''}${c.coverage === 'low' ? '; data coverage low' : ''}</td>
         <td>${c.rent_max ? `max ${esc(money(c.rent_max, cur))}` : '–'}</td></tr>`).join('')}
     </tbody></table>` : '';
   const b = state.budget;
+  const sources = saved ? ' Sources: saved example, aggregates only, no Qloo call.'
+    : (b ? ` Sources: Qloo taste graph (${esc(b.qloo_calls)} calls, ${esc(b.workflows.length)} workflows)${broker ? ', © OpenStreetMap contributors, official business registers' : ''}.` : '');
   return `<header class="memo-top"><span class="brand"><svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true"><rect class="f-ink" x="1" y="1" width="26" height="26" rx="6"/><rect class="s-hl" x="6" y="6" width="16" height="16" rx="2.5" fill="url(#hatch)" stroke-width="1.4"/></svg>TasteFit ${broker ? 'tenant' : 'fit'} memo</span>
       <div class="meta">${esc(today)}${state.demo ? '<br><span class="memo-stamp">SAMPLE DATA</span>' : ''}</div></header>
     <h1 id="memo-title">${esc(title)}</h1>
@@ -800,7 +803,7 @@ function memoHTML() {
     ${state.demo ? `<p><b>${esc(state.demo.notice || 'Sample report: synthetic data.')}</b></p>` : ''}
     ${table}
     <div class="memo-md">${md(state.memo.markdown)}</div>
-    <p class="hint-line">Written by ${esc(state.memo.author === 'template' ? 'the TasteFit template (no model available)' : state.memo.author || 'the agent')}.${b ? ` Sources: Qloo taste graph (${esc(b.qloo_calls)} calls, ${esc(b.workflows.length)} workflows)${broker ? ', © OpenStreetMap contributors, official business registers' : ''}.` : ''}</p>`;
+    <p class="hint-line">Written by ${esc(state.memo.author === 'template' ? 'the TasteFit template (no model available)' : state.memo.author || 'the agent')}.${sources}</p>`;
 }
 function openMemo() {
   $('#memo-page').innerHTML = memoHTML();

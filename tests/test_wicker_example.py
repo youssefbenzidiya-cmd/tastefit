@@ -58,6 +58,8 @@ class WickerExample(unittest.TestCase):
         self.assertIn("did not beat a citywide baseline", self.doc["shortlist"]["footfall"]["sentence"])
         memo = self.doc["memo"]["markdown"]
         self.assertIn("## Limits", memo)
+        self.assertNotIn("one Qloo rank call", memo)
+        self.assertIn("stated aggregates, not a Qloo rank call", memo)
         self.assertIn("Street certificate", memo)
         self.assertIn("not a vetted address", memo)
 
@@ -96,6 +98,8 @@ class WickerExample(unittest.TestCase):
         self.assertIn("Example rank", script)
         self.assertIn("if (!W) return ''", script)
         self.assertIn("saved example from 2026-10-15", script)
+        self.assertIn("stated example", script)
+        self.assertIn("saved example, aggregates only, no Qloo call", script)
         code, ctype, body, _csp = app.Handler._page(None, "/wicker-example.json")
         self.assertEqual(code, 200)
         self.assertEqual(ctype, "application/json")
