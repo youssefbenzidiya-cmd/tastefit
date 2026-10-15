@@ -29,8 +29,10 @@ import sys
 import time
 import urllib.parse
 import urllib.request
+from pathlib import Path
 
 import backtest_bias
+import footfall
 import qloo
 import tenant
 import tgi
@@ -335,6 +337,51 @@ def score(table, orders):
     return out
 
 
+def _paired(table, orders, names, left, right="prior"):
+    rows = []
+    for area in names:
+        if not (orders.get(left) or {}).get(area) or not (orders.get(right) or {}).get(area):
+            continue
+        hit_l, tot = hits_at_k(orders[left][area], table[area])
+        hit_r, _ = hits_at_k(orders[right][area], table[area])
+        if tot:
+            rows.append((hit_l, hit_r, tot))
+    return bootstrap_diff(rows) if rows else None
+
+
+def footfall_orders(table, areas, supply, doc):
+    """Three stated orderings. Taste Gap here is the supply leg only: D is 0 because it is not recomputed."""
+    shares = footfall.city_shares(doc)
+    placed = {p["area"]: p["community_area_number"] for p in doc["backtest_areas"]}
+    out = {m: {} for m in ("footfall", "footfall_tgi", "footfall_prior", "prior")}
+    for name, _, _ in areas:
+        number = placed[name]
+        mass = {c: footfall.concept_score(doc, number, c, shares) for c in CONCEPTS}
+        out["footfall"][name] = order_by(mass)
+        out["prior"][name] = prior_order(table, name)
+        counts = prior_counts(table, name)
+        tot = sum(counts.values()) + 0.5 * len(CONCEPTS)
+        out["footfall_prior"][name] = order_by({
+            c: math.log((counts[c] + 0.5) / tot) + math.log(mass[c] if mass[c] > 0 else 1e-12) for c in CONCEPTS})
+        row = supply.get(name) or {}
+        if all(c in row for c in CONCEPTS):
+            out["footfall_tgi"][name] = order_by({
+                c: tgi.score(0.0, row[c][0]) + footfall.FOOTFALL_POINTS * mass[c] for c in CONCEPTS})
+        else:
+            out["footfall_tgi"][name] = None
+    return out
+
+
+def footfall_report(table, orders, area_names, published_prior, sources, osm_as_of):
+    """Hit rates and 90% intervals on one area list. Prior is this run's leave-one-area-out baseline."""
+    sub = {a: table[a] for a in area_names if a in table}
+    methods = score(sub, orders)
+    common = common_areas(sub, orders)
+    intervals = {f"{m}_minus_prior_ci90": _paired(sub, orders, common, m) for m in ("footfall", "footfall_tgi", "footfall_prior")}
+    return {"areas_scored": common, "methods": methods, "published_citywide_hit_at_k": published_prior,
+            "osm_snapshot": osm_as_of, "qloo_calls": 0, "sources": sources, **intervals}
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--json")
@@ -342,10 +389,43 @@ def main(argv=None):
     ap.add_argument("--food", help="OSM food-venue snapshot from before the window (tgi.py build chicago 2023-01-01 OUT)")
     ap.add_argument("--public-only", action="store_true",
                     help="Chicago register only: IPW and conformal on the citywide share. No Qloo call.")
+    ap.add_argument("--footfall", action="store_true",
+                    help="Score footfall variants on the public register. No Qloo call. Requires --food dated before the window.")
     args = ap.parse_args(argv)
 
     opened, alive = load_register()
     table = outcomes(opened, alive)
+    if args.footfall:
+        if not args.food:
+            raise SystemExit("--footfall needs --food dated on or before 2023-01-01")
+        import gzip
+        with gzip.open(args.food, "rt") as f:
+            snap = json.load(f)
+        as_of = snap.get("as_of") or ""
+        if as_of > WINDOW[0]:
+            raise SystemExit(f"OSM snapshot {as_of} is after the backtest window starts")
+        doc = footfall.load()
+        footfall.assert_before_window(doc)
+        supply = osm_supply(AREAS, tgi.Venues(snap["grid"], snap["venues"]))
+        orders = footfall_orders(table, AREAS, supply, doc)
+        published = json.loads((Path(__file__).parent / "backtest_chicago.json").read_text())
+        published_prior = published["methods"]["prior"]["hit_at_k"]
+        names = [a for a in published["areas_scored"] if sum(s for _, s in table.get(a, {}).values())]
+        result = {
+            "window": WINDOW, "survival_seen": SURVIVAL_SEEN, "radius_km": RADIUS_KM, "k": K,
+            "openings": len(opened), "classified": sum(classify(o["name"]) is not None for o in opened.values()),
+            "published_areas": published["areas_scored"],
+            "taste_gap": "Supply leg only. Over-index D is 0 because it was not recomputed. This is not the published Taste Gap Index.",
+            "weights": "Stated priors in footfall.WEIGHTS, not fitted to these outcomes.",
+            "qloo_calls": 0,
+        }
+        result.update(footfall_report(table, orders, names, published_prior, doc["datasets"], as_of))
+        text = json.dumps(result, indent=1)
+        print(text)
+        if args.json:
+            with open(args.json, "w") as f:
+                f.write(text + "\n")
+        return
     if args.public_only:
         orders = {"prior": {a[0]: prior_order(table, a[0]) for a in AREAS}}
         areas = common_areas(table, orders)

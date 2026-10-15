@@ -40,7 +40,7 @@ Hotspot cells come with coordinates; places carry an address, geocoded with Open
 
 The map uses Leaflet with OpenStreetMap tiles. The suggested spot points to a block to scout, not a vetted address.
 
-The memo only cites places, tags and numbers returned by Qloo, plus OpenStreetMap supply counts attributed as such in tenant memos, keeps Qloo results separate from interpretation, and ends with a **Limits** section: Qloo describes aggregate group affinities, not foot traffic, rents or individual behaviour. No personal data is sent to Qloo; inputs are a concept and a place name.
+The memo cites places, tags and numbers returned by Qloo, OpenStreetMap supply counts attributed as such, and, when the city is Chicago, the committed City of Chicago Data Portal community-area footfall shares with their dataset id and date range. It does not attach those Chicago counts to another city, and a name such as South Loop is not given the Loop's totals. It keeps Qloo results separate from interpretation, and ends with a **Limits** section: Qloo describes aggregate group affinities, not foot traffic, rents or individual behaviour. No personal data is sent to Qloo; inputs are a concept and a place name. The footfall line is a community-area total, not a count at the door and not a vetted address.
 
 ### City Scan and rent ceiling (`/scan`, `/scan/unit`)
 
@@ -122,6 +122,30 @@ The backtest (`--food`, results in `backtest_chicago_tgi.json`) uses an OSM snap
 | Citywide baseline alone | 68% (0.31) |
 
 Result: **no measurable gain**. The index beats the plain Qloo rank by 19 points, but the 90% interval of that difference (−13 to +42 points) includes zero, and every TGI variant is below the citywide baseline (index minus baseline: −36 to −6 points; adding the index to the baseline makes it worse, −22 to −6). On 9 areas, what is opening everywhere in Chicago predicts better than local taste or local gaps. The app still shows the index, labelled uncalibrated, because it is the clearest way to explain a recommendation; OSM supply also replaces four Qloo calls per run.
+
+**Footfall ("demand already there").** `build_chicago_footfall.py` writes `data/chicago_footfall.json`. Counts only, from the City of Chicago Data Portal, under the city's data disclaimer. No trip rows, no rider identifiers, and no Divvy gender or birth year. Every window ends before 2023-01-01.
+
+| Series | Dataset | Window |
+|---|---|---|
+| TNP evening drop-offs, trip end hour 17 through 21 | m6dm-c72p | 2022-01-01 to 2022-12-31 |
+| TNP weekend drop-offs, each Saturday and Sunday | m6dm-c72p | 2022-01-01 to 2022-12-31 |
+| Divvy trip ends, placed by the station coordinate | fg6s-gzvg | 2019-01-01 to 2019-12-31 |
+| CTA 'L' station entries, stations from 8pix-ypme | 5neh-572f | 2022-01-01 to 2022-12-31 |
+
+The Divvy portal file ends 2020-01-21, so 2019 is its last full year and is still before the backtest. A Saturday evening trip is in both the evening series and the weekend series. A point is counted in the community area whose polygon contains it (boundaries igwz-8jzy). L stations outside the 77 areas, including the suburban ends of the system, are left out: 5,105,024 entries. A zero means the polygon contains no station, not that the file is missing. Hyde Park's polygon contains none in this join.
+
+The concept score is a stated weight vector (`footfall.WEIGHTS`, each row sums to 1, fixed before this run, not fitted) dotted with the area's share of each citywide total. Dinner concepts load on evening and weekend drop-offs. Daytime concepts load on CTA entries and Divvy ends. The area total is the same for every concept; the weights are what change the order.
+
+`backtest_chicago.py --footfall` rescores the same 9 areas and 31 survivors with the OpenStreetMap food snapshot dated 2023-01-01. No Qloo call. Over-index D is 0, so the Taste Gap column here is the supply leg plus footfall, not the published Taste Gap Index.
+
+| Ordering | Top-3 hit rate | 90% interval versus this run's citywide baseline |
+|---|---|---|
+| Footfall alone | 39% | −52 to +3 points |
+| Footfall + Taste Gap supply | 39% | −44 to −15 points |
+| Footfall + citywide baseline | 68% | 0 to 0 points |
+| This run's citywide baseline | 68% | |
+
+No footfall variant beats the citywide 68%. Adding footfall to the baseline did not change the top-3 hits. The counts are community-area totals, not a count at the door and not a vetted address. The page at `/evidence` quotes `backtest_chicago_footfall.json`. A tenant run reads the committed file and adds no Qloo call.
 
 What this means for the product: Qloo is useful here as evidence a broker can show (what the area loves, who already serves it, where the audience is), not as a validated predictor of tenant survival. Every tenant memo's Limits section reports this backtest result (`tenant.BACKTEST_NOTE`, added by code if the LLM leaves it out).
 

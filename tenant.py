@@ -18,6 +18,7 @@ import time
 
 import decision
 import geo
+import footfall
 import ledger
 import llm
 import market_share
@@ -508,7 +509,7 @@ share", stated weights, not causal), ## Why this audience (local places, tags an
 its evppi in currency per month as "worth up to about"; say these come from TasteFit's stated cost assumptions; then
 on-site checks, 3 to 5 bullets in total), ## Limits (Qloo describes aggregate taste affinities, not foot
 traffic, sales or individuals; rank scores are relative to these candidates; rent ceilings are a model, not a forecast;
-the Taste Gap Index (tgi, tgi_label) uses stated, uncalibrated weights; if trial is present, quote its sentence unchanged, including the weeks and the threshold, and say there is no interest and no discounting; supply figures with supply_source OpenStreetMap
+the Taste Gap Index (tgi, tgi_label) uses stated, uncalibrated weights; if trial is present, quote its sentence unchanged, including the weeks and the threshold, and say there is no interest and no discounting; if footfall is present, quote its sentence and do not invent shares (it is a community-area total from before 2023, not a door count); supply figures with supply_source OpenStreetMap
 are mapped OSM venues, not Qloo data, and must be attributed to OpenStreetMap (coverage "low" means the city-wide
 prior outweighs the local count and the estimate stays near the city average: say so); in a Chicago backtest neither Qloo demand
 rankings nor the Taste Gap Index predicted which concepts survived better than a citywide baseline).
@@ -529,9 +530,25 @@ BACKTEST_NOTE = ("- In a Chicago backtest of 2023-2024 openings, neither Qloo de
 LIMITS += "\n" + BACKTEST_NOTE
 
 
-def ensure_trial(memo, plan):
-    """Cite the pop-up plan inside Limits, above the backtest note. It does not change the fingerprint."""
-    sentence = (plan or {}).get("sentence")
+def _is_chicago(city):
+    """Footfall counts exist for Chicago only. Another city's name must not pick up a Chicago area."""
+    text = " ".join((city or "").replace(",", " ").split()).casefold()
+    return text in {"chicago", "chicago il", "chicago illinois"}
+
+
+def footfall_signal(area, city):
+    """Committed portal aggregates for a Chicago place, or None. No network and no Qloo call."""
+    if not _is_chicago(city):
+        return None
+    try:
+        doc = footfall.load()
+        footfall.assert_before_window(doc)
+    except (OSError, ValueError, KeyError):
+        return None
+    return footfall.signal(doc, f"{area}, {city}")
+
+
+def _insert_before_backtest(memo, sentence):
     if not sentence or sentence in (memo or ""):
         return memo
     if BACKTEST_NOTE in memo:
@@ -539,7 +556,17 @@ def ensure_trial(memo, plan):
     return (memo or "").rstrip() + "\n- " + sentence
 
 
-def template_memo(area, city, shortlist, profile, voi=None, trial_sentence=None):
+def ensure_footfall(memo, signal):
+    """Cite the committed footfall sentence inside Limits, above the backtest note."""
+    return _insert_before_backtest(memo, (signal or {}).get("sentence"))
+
+
+def ensure_trial(memo, plan):
+    """Cite the pop-up plan inside Limits, above the backtest note. It does not change the fingerprint."""
+    return _insert_before_backtest(memo, (plan or {}).get("sentence"))
+
+
+def template_memo(area, city, shortlist, profile, voi=None, trial_sentence=None, footfall_sentence=None):
     scored = [s for s in shortlist if s.get("call")]
     lines = [f"# Tenant memo: {area if city.lower() in area.lower() else f'{area}, {city}'}", ""]
     if scored:
@@ -577,6 +604,9 @@ def template_memo(area, city, shortlist, profile, voi=None, trial_sentence=None)
         "- Visit the named local favourites to confirm price tier and queues.", ""]
     if trial_sentence:
         lines.append(trial_sentence)
+        lines.append("")
+    if footfall_sentence:
+        lines.append(footfall_sentence)
         lines.append("")
     lines.append(LIMITS)
     return "\n".join(lines)
@@ -859,8 +889,9 @@ def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None,
     if top:
         place_trial = trial.recommend(area_label, top, scan.slugify(city), rent_of.get(top["concept"]),
                                       asking_rent, own_voi, stamped)
+    place_footfall = footfall_signal(area, city)
     yield "shortlist", {"area": area, "city": city, "currency": unit.get("currency"), "asking_rent": asking_rent,
-                        "trial": place_trial,
+                        "trial": place_trial, "footfall": place_footfall,
                         "weights": WEIGHTS, "concepts": shortlist, "heat": heat[:8], "voi": voi,
                         "method": "Score = 0.45 x demand (position in one Qloo rank call) + 0.35 x white space "
                                   + (f"(where the concept maps to OpenStreetMap: 100 x the probability that it is "
@@ -910,16 +941,21 @@ def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None,
                 "trial": None if not place_trial else {"sentence": place_trial["sentence"],
                                                        "weeks": place_trial["weeks"],
                                                        "threshold": place_trial["threshold"],
-                                                       "sha256": place_trial["sha256"]}}
+                                                       "sha256": place_trial["sha256"]},
+                "footfall": None if not place_footfall else {"sentence": place_footfall["sentence"],
+                                                             "community_area": place_footfall["community_area"]}}
     try:
         msg = chat_fn([{"role": "user", "content": MEMO_PROMPT.format(evidence=json.dumps(evidence, ensure_ascii=False))}])
         memo, author = (msg.get("content") or "").strip(), msg.get("provider") or "llm"
         if len(memo) < 200:
             raise ValueError("memo too short")
     except Exception:  # noqa: BLE001  the template memo always works
-        memo, author = template_memo(area, city, shortlist, profile, voi, (place_trial or {}).get("sentence")), "template"
+        memo, author = template_memo(area, city, shortlist, profile, voi,
+                                     trial_sentence=(place_trial or {}).get("sentence"),
+                                     footfall_sentence=(place_footfall or {}).get("sentence")), "template"
     fp = ledger.from_shortlist(area_label, [{"concept": s.get("concept"), "verdict": s.get("call")} for s in shortlist], stamped)
-    memo = ledger.ensure_street(ledger.ensure_fingerprint(ensure_trial(ensure_limits(memo), place_trial), fp), port)
+    memo = ledger.ensure_street(ledger.ensure_fingerprint(
+        ensure_trial(ensure_footfall(ensure_limits(memo), place_footfall), place_trial), fp), port)
     yield "memo", {"markdown": memo, "author": author, "fingerprint": fp["sha256"]}
     yield "budget", {"qloo_calls": led.network, "cache_hits": led.cached, "budget": led.budget,
                      "workflows": led.workflows()}
