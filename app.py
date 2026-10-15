@@ -31,6 +31,8 @@ _TEMPLATE = (ROOT / "index.html").read_text().replace("{{CTA}}", _CTA).replace("
 
 # Synthetic replay for /demo; never real Qloo output (AGENTS.md rule 2).
 DEMO_FILE = ROOT / "demo" / "sample-report.json"
+# Aggregates-only saved example. No Qloo response is stored in this file.
+WICKER_FILE = ROOT / "demo" / "wicker-park.json"
 DEMO_DELAY_SCALE = float(os.environ.get("DEMO_DELAY_SCALE", "1"))
 
 STATIC = {
@@ -126,6 +128,12 @@ class Handler(BaseHTTPRequestHandler):
             return 200, "text/html; charset=utf-8", ledger.page().encode(), CSP_LEDGER
         if path == "/evidence":
             return 200, "text/html; charset=utf-8", evidence.page().encode(), CSP_LEDGER
+        if path == "/wicker-example.json":
+            try:
+                body = WICKER_FILE.read_bytes()
+            except OSError:
+                return 404, "text/plain", b"not found", None
+            return 200, "application/json", body, None
         if path in _STATIC_BODIES:
             body, ctype = _STATIC_BODIES[path]
             return 200, ctype, body, None

@@ -36,7 +36,7 @@ const ERRORS = {
 const state = {
   mode: 'broker', unit: null, phase: 'empty', tab: 'shortlist', run: null,
   steps: [], unitInfo: null, shortlist: null, baseline: null, budget: null, memo: null, scorecard: null, geo: null,
-  competitors: [], error: null, asking: null, streetRents: '', streetShort: false, concept: '', startedAt: 0, endedAt: 0, demo: null, portfolio: null,
+  competitors: [], error: null, asking: null, streetRents: '', streetShort: false, concept: '', startedAt: 0, endedAt: 0, demo: null, portfolio: null, savedWhatIf: null,
 };
 
 const COPY = {
@@ -100,6 +100,12 @@ function route() {
   document.body.classList.toggle('in-app', inApp);
   if (!inApp) return;
   const q = new URLSearchParams(query || '');
+  if (q.get('example') === 'wicker') {
+    initMap();
+    loadWicker();
+    setTimeout(() => map && map.invalidateSize(), 50);
+    return;
+  }
   if (q.get('mode') && q.get('mode') !== state.mode) setMode(q.get('mode'), { silent: true });
   if (q.get('concept')) state.concept = q.get('concept').slice(0, 300);
   initMap();
@@ -210,8 +216,13 @@ $('#scan-concept').addEventListener('change', () => loadScan());
 const panel = $('#panel-body');
 function paint(html) { panel.innerHTML = html; panel.classList.remove('panel-enter'); void panel.offsetWidth; panel.classList.add('panel-enter'); }
 
+function exampleFlag() {
+  const flag = $('#sample-flag');
+  flag.hidden = !state.demo;
+  if (state.demo) flag.textContent = state.demo.label || 'Sample data';
+}
 function renderPanel() {
-  $('#sample-flag').hidden = !state.demo;
+  exampleFlag();
   if (state.phase === 'empty' || !state.unit) return paint(emptyHTML());
   if (state.phase === 'selected') return paint(unitCardHTML(true));
   if (state.phase === 'error') return paint(unitCardHTML(false) + errorHTML() + traceHTML());
@@ -370,6 +381,7 @@ function trendHTML(t) {
 }
 function stackHTML(c) {
   const W = state.shortlist.weights;
+  if (!W) return '';
   const d = Math.round(W.demand * (c.demand ?? 0)), w = Math.round(W.white_space * (c.white_space ?? 0)), o = Math.round(W.overlap * (c.overlap ?? 0));
   return `<div class="stack"><div class="stack-bar" role="img" aria-label="Score ${esc(c.score)}: demand ${d}, white space ${w}, audience overlap ${o} points">
       <i class="seg-demand" style="width:${d}%"></i><i class="seg-space" style="width:${w}%"></i><i class="seg-overlap" style="width:${o}%"></i></div>
@@ -411,7 +423,7 @@ function cardHTML(c, i) {
       <div class="score"><span class="score-n">${esc(c.score)}<small>/100</small></span>${badge(c.call, 'badge-xs')}</div></div>
     ${stackHTML(c)}
     <div class="chips">
-      <span class="chip"><span class="k">Qloo rank</span><b>${esc(c.position)} of ${esc(c.of)}</b></span>
+      <span class="chip"><span class="k">${state.demo && state.demo.saved ? 'Example rank' : 'Qloo rank'}</span><b>${esc(c.position)} of ${esc(c.of)}</b></span>
       ${supplyChip(c)}
       ${c.tgi_label ? `<span class="chip" title="Taste Gap: over-index (area vs city, Qloo) against OSM supply. Stated priors, uncalibrated."><span class="k">Taste Gap</span><b>${esc(c.tgi_label)}</b>${c.overindex != null ? `<span class="k">over-index ${c.overindex > 0 ? '+' : ''}${esc(c.overindex)}</span>` : ''}</span>` : ''}
       ${c.overlap != null ? `<span class="chip"><span class="k">Overlap</span><b>${esc((c.overlap / 100).toFixed(2))}</b></span>` : ''}
@@ -455,7 +467,7 @@ function whatIfHTML(p) {
     <div class="field"><label for="what-add">Or add a tenant</label>
       <input class="input" id="what-add" maxlength="80" autocomplete="off" placeholder="supermarket at the corner"></div>
     <button type="submit" class="btn btn-ink btn-sm">Re-run this street</button>
-    <div id="what-result"></div></form>`;
+    <div id="what-result">${state.savedWhatIf ? whatIfResultHTML(state.savedWhatIf) : ''}</div></form>`;
 }
 function whatIfResultHTML(data) {
   const lines = (data.changes || []).map(c => {
@@ -524,7 +536,9 @@ function footfallHTML() {
 function leadHTML() {
   const top = state.shortlist.concepts.find(c => c.call);
   if (!top) return '';
-  return `<section class="lead" aria-labelledby="lead-title"><div class="lead-row">${badge(top.call, 'badge-lg')}<span class="num" style="font-weight:700">${esc(top.score)}/100</span></div>
+  const saved = state.demo && state.demo.label
+    ? `<p class="hint-line" id="example-label"><b>${esc(state.demo.label)}</b>. ${esc(state.demo.notice || '')}</p>` : '';
+  return `${saved}<section class="lead" aria-labelledby="lead-title"><div class="lead-row">${badge(top.call, 'badge-lg')}<span class="num" style="font-weight:700">${esc(top.score)}/100</span></div>
     <h3 id="lead-title">${esc(top.concept)} leads the shortlist for this unit.</h3>
     <p>Rank ${esc(top.position)} of ${esc(top.of)} for the ${esc(state.shortlist.area)} audience${top.local_supply != null ? `, ${esc(top.local_supply)} similar places nearby` : ''}${top.trend ? `, interest ${top.trend.change >= 3 ? 'rising' : top.trend.change <= -3 ? 'fading' : 'steady'}` : ''}. ${esc(top.rent_note)} ${esc(top.adjust_note || '')}</p>
     ${voiHTML(state.shortlist.voi)}${trialHTML()}${footfallHTML()}</section>`;
@@ -554,7 +568,7 @@ function founderResultHTML() {
 
 function paintRun() {
   const founder = state.mode === 'founder';
-  $('#sample-flag').hidden = !state.demo;
+  exampleFlag();
   let body = '';
   if (state.phase === 'running') {
     body = traceHTML() + `<div aria-hidden="true" style="display:grid;gap:10px"><div class="sk" style="width:40%"></div><div class="sk" style="width:90%"></div><div class="sk" style="width:75%"></div></div>`;
@@ -680,7 +694,7 @@ function drawFounderGeo(g) {
 let clockTimer;
 function resetRun() {
   if (state.run) { state.run.stopped = true; state.run.ctrl.abort(); }
-  Object.assign(state, { phase: state.unit ? 'selected' : 'empty', run: null, steps: [], unitInfo: null, shortlist: null, portfolio: null, streetShort: false, baseline: null, budget: null, memo: null, scorecard: null, geo: null, competitors: [], error: null, demo: null, tab: 'shortlist', endedAt: 0 });
+  Object.assign(state, { phase: state.unit ? 'selected' : 'empty', run: null, steps: [], unitInfo: null, shortlist: null, portfolio: null, savedWhatIf: null, streetShort: false, baseline: null, budget: null, memo: null, scorecard: null, geo: null, competitors: [], error: null, demo: null, tab: 'shortlist', endedAt: 0 });
   clearInterval(clockTimer);
   if (layerHeat) layerHeat.clearLayers();
 }
@@ -773,12 +787,15 @@ function memoHTML() {
   const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   const sl = state.shortlist, broker = !!sl, cur = sl && sl.currency;
   const title = broker ? `${state.unitInfo && state.unitInfo.area || state.unit.name}` : `${state.concept} in ${state.demo ? state.demo.location : state.location}`;
+  const saved = state.demo && state.demo.saved;
   const table = broker ? `<table class="memo-table"><thead><tr><th>Concept</th><th>Call</th><th>Score</th><th>Evidence</th><th>Rent</th></tr></thead><tbody>
       ${sl.concepts.filter(c => c.call).map(c => `<tr><td>${esc(c.concept)}</td><td>${badge(c.call, 'badge-xs')}</td><td>${esc(c.score)}</td>
-        <td>Rank ${esc(c.position)} of ${esc(c.of)} (Qloo)${c.local_supply != null ? `; ${esc(c.local_supply)} nearby (${esc(c.supply_source)})` : ''}${c.overlap != null ? `; overlap ${esc((c.overlap / 100).toFixed(2))}` : ''}${c.coverage === 'low' ? '; data coverage low' : ''}</td>
+        <td>Rank ${esc(c.position)} of ${esc(c.of)} (${saved ? 'stated example' : 'Qloo'})${c.local_supply != null ? `; ${esc(c.local_supply)} nearby (${esc(c.supply_source)})` : ''}${c.overlap != null ? `; overlap ${esc((c.overlap / 100).toFixed(2))}` : ''}${c.coverage === 'low' ? '; data coverage low' : ''}</td>
         <td>${c.rent_max ? `max ${esc(money(c.rent_max, cur))}` : '–'}</td></tr>`).join('')}
     </tbody></table>` : '';
   const b = state.budget;
+  const sources = saved ? ' Sources: saved example, aggregates only, no Qloo call.'
+    : (b ? ` Sources: Qloo taste graph (${esc(b.qloo_calls)} calls, ${esc(b.workflows.length)} workflows)${broker ? ', © OpenStreetMap contributors, official business registers' : ''}.` : '');
   return `<header class="memo-top"><span class="brand"><svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true"><rect class="f-ink" x="1" y="1" width="26" height="26" rx="6"/><rect class="s-hl" x="6" y="6" width="16" height="16" rx="2.5" fill="url(#hatch)" stroke-width="1.4"/></svg>TasteFit ${broker ? 'tenant' : 'fit'} memo</span>
       <div class="meta">${esc(today)}${state.demo ? '<br><span class="memo-stamp">SAMPLE DATA</span>' : ''}</div></header>
     <h1 id="memo-title">${esc(title)}</h1>
@@ -786,11 +803,62 @@ function memoHTML() {
     ${state.demo ? `<p><b>${esc(state.demo.notice || 'Sample report: synthetic data.')}</b></p>` : ''}
     ${table}
     <div class="memo-md">${md(state.memo.markdown)}</div>
-    <p class="hint-line">Written by ${esc(state.memo.author === 'template' ? 'the TasteFit template (no model available)' : state.memo.author || 'the agent')}.${b ? ` Sources: Qloo taste graph (${esc(b.qloo_calls)} calls, ${esc(b.workflows.length)} workflows)${broker ? ', © OpenStreetMap contributors, official business registers' : ''}.` : ''}</p>`;
+    <p class="hint-line">Written by ${esc(state.memo.author === 'template' ? 'the TasteFit template (no model available)' : state.memo.author || 'the agent')}.${sources}</p>`;
 }
 function openMemo() {
   $('#memo-page').innerHTML = memoHTML();
   $('#memo').showModal();
+}
+let wickerLoad = 0;
+async function loadWicker() {
+  const token = ++wickerLoad;
+  setMode('broker', { silent: true });
+  const base = EXAMPLES.find(x => x.id === 'chicago-wicker');
+  state.unit = Object.assign({}, base, {
+    street: 'saved example from 2026-10-15. Example point near Milwaukee Avenue. Not a vetted address.',
+  });
+  resetRun();
+  state.phase = 'running';
+  state.startedAt = Date.now();
+  state.steps = [{ key: 'example', title: 'Opening the saved Wicker Park example', out: 'Aggregates only. No Qloo call.', kind: 'local', calls: [], isNew: true }];
+  paintRun();
+  initMap();
+  highlightUnit(base.id);
+  placeDrop(base);
+  if (map) map.setView([base.lat, base.lon], 15);
+  try {
+    const res = await fetch('/wicker-example.json', { headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error('missing');
+    const doc = await res.json();
+    if (token !== wickerLoad || !location.hash.includes('example=wicker')) return;
+    state.demo = { saved: true, label: doc.label, notice: doc.notice, location: doc.place };
+    state.asking = doc.asking_rent;
+    state.unitInfo = doc.unit;
+    state.shortlist = doc.shortlist;
+    state.portfolio = doc.portfolio;
+    state.savedWhatIf = doc.what_if;
+    state.baseline = { unavailable: true };
+    state.budget = { qloo_calls: 0, workflows: [] };
+    state.memo = doc.memo;
+    state.endedAt = Date.now();
+    state.run = null;
+    state.phase = 'done';
+    state.tab = 'shortlist';
+    paintRun();
+    const h = $('#lead-title');
+    if (h) { h.setAttribute('tabindex', '-1'); h.focus(); }
+  } catch (err) {
+    if (token !== wickerLoad) return;
+    state.error = { title: 'The saved example did not load', text: 'The Wicker Park snapshot is not available.', sample: true };
+    state.phase = 'error';
+    renderPanel();
+  }
+}
+function openWicker() {
+  if (state.phase === 'running') return;
+  const want = '#/app?unit=chicago-wicker&example=wicker';
+  if (location.hash !== want) { location.hash = '/app?unit=chicago-wicker&example=wicker'; return; }
+  loadWicker();
 }
 async function openSample() {
   if (state.phase === 'running') return;
@@ -828,6 +896,7 @@ document.addEventListener('click', e => {
   else if (act === 'run-again') { if (state.unit && state.unit.id === 'demo') { openSample(); return; } const keep = { concept: state.concept, asking: state.asking }; resetRun(); Object.assign(state, keep, { phase: 'selected' }); renderPanel(); }
   else if (act === 'memo') openMemo();
   else if (act === 'sample-memo') openSample();
+  else if (act === 'wicker-example') openWicker();
   else if (act === 'print') window.print();
   else if (act === 'close-memo') $('#memo').close();
   else if (act === 'share') {
