@@ -1,0 +1,109 @@
+{
+  "units": [
+    {
+      "id": "Example A",
+      "rent": 2600
+    },
+    {
+      "id": "Example B",
+      "rent": 2400
+    },
+    {
+      "id": "Example C",
+      "rent": 2200
+    },
+    {
+      "id": "Example D",
+      "rent": 2000
+    }
+  ],
+  "concepts": [
+    {
+      "id": "Ramen shop",
+      "category": "restaurant",
+      "fit": 78,
+      "overlap": 55,
+      "strong": true,
+      "avoid": false,
+      "rent_first": false,
+      "rent_row": {
+        "viable": true,
+        "rent_max": 3230,
+        "ci90": [
+          2800,
+          4000
+        ]
+      }
+    },
+    {
+      "id": "Chicken sandwich",
+      "category": "fast_food",
+      "fit": 58,
+      "overlap": 40,
+      "strong": false,
+      "avoid": false,
+      "rent_first": false,
+      "rent_row": {
+        "viable": true,
+        "rent_max": 2790,
+        "ci90": [
+          1930,
+          4020
+        ]
+      }
+    },
+    {
+      "id": "Grain bowl",
+      "category": "restaurant",
+      "fit": 36,
+      "overlap": 22,
+      "strong": false,
+      "avoid": false,
+      "rent_first": false,
+      "rent_row": {
+        "viable": true,
+        "rent_max": 3230,
+        "ci90": [
+          2800,
+          4000
+        ]
+      }
+    }
+  ],
+  "matches": [
+    {
+      "unit": "Example A",
+      "rent": 2600,
+      "concept": "Ramen shop",
+      "verdict": "GO",
+      "category": "restaurant",
+      "fit": 78
+    },
+    {
+      "unit": "Example B",
+      "rent": 2400,
+      "concept": "Chicken sandwich",
+      "verdict": "ADJUST",
+      "category": "fast_food",
+      "fit": 58
+    },
+    {
+      "unit": "Example C",
+      "rent": 2200,
+      "concept": "Grain bowl",
+      "verdict": "NO-GO",
+      "category": "restaurant",
+      "fit": 36
+    },
+    {
+      "unit": "Example D",
+      "rent": 2000,
+      "concept": null,
+      "verdict": null,
+      "category": null,
+      "fit": null
+    }
+  ],
+  "notice": "Stated scores and rents. No Qloo response. Not a vetted address.",
+  "proof": "No improving move: 0 replacements and 3 swaps checked. Neighbour effects are an uncalibrated map of this run's audience overlap (same category cannibalises, a different category is treated as complementary footfall, and the effect scales with the neighbour's fit); no extra Qloo call. Units are treated as a line of neighbours, about 100 m apart or on one mall floor; that distance is not measured. With negotiable rent only the symmetric part of those effects changes the total. The 2023-2024 Chicago backtest found no measurable gain, so this is not a survival forecast. Empty units are not part of those checks: this search does not move a tenant into a vacant unit. Only the concepts that received an audience-overlap check carry a neighbour effect, and a run checks at most two, so other concepts contribute 0."
+}
