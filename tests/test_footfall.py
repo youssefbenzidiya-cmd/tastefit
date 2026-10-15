@@ -55,6 +55,14 @@ class Weights(unittest.TestCase):
         self.assertIn("not a vetted address", sig["sentence"])
         self.assertIsNone(footfall.signal(DOC, "Oberkampf, Paris"))
 
+    def test_south_loop_is_not_the_loop(self):
+        doc = footfall.load()
+        self.assertIsNone(footfall.for_text(doc, "South Loop, Chicago"))
+        self.assertIsNone(tenant.footfall_signal("South Loop", "Chicago"))
+        loop = footfall.for_text(doc, "The Loop, Chicago")
+        self.assertEqual(loop["name"].casefold(), "loop")
+        self.assertEqual(footfall.for_text(doc, "West Loop, Chicago")["name"].casefold(), "near west side")
+
 
 class BacktestOrders(unittest.TestCase):
     def test_three_variants_and_no_qloo(self):

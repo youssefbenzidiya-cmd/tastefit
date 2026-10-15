@@ -40,7 +40,7 @@ Hotspot cells come with coordinates; places carry an address, geocoded with Open
 
 The map uses Leaflet with OpenStreetMap tiles. The suggested spot points to a block to scout, not a vetted address.
 
-The memo only cites places, tags and numbers returned by Qloo, plus OpenStreetMap supply counts attributed as such in tenant memos, keeps Qloo results separate from interpretation, and ends with a **Limits** section: Qloo describes aggregate group affinities, not foot traffic, rents or individual behaviour. No personal data is sent to Qloo; inputs are a concept and a place name.
+The memo cites places, tags and numbers returned by Qloo, OpenStreetMap supply counts attributed as such, and, when the city is Chicago, the committed City of Chicago Data Portal community-area footfall shares with their dataset id and date range. It does not attach those Chicago counts to another city, and a name such as South Loop is not given the Loop's totals. It keeps Qloo results separate from interpretation, and ends with a **Limits** section: Qloo describes aggregate group affinities, not foot traffic, rents or individual behaviour. No personal data is sent to Qloo; inputs are a concept and a place name. The footfall line is a community-area total, not a count at the door and not a vetted address.
 
 ### City Scan and rent ceiling (`/scan`, `/scan/unit`)
 

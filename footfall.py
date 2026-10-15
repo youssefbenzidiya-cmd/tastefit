@@ -5,6 +5,7 @@ A community-area count is the same for every concept. Concepts differ because ea
 loads on a different mix of evening drop-offs, weekend drop-offs, Divvy trip ends and CTA entries.
 """
 import json
+import re
 from pathlib import Path
 
 FILE = Path(__file__).parent / "data" / "chicago_footfall.json"
@@ -62,17 +63,31 @@ def concept_score(doc, community_number, concept, shares=None):
     return sum(w * mix[k] for w, k in zip(WEIGHTS[concept], COMPONENTS))
 
 
+# A modifier in front of a shorter name is a different place: South Loop is not the Loop.
+_LEADING = {"south", "north", "east", "west", "new", "old", "greater", "lower", "upper", "near"}
+
+
+def _phrase(text, phrase):
+    folded = text.casefold()
+    match = re.search(rf"(?<![a-z0-9]){re.escape(phrase.casefold())}(?![a-z0-9])", folded)
+    if not match:
+        return False
+    before = folded[:match.start()].split()
+    return not (before and before[-1] in _LEADING)
+
+
 def for_text(doc, text):
     """The community area named by a backtest area or by a community-area name, else None."""
     if not text:
         return None
-    folded = text.casefold()
-    for place in doc.get("backtest_areas") or []:
-        if place["area"].casefold() in folded:
+    places = sorted(doc.get("backtest_areas") or [], key=lambda p: len(p["area"]), reverse=True)
+    for place in places:
+        if _phrase(text, place["area"]):
             row = _area_row(doc, place["community_area_number"])
             return row | {"matched": place["area"]}
-    for row in doc["community_areas"]:
-        if row["name"] and row["name"].casefold() in folded:
+    rows = sorted(doc["community_areas"], key=lambda r: len(r["name"] or ""), reverse=True)
+    for row in rows:
+        if row["name"] and _phrase(text, row["name"]):
             return row | {"matched": row["name"].title()}
     return None
 
