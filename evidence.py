@@ -238,6 +238,12 @@ audience overlap already in the run. The page states when no replacement or swap
 when fixed rents have no stable assignment. No extra Qloo call. The certificate is not a survival forecast.
 Baseline: ignores neighbours. Gale and Shapley (1962) matched on fit and the rent-first verdict and did not
 use neighbour effects.</p>
+<h2>Find an improving move our certificate missed</h2>
+<p>The published street is <code>docs/published-street.json</code>. Scores and overlap in that file are stated
+for the example. It stores no Qloo response. The units are an example line, not vetted addresses. From a checkout:</p>
+<pre>python3 docs/verify_certificate.py docs/published-street.json</pre>
+<p>Exit 0 means no replacement or swap raises the surplus. Exit 1 prints the move. The script uses the same
+surplus as the certificate and makes no Qloo call. The certificate is not a survival forecast.</p>
 <h2>Call it from an agent</h2>
 <p>The MCP server is <code>mcp_server.py</code> on stdio. Nothing is written to disk. The snippet below is the
 client shape. This change does not add a step-by-step client guide.</p>

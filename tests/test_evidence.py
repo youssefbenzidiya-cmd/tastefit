@@ -19,6 +19,8 @@ class Page(unittest.TestCase):
         self.assertIn("not a vetted address", html)
         self.assertIn("Vovk", html)
         self.assertIn("Test before you lease", html)
+        self.assertIn("Find an improving move our certificate missed", html)
+        self.assertIn("docs/verify_certificate.py", html)
         self.assertIn("no interest and no discounting", html)
 
     def test_values_are_escaped(self):
