@@ -154,13 +154,37 @@ def _footfall_section(doc):
     return "<h2>Footfall, before the window</h2><p>" + _esc(text) + "</p>"
 
 
-def page(chicago=None, tgi=None, bias=None, ledger_doc=None, footfall=None):
+def _live_street(doc):
+    """Certificate line plus event kinds and timings. No Qloo body."""
+    if not doc:
+        return ""
+    events = "".join(
+        "<li>" + _esc(event.get("kind")) + " at " + _esc(event.get("ms")) + " ms</li>"
+        for event in doc.get("events") or [])
+    assigned = ", ".join(
+        _esc(match.get("unit")) + ": " + _esc(match.get("concept") or "unmatched")
+        + " (" + _esc(match.get("verdict") or "none") + ")"
+        for match in doc.get("matches") or [])
+    return ("<h2>Milwaukee Avenue, representative rents</h2><p>"
+            + _esc(doc.get("notice")) + " "
+            + _esc(doc.get("place")) + " on " + _esc(doc.get("ran_on"))
+            + ". Rents in USD: " + _esc(", ".join(str(r) for r in doc.get("rents_usd") or []))
+            + ". Elapsed " + _esc(doc.get("elapsed_ms")) + " ms. "
+            + _esc(doc.get("server"))
+            + " Steps that hit a rate limit: " + _esc(doc.get("rate_limit_steps"))
+            + ".</p><p>" + _esc(doc.get("certificate")) + "</p><p>"
+            + _esc(doc.get("proof")) + "</p><p>Assignment: " + assigned
+            + ". Not a vetted address.</p><ul>" + events + "</ul>")
+
+
+def page(chicago=None, tgi=None, bias=None, ledger_doc=None, footfall=None, street_run=None):
     """HTML. Pass dicts in tests; otherwise the committed JSON files are read."""
     chicago = _load("backtest_chicago.json") if chicago is None else chicago
     tgi = _load("backtest_chicago_tgi.json") if tgi is None else tgi
     bias = _load("backtest_bias.json") if bias is None else bias
     ledger_doc = _load("data/ledger.json") if ledger_doc is None else ledger_doc
     footfall = _load("backtest_chicago_footfall.json") if footfall is None else footfall
+    street_run = _load("data/milwaukee_street.json") if street_run is None else street_run
     source = tgi or chicago or {}
     comparison, no_gain = _comparison(source, chicago if isinstance(chicago, dict) else source)
     heckman = (bias or {}).get("heckman") or {}
@@ -238,6 +262,13 @@ audience overlap already in the run. The page states when no replacement or swap
 when fixed rents have no stable assignment. No extra Qloo call. The certificate is not a survival forecast.
 Baseline: ignores neighbours. Gale and Shapley (1962) matched on fit and the rent-first verdict and did not
 use neighbour effects.</p>
+""" + _live_street(street_run) + """
+<h2>Find an improving move our certificate missed</h2>
+<p>The published street is <code>docs/published-street.json</code>. Scores and overlap in that file are stated
+for the example. It stores no Qloo response. The units are an example line, not vetted addresses. From a checkout:</p>
+<pre>python3 docs/verify_certificate.py docs/published-street.json</pre>
+<p>Exit 0 means no replacement or swap raises the surplus. Exit 1 prints the move. The script uses the same
+surplus as the certificate and makes no Qloo call. The certificate is not a survival forecast.</p>
 <h2>Call it from an agent</h2>
 <p>The MCP server is <code>mcp_server.py</code> on stdio. Nothing is written to disk. The snippet below is the
 client shape. This change does not add a step-by-step client guide.</p>
