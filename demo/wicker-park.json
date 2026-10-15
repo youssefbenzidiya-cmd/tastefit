@@ -1,0 +1,575 @@
+{
+  "_notice": "AGGREGATES ONLY. No Qloo response, entity, tag or raw payload is stored. saved example from 2026-10-15.",
+  "saved_on": "2026-10-15",
+  "label": "saved example from 2026-10-15",
+  "place": "Wicker Park, Chicago",
+  "notice": "Aggregates only. Not a live Qloo response. Not a vetted address.",
+  "point": {
+    "lat": 41.9088,
+    "lon": -87.6796,
+    "name": "Example point near Milwaukee Avenue"
+  },
+  "asking_rent": 2600,
+  "unit": {
+    "area": "Wicker Park, Chicago",
+    "city": "Chicago",
+    "currency": "USD",
+    "cell": 1577,
+    "rent_note": "City Scan rent ceiling for this example point. A model, not a forecast."
+  },
+  "units": [
+    {
+      "id": "Example A",
+      "rent": 2600
+    },
+    {
+      "id": "Example B",
+      "rent": 2400
+    },
+    {
+      "id": "Example C",
+      "rent": 2200
+    },
+    {
+      "id": "Example D",
+      "rent": 2000
+    }
+  ],
+  "concepts": [
+    {
+      "id": "Ramen shop",
+      "category": "restaurant",
+      "fit": 78,
+      "overlap": 55,
+      "strong": true,
+      "avoid": false,
+      "rent_first": false,
+      "rent_row": {
+        "viable": true,
+        "rent_max": 3230.0,
+        "ci90": [
+          2800.0,
+          4000.0
+        ],
+        "relative_demand": 0.616
+      }
+    },
+    {
+      "id": "Chicken sandwich",
+      "category": "fast_food",
+      "fit": 58,
+      "overlap": 40,
+      "strong": false,
+      "avoid": false,
+      "rent_first": false,
+      "rent_row": {
+        "viable": true,
+        "rent_max": 2790.0,
+        "ci90": [
+          1930.0,
+          4020.0
+        ],
+        "relative_demand": 1.028
+      }
+    },
+    {
+      "id": "Grain bowl",
+      "category": "restaurant",
+      "fit": 36,
+      "overlap": 22,
+      "strong": false,
+      "avoid": false,
+      "rent_first": false,
+      "rent_row": {
+        "viable": true,
+        "rent_max": 3230.0,
+        "ci90": [
+          2800.0,
+          4000.0
+        ],
+        "relative_demand": 0.616
+      }
+    }
+  ],
+  "shortlist": {
+    "area": "Wicker Park",
+    "city": "Chicago",
+    "currency": "USD",
+    "asking_rent": 2600,
+    "trial": {
+      "area": "Wicker Park, Chicago",
+      "concept": "Ramen shop",
+      "check": "covers_day",
+      "direction": "at_least",
+      "rent": 3230.0,
+      "threshold": 70.0,
+      "weeks": 8,
+      "ts": "2026-10-15T12:00:00Z",
+      "sha256": "82839e1cada1151ca159c1ea3e0d8013c52376f6b36d1f542ea0dc92894488cc",
+      "currency": "USD",
+      "range_threshold": 71.5,
+      "label": "your real covers per day (door counts at a comparable venue)",
+      "afford": "ok",
+      "sentence": "Test before you lease: a 8-week pop-up for Ramen shop. Success is your real covers per day (door counts at a comparable venue) at least 70.0 covers/day, the mode break-even at the rent-first ceiling of 3230 USD/month. The top of the ceiling's 90% range would move that line to 71.5 covers/day. From TasteFit's stated cost assumptions, not your figures. Monthly figures, no interest and no discounting. Trial plan `82839e1cada1151ca159c1ea3e0d8013c52376f6b36d1f542ea0dc92894488cc`. When the pop-up ends, log the observed value, the weeks run and whether it cleared. That log is not the five-field prediction fingerprint. A pop-up is not a vetted address."
+    },
+    "footfall": {
+      "label": "Demand already there",
+      "community_area": "West Town",
+      "community_area_number": "24",
+      "city_share": {
+        "evening_dropoffs": 0.0629,
+        "weekend_dropoffs": 0.0629,
+        "divvy_ends": 0.0694,
+        "cta_boardings": 0.0355
+      },
+      "sentence": "Demand already there: West Town had 6.3% of Chicago evening rideshare drop-offs (2022-01-01 to 2022-12-31, dataset m6dm-c72p) and 6.3% of weekend drop-offs, 6.9% of Divvy trip ends (2019-01-01 to 2019-12-31, dataset fg6s-gzvg), and 3.6% of CTA 'L' station entries (2022-01-01 to 2022-12-31, dataset 5neh-572f). Community-area totals from the City of Chicago Data Portal, not a count at this door, and not a vetted address. In the Chicago backtest, footfall did not beat a citywide baseline."
+    },
+    "concepts": [
+      {
+        "concept": "Ramen shop",
+        "why": "Stated example score. A sit-down bowl shop for this illustration.",
+        "rent_group": "restaurant",
+        "demand": 78,
+        "position": 1,
+        "of": 3,
+        "overlap": 55,
+        "score": 78,
+        "call": "GO",
+        "call_rule": "score",
+        "rent_note": "Asking rent 2600 is within the ceiling 3230.",
+        "rent_max": 3230.0
+      },
+      {
+        "concept": "Chicken sandwich",
+        "why": "Stated example score. A fast counter for this illustration.",
+        "rent_group": "fast_food",
+        "demand": 58,
+        "position": 2,
+        "of": 3,
+        "overlap": 40,
+        "score": 58,
+        "call": "ADJUST",
+        "call_rule": "score",
+        "rent_note": "Asking rent 2600 is within the ceiling 2790.",
+        "rent_max": 2790.0
+      },
+      {
+        "concept": "Grain bowl",
+        "why": "Stated example score. A second sit-down concept for this illustration.",
+        "rent_group": "restaurant",
+        "demand": 36,
+        "position": 3,
+        "of": 3,
+        "overlap": 22,
+        "score": 36,
+        "call": "NO-GO",
+        "call_rule": "score",
+        "rent_note": "Asking rent 2600 is within the ceiling 3230.",
+        "rent_max": 3230.0
+      }
+    ],
+    "heat": [],
+    "voi": {
+      "currency": "USD",
+      "evpi": 9774,
+      "noise_floor": 0,
+      "p_profit": 0.408,
+      "draws": 2000,
+      "checks": [
+        {
+          "input": "covers_day",
+          "label": "your real covers per day (door counts at a comparable venue)",
+          "evppi": 9391,
+          "above_noise": true
+        },
+        {
+          "input": "ticket",
+          "label": "the average ticket",
+          "evppi": 799,
+          "above_noise": true
+        },
+        {
+          "input": "staff",
+          "label": "staff cost (payroll quotes)",
+          "evppi": 502,
+          "above_noise": true
+        },
+        {
+          "input": "other_var",
+          "label": "card and delivery fees",
+          "evppi": 301,
+          "above_noise": true
+        },
+        {
+          "input": "cogs",
+          "label": "food cost share (supplier quotes)",
+          "evppi": 217,
+          "above_noise": true
+        },
+        {
+          "input": "days",
+          "label": "opening days per month",
+          "evppi": 207,
+          "above_noise": true
+        },
+        {
+          "input": "other_fixed",
+          "label": "utilities, licences and maintenance quotes",
+          "evppi": 85,
+          "above_noise": true
+        }
+      ],
+      "concept": "Ramen shop",
+      "rent": 2600,
+      "rent_source": "asking"
+    },
+    "method": "saved example from 2026-10-15. Scores, ranks and overlap are stated aggregates for this example. They are not a live Qloo response, and this file stores no Qloo payload. Rent ceilings are the City Scan survival model for the example point near Milwaukee Avenue. GO at 65 and above, ADJUST from 45 to 64, NO-GO below 45. A rent above the ceiling downgrades the call. Not a vetted address."
+  },
+  "portfolio": {
+    "matches": [
+      {
+        "unit": "Example A",
+        "rent": 2600,
+        "concept": "Ramen shop",
+        "verdict": "GO",
+        "category": "restaurant",
+        "fit": 78
+      },
+      {
+        "unit": "Example B",
+        "rent": 2400,
+        "concept": "Chicken sandwich",
+        "verdict": "ADJUST",
+        "category": "fast_food",
+        "fit": 58
+      },
+      {
+        "unit": "Example C",
+        "rent": 2200,
+        "concept": "Grain bowl",
+        "verdict": "NO-GO",
+        "category": "restaurant",
+        "fit": 36
+      },
+      {
+        "unit": "Example D",
+        "rent": 2000,
+        "concept": null,
+        "verdict": null,
+        "category": null,
+        "fit": null
+      }
+    ],
+    "k": 1,
+    "blocking": [],
+    "needs_rent_flexibility": false,
+    "replacements": 0,
+    "swaps": 3,
+    "steps": [
+      126.38499999999999
+    ],
+    "proof": "No improving move: 0 replacements and 3 swaps checked. Neighbour effects are an uncalibrated map of this run's audience overlap (same category cannibalises, a different category is treated as complementary footfall, and the effect scales with the neighbour's fit); no extra Qloo call. Units are treated as a line of neighbours, about 100 m apart or on one mall floor; that distance is not measured. With negotiable rent only the symmetric part of those effects changes the total. The 2023-2024 Chicago backtest found no measurable gain, so this is not a survival forecast. Empty units are not part of those checks: this search does not move a tenant into a vacant unit. Only the concepts that received an audience-overlap check carry a neighbour effect, and a run checks at most two, so other concepts contribute 0.",
+    "rents": {
+      "Example A": 2600,
+      "Example B": 2400,
+      "Example C": 2200,
+      "Example D": 2000
+    },
+    "rent_split": {
+      "label": "suggested, uncalibrated",
+      "rows": [
+        {
+          "unit": "Example A",
+          "concept": "Ramen shop",
+          "contribution": 3.4000000000000004,
+          "role": "anchor",
+          "asking": 2600.0,
+          "suggested": 2599.73
+        },
+        {
+          "unit": "Example B",
+          "concept": "Chicken sandwich",
+          "contribution": 4.692500000000001,
+          "role": "anchor",
+          "asking": 2400.0,
+          "suggested": 2398.44
+        },
+        {
+          "unit": "Example C",
+          "concept": "Grain bowl",
+          "contribution": 1.2925,
+          "role": "free-rider",
+          "asking": 2200.0,
+          "suggested": 2201.83
+        }
+      ],
+      "total_asking": 9200.0,
+      "total_suggested": 9200.0,
+      "applied_scale": 1.0,
+      "note": "Each figure is the symmetric part of the neighbour effect on the tenants next door. An anchor is above the street average and pays less. A free-rider is below it and pays more. The shift starts at one currency unit per surplus point and is recentered so the monthly total stays the asking total. Fixed rents only: no interest and no discounting."
+    },
+    "inputs": [
+      {
+        "id": "Ramen shop",
+        "category": "restaurant",
+        "fit": 78,
+        "overlap": 55,
+        "strong": true,
+        "avoid": false,
+        "rent_first": false,
+        "rent_row": {
+          "rent_max": 3230.0,
+          "ci90": [
+            2800.0,
+            4000.0
+          ],
+          "viable": true
+        }
+      },
+      {
+        "id": "Chicken sandwich",
+        "category": "fast_food",
+        "fit": 58,
+        "overlap": 40,
+        "strong": false,
+        "avoid": false,
+        "rent_first": false,
+        "rent_row": {
+          "rent_max": 2790.0,
+          "ci90": [
+            1930.0,
+            4020.0
+          ],
+          "viable": true
+        }
+      },
+      {
+        "id": "Grain bowl",
+        "category": "restaurant",
+        "fit": 36,
+        "overlap": 22,
+        "strong": false,
+        "avoid": false,
+        "rent_first": false,
+        "rent_row": {
+          "rent_max": 3230.0,
+          "ci90": [
+            2800.0,
+            4000.0
+          ],
+          "viable": true
+        }
+      }
+    ]
+  },
+  "what_if": {
+    "before": {
+      "matches": [
+        {
+          "unit": "Example A",
+          "rent": 2600.0,
+          "concept": "Ramen shop",
+          "verdict": "GO",
+          "category": "restaurant",
+          "fit": 78.0
+        },
+        {
+          "unit": "Example B",
+          "rent": 2400.0,
+          "concept": "Chicken sandwich",
+          "verdict": "ADJUST",
+          "category": "fast_food",
+          "fit": 58.0
+        },
+        {
+          "unit": "Example C",
+          "rent": 2200.0,
+          "concept": "Grain bowl",
+          "verdict": "NO-GO",
+          "category": "restaurant",
+          "fit": 36.0
+        },
+        {
+          "unit": "Example D",
+          "rent": 2000.0,
+          "concept": null,
+          "verdict": null,
+          "category": null,
+          "fit": null
+        }
+      ],
+      "k": 1,
+      "blocking": [],
+      "needs_rent_flexibility": false,
+      "replacements": 0,
+      "swaps": 3,
+      "steps": [
+        126.38499999999999
+      ],
+      "proof": "No improving move: 0 replacements and 3 swaps checked. Neighbour effects are an uncalibrated map of this run's audience overlap (same category cannibalises, a different category is treated as complementary footfall, and the effect scales with the neighbour's fit); no extra Qloo call. Units are treated as a line of neighbours, about 100 m apart or on one mall floor; that distance is not measured. With negotiable rent only the symmetric part of those effects changes the total. The 2023-2024 Chicago backtest found no measurable gain, so this is not a survival forecast. Empty units are not part of those checks: this search does not move a tenant into a vacant unit. Only the concepts that received an audience-overlap check carry a neighbour effect, and a run checks at most two, so other concepts contribute 0.",
+      "rents": {
+        "Example A": 2600.0,
+        "Example B": 2400.0,
+        "Example C": 2200.0,
+        "Example D": 2000.0
+      },
+      "rent_split": {
+        "label": "suggested, uncalibrated",
+        "rows": [
+          {
+            "unit": "Example A",
+            "concept": "Ramen shop",
+            "contribution": 3.4000000000000004,
+            "role": "anchor",
+            "asking": 2600.0,
+            "suggested": 2599.73
+          },
+          {
+            "unit": "Example B",
+            "concept": "Chicken sandwich",
+            "contribution": 4.692500000000001,
+            "role": "anchor",
+            "asking": 2400.0,
+            "suggested": 2398.44
+          },
+          {
+            "unit": "Example C",
+            "concept": "Grain bowl",
+            "contribution": 1.2925,
+            "role": "free-rider",
+            "asking": 2200.0,
+            "suggested": 2201.83
+          }
+        ],
+        "total_asking": 9200.0,
+        "total_suggested": 9200.0,
+        "applied_scale": 1.0,
+        "note": "Each figure is the symmetric part of the neighbour effect on the tenants next door. An anchor is above the street average and pays less. A free-rider is below it and pays more. The shift starts at one currency unit per surplus point and is recentered so the monthly total stays the asking total. Fixed rents only: no interest and no discounting."
+      }
+    },
+    "after": {
+      "matches": [
+        {
+          "unit": "Example A",
+          "rent": 2600.0,
+          "concept": "Ramen shop",
+          "verdict": "GO",
+          "category": "restaurant",
+          "fit": 78.0
+        },
+        {
+          "unit": "Example B",
+          "rent": 2400.0,
+          "concept": "Chicken sandwich",
+          "verdict": "ADJUST",
+          "category": "fast_food",
+          "fit": 58.0
+        },
+        {
+          "unit": "Example C",
+          "rent": 2200.0,
+          "concept": "Grain bowl",
+          "verdict": "NO-GO",
+          "category": "restaurant",
+          "fit": 36.0
+        },
+        {
+          "unit": "Example D",
+          "rent": 2000.0,
+          "concept": "corner bakery",
+          "verdict": "NO-GO",
+          "category": "other",
+          "fit": 0.0
+        }
+      ],
+      "k": 1,
+      "blocking": [],
+      "needs_rent_flexibility": false,
+      "replacements": 0,
+      "swaps": 6,
+      "steps": [
+        86.38499999999999
+      ],
+      "proof": "No improving move: 0 replacements and 6 swaps checked. Neighbour effects are an uncalibrated map of this run's audience overlap (same category cannibalises, a different category is treated as complementary footfall, and the effect scales with the neighbour's fit); no extra Qloo call. Units are treated as a line of neighbours, about 100 m apart or on one mall floor; that distance is not measured. With negotiable rent only the symmetric part of those effects changes the total. The 2023-2024 Chicago backtest found no measurable gain, so this is not a survival forecast. Empty units are not part of those checks: this search does not move a tenant into a vacant unit. Only the concepts that received an audience-overlap check carry a neighbour effect, and a run checks at most two, so other concepts contribute 0.",
+      "rents": {
+        "Example A": 2600.0,
+        "Example B": 2400.0,
+        "Example C": 2200.0,
+        "Example D": 2000.0
+      },
+      "rent_split": {
+        "label": "suggested, uncalibrated",
+        "rows": [
+          {
+            "unit": "Example A",
+            "concept": "Ramen shop",
+            "contribution": 3.4000000000000004,
+            "role": "anchor",
+            "asking": 2600.0,
+            "suggested": 2598.95
+          },
+          {
+            "unit": "Example B",
+            "concept": "Chicken sandwich",
+            "contribution": 4.692500000000001,
+            "role": "anchor",
+            "asking": 2400.0,
+            "suggested": 2397.65
+          },
+          {
+            "unit": "Example C",
+            "concept": "Grain bowl",
+            "contribution": 1.2925,
+            "role": "free-rider",
+            "asking": 2200.0,
+            "suggested": 2201.05
+          },
+          {
+            "unit": "Example D",
+            "concept": "corner bakery",
+            "contribution": 0.0,
+            "role": "free-rider",
+            "asking": 2000.0,
+            "suggested": 2002.35
+          }
+        ],
+        "total_asking": 9200.0,
+        "total_suggested": 9200.0,
+        "applied_scale": 1.0,
+        "note": "Each figure is the symmetric part of the neighbour effect on the tenants next door. An anchor is above the street average and pays less. A free-rider is below it and pays more. The shift starts at one currency unit per surplus point and is recentered so the monthly total stays the asking total. Fixed rents only: no interest and no discounting."
+      }
+    },
+    "changes": [
+      {
+        "concept": "Chicken sandwich",
+        "before": 47.89,
+        "after": 47.89,
+        "delta": 0.0
+      },
+      {
+        "concept": "Grain bowl",
+        "before": -2.4050000000000002,
+        "after": -2.4050000000000002,
+        "delta": 0.0
+      },
+      {
+        "concept": "Ramen shop",
+        "before": 80.9,
+        "after": 80.9,
+        "delta": 0.0
+      },
+      {
+        "concept": "corner bakery",
+        "before": null,
+        "after": -40.0,
+        "delta": null
+      }
+    ],
+    "qloo_calls": 0,
+    "added_note": "No taste data in this run, so this concept's fit and neighbour effects are 0. No extra Qloo call."
+  },
+  "memo": {
+    "markdown": "# Tenant memo: Wicker Park, Chicago\n\nsaved example from 2026-10-15. Aggregates only. This file stores no Qloo response. Scores and overlap are stated for the example. Rent ceilings are the City Scan model for the example point. The certificate, the rent split and the pop-up line are computed from those figures. The point is an example on the map, not a vetted address.\n\n## Recommendation\nRamen shop leads this example (GO, score 78).\n\n## Shortlist\n- **Ramen shop**: GO, stated score 78, example rank 1 of 3. Rent: Asking rent 2600 is within the ceiling 3230.\n- **Chicken sandwich**: ADJUST, stated score 58, example rank 2 of 3. Rent: Asking rent 2600 is within the ceiling 2790.\n- **Grain bowl**: NO-GO, stated score 36, example rank 3 of 3. Rent: Asking rent 2600 is within the ceiling 3230.\n\n## Limits\n- Qloo describes aggregate taste affinities of an area's audience, not foot traffic, sales or any individual.\n- Demand scores are relative to the candidates in this run (one Qloo rank call), not absolute.\n- White space comes from OpenStreetMap venues near the unit where the city has a venue file (mapping is incomplete), else from the places Qloo returns inside the area (capped at 10); neither is a census of competitors.\n- Rent ceilings are a survival model built from official data, not a forecast; cafés are not covered.\n- Score breakdowns split TasteFit's own scoring model (stated weights), not cause and effect; the check values come from TasteFit's stated cost assumptions, not your figures.\n- The unit is a point on a map, not a vetted address.\n- Demand already there: West Town had 6.3% of Chicago evening rideshare drop-offs (2022-01-01 to 2022-12-31, dataset m6dm-c72p) and 6.3% of weekend drop-offs, 6.9% of Divvy trip ends (2019-01-01 to 2019-12-31, dataset fg6s-gzvg), and 3.6% of CTA 'L' station entries (2022-01-01 to 2022-12-31, dataset 5neh-572f). Community-area totals from the City of Chicago Data Portal, not a count at this door, and not a vetted address. In the Chicago backtest, footfall did not beat a citywide baseline.\n- Test before you lease: a 8-week pop-up for Ramen shop. Success is your real covers per day (door counts at a comparable venue) at least 70.0 covers/day, the mode break-even at the rent-first ceiling of 3230 USD/month. The top of the ceiling's 90% range would move that line to 71.5 covers/day. From TasteFit's stated cost assumptions, not your figures. Monthly figures, no interest and no discounting. Trial plan `82839e1cada1151ca159c1ea3e0d8013c52376f6b36d1f542ea0dc92894488cc`. When the pop-up ends, log the observed value, the weeks run and whether it cleared. That log is not the five-field prediction fingerprint. A pop-up is not a vetted address.\n- In a Chicago backtest of 2023-2024 openings, neither Qloo demand rankings nor the Taste Gap Index predicted which concepts opened and survived better than a citywide baseline: read them as taste and supply evidence, not a survival forecast.\n- Street certificate `4c650269ee53c7f84e884c5c83aa6ed519af871d6ba8436236aa9135f19bba32` (SHA-256 of the unit ids, the rents, the assigned concepts, the moves checked and whether the street needs rent flexibility; no Qloo payload).\n",
+    "author": "saved example"
+  }
+}
