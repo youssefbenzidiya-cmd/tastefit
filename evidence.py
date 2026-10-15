@@ -140,7 +140,10 @@ def _footfall_section(doc):
     elif point_above:
         text += " A higher point estimate is not a gain: no 90% interval versus the baseline sits entirely above zero."
     else:
-        text += " No footfall variant beats the citywide 68%."
+        if _rate(published):
+            text += f" No footfall variant beats the citywide {_pct(published)}."
+        else:
+            text += " No footfall variant beats the published citywide baseline."
     cited = [f"{s.get('id')} ({s.get('start')} to {s.get('end')})" for s in (doc.get("sources") or [])
              if s.get("id") and s.get("start") and s.get("end")]
     if cited:

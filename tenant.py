@@ -530,8 +530,16 @@ BACKTEST_NOTE = ("- In a Chicago backtest of 2023-2024 openings, neither Qloo de
 LIMITS += "\n" + BACKTEST_NOTE
 
 
+def _is_chicago(city):
+    """Footfall counts exist for Chicago only. Another city's name must not pick up a Chicago area."""
+    text = " ".join((city or "").replace(",", " ").split()).casefold()
+    return text in {"chicago", "chicago il", "chicago illinois"}
+
+
 def footfall_signal(area, city):
-    """Committed portal aggregates for this place, or None. No network and no Qloo call."""
+    """Committed portal aggregates for a Chicago place, or None. No network and no Qloo call."""
+    if not _is_chicago(city):
+        return None
     try:
         doc = footfall.load()
         footfall.assert_before_window(doc)
