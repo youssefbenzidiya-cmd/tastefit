@@ -1,5 +1,7 @@
 """The evidence page quotes the committed files and escapes them."""
+import json
 import unittest
+from pathlib import Path
 
 import evidence
 
@@ -19,6 +21,13 @@ class Page(unittest.TestCase):
         self.assertIn("not a vetted address", html)
         self.assertIn("Vovk", html)
         self.assertIn("Test before you lease", html)
+        self.assertIn("Milwaukee Avenue, representative rents", html)
+        self.assertIn("a7d5aa6fe01da33ddda9cc58116ed713becb74fb1d28816dc2169f0fcf3e9719", html)
+        self.assertIn("not a vetted address", html.lower())
+        self.assertIn("at 80363 ms", html)
+        doc = json.loads((Path(__file__).resolve().parent.parent / "data" / "milwaukee_street.json").read_text())
+        self.assertTrue(all(set(event) == {"kind", "ms"} for event in doc["events"]))
+        self.assertNotIn("urn:", json.dumps(doc))
         self.assertIn("no interest and no discounting", html)
 
     def test_values_are_escaped(self):
