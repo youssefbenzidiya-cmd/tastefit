@@ -1,0 +1,180 @@
+{
+  "notice": "Event kinds and timings only, plus the street certificate. No Qloo response is stored. Representative rents, not confirmed vacancies, and not a vetted address.",
+  "ran_on": "2026-10-15",
+  "place": "Example point near Milwaukee Avenue, Wicker Park, Chicago",
+  "point": {
+    "lat": 41.9088,
+    "lon": -87.6796
+  },
+  "rents_usd": [
+    2600,
+    2400,
+    2200,
+    2000
+  ],
+  "server": "TasteFit /tenant, same code as main 4dde350, run locally on 2026-10-15 because https://tastefit.onrender.com/tenant returned offline.",
+  "elapsed_ms": 80363,
+  "rate_limit_steps": 1,
+  "certificate": "- Street certificate `a7d5aa6fe01da33ddda9cc58116ed713becb74fb1d28816dc2169f0fcf3e9719` (SHA-256 of the unit ids, the rents, the assigned concepts, the moves checked and whether the street needs rent flexibility; no Qloo payload).",
+  "proof": "No improving move: 0 replacements and 6 swaps checked. Neighbour effects are an uncalibrated map of this run's audience overlap (same category cannibalises, a different category is treated as complementary footfall, and the effect scales with the neighbour's fit); no extra Qloo call. Units are treated as a line of neighbours, about 100 m apart or on one mall floor; that distance is not measured. With negotiable rent only the symmetric part of those effects changes the total. The 2023-2024 Chicago backtest found no measurable gain, so this is not a survival forecast. Empty units are not part of those checks: this search does not move a tenant into a vacant unit. Only the concepts that received an audience-overlap check carry a neighbour effect, and a run checks at most two, so other concepts contribute 0.",
+  "matches": [
+    {
+      "unit": "Unit 1",
+      "rent": 2600.0,
+      "concept": "Mediterranean bowls",
+      "verdict": "GO"
+    },
+    {
+      "unit": "Unit 2",
+      "rent": 2400.0,
+      "concept": "ramen shop",
+      "verdict": "GO"
+    },
+    {
+      "unit": "Unit 3",
+      "rent": 2200.0,
+      "concept": "salad bowls",
+      "verdict": "ADJUST"
+    },
+    {
+      "unit": "Unit 4",
+      "rent": 2000.0,
+      "concept": "Korean fried chicken",
+      "verdict": "NO-GO"
+    }
+  ],
+  "events": [
+    {
+      "kind": "unit",
+      "ms": 16802
+    },
+    {
+      "kind": "step",
+      "ms": 16802
+    },
+    {
+      "kind": "step",
+      "ms": 16802
+    },
+    {
+      "kind": "step",
+      "ms": 16802
+    },
+    {
+      "kind": "profile",
+      "ms": 16802
+    },
+    {
+      "kind": "step",
+      "ms": 16802
+    },
+    {
+      "kind": "step",
+      "ms": 16802
+    },
+    {
+      "kind": "step",
+      "ms": 16802
+    },
+    {
+      "kind": "step",
+      "ms": 16802
+    },
+    {
+      "kind": "step",
+      "ms": 16802
+    },
+    {
+      "kind": "step",
+      "ms": 16802
+    },
+    {
+      "kind": "candidates",
+      "ms": 38337
+    },
+    {
+      "kind": "step",
+      "ms": 38337
+    },
+    {
+      "kind": "step",
+      "ms": 38337
+    },
+    {
+      "kind": "step",
+      "ms": 38337
+    },
+    {
+      "kind": "step",
+      "ms": 38337
+    },
+    {
+      "kind": "step",
+      "ms": 38337
+    },
+    {
+      "kind": "step",
+      "ms": 38337
+    },
+    {
+      "kind": "step",
+      "ms": 38337
+    },
+    {
+      "kind": "step",
+      "ms": 38338
+    },
+    {
+      "kind": "step",
+      "ms": 38338
+    },
+    {
+      "kind": "step",
+      "ms": 38338
+    },
+    {
+      "kind": "step",
+      "ms": 38338
+    },
+    {
+      "kind": "step",
+      "ms": 38338
+    },
+    {
+      "kind": "step",
+      "ms": 38338
+    },
+    {
+      "kind": "step",
+      "ms": 38338
+    },
+    {
+      "kind": "step",
+      "ms": 38338
+    },
+    {
+      "kind": "step",
+      "ms": 38338
+    },
+    {
+      "kind": "shortlist",
+      "ms": 80363
+    },
+    {
+      "kind": "portfolio",
+      "ms": 80363
+    },
+    {
+      "kind": "baseline",
+      "ms": 80363
+    },
+    {
+      "kind": "memo",
+      "ms": 80363
+    },
+    {
+      "kind": "budget",
+      "ms": 80363
+    }
+  ]
+}
