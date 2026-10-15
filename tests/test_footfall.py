@@ -53,6 +53,7 @@ class Weights(unittest.TestCase):
         self.assertIn("m6dm-c72p", sig["sentence"])
         self.assertIn("2022-01-01", sig["sentence"])
         self.assertIn("not a vetted address", sig["sentence"])
+        self.assertIn("did not beat a citywide baseline", sig["sentence"])
         self.assertIsNone(footfall.signal(DOC, "Oberkampf, Paris"))
 
     def test_south_loop_is_not_the_loop(self):

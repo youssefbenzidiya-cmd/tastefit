@@ -111,7 +111,7 @@ def signal(doc, text, shares=None):
         f"and {mix['cta_boardings']:.1%} of CTA 'L' station entries "
         f"({cta['start']} to {cta['end']}, dataset {cta['id']}). "
         "Community-area totals from the City of Chicago Data Portal, not a count at this door, "
-        "and not a vetted address."
+        "and not a vetted address. In the Chicago backtest, footfall did not beat a citywide baseline."
     )
     return {"label": "Demand already there", "community_area": row["name"].title(),
             "community_area_number": row["number"], "city_share": {k: round(mix[k], 4) for k in COMPONENTS},
