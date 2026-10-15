@@ -489,7 +489,7 @@ async function runWhatIf() {
 function shortlistHTML() {
   const sl = state.shortlist, scored = sl.concepts.filter(c => c.call), rest = sl.concepts.filter(c => !c.call);
   if (!scored.length) return `<div class="state state-warn"><h3>No concept could be scored here</h3><p>Qloo did not return enough benchmarks for this area. Try a better-known neighbourhood.</p></div>${portfolioHTML()}`;
-  return `${footfallHTML()}<ol class="cards" aria-label="Ranked tenant shortlist">${scored.map(cardHTML).join('')}</ol>
+  return `<ol class="cards" aria-label="Ranked tenant shortlist">${scored.map(cardHTML).join('')}</ol>
     ${rest.length ? `<p class="unscored">Also tested: ${rest.map(c => `${esc(c.concept)}${c.position ? ` (rank ${esc(c.position)} of ${esc(c.of)})` : ''}`).join(', ')}. Only the top concepts by demand get the supply and audience checks.</p>` : ''}
     <p class="hint-line">${esc(sl.method)}</p>${portfolioHTML()}`;
 }
@@ -511,6 +511,11 @@ function compareHTML() {
       ${venues}
     </div></section>`;
 }
+function trialHTML() {
+  const t = state.shortlist && state.shortlist.trial;
+  if (!t || !t.sentence) return '';
+  return `<p class="hint-line">${esc(t.sentence)}</p>`;
+}
 function footfallHTML() {
   const f = state.shortlist && state.shortlist.footfall;
   if (!f || !f.sentence) return '';
@@ -522,7 +527,7 @@ function leadHTML() {
   return `<section class="lead" aria-labelledby="lead-title"><div class="lead-row">${badge(top.call, 'badge-lg')}<span class="num" style="font-weight:700">${esc(top.score)}/100</span></div>
     <h3 id="lead-title">${esc(top.concept)} leads the shortlist for this unit.</h3>
     <p>Rank ${esc(top.position)} of ${esc(top.of)} for the ${esc(state.shortlist.area)} audience${top.local_supply != null ? `, ${esc(top.local_supply)} similar places nearby` : ''}${top.trend ? `, interest ${top.trend.change >= 3 ? 'rising' : top.trend.change <= -3 ? 'fading' : 'steady'}` : ''}. ${esc(top.rent_note)} ${esc(top.adjust_note || '')}</p>
-    ${voiHTML(state.shortlist.voi)}${footfallHTML()}</section>`;
+    ${voiHTML(state.shortlist.voi)}${trialHTML()}${footfallHTML()}</section>`;
 }
 function voiHTML(v) {
   const top = v && v.checks.filter(c => c.above_noise);
