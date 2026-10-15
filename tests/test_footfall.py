@@ -95,6 +95,22 @@ class BacktestOrders(unittest.TestCase):
         self.assertNotIn("sits above zero", html)
 
 
+class CommittedFile(unittest.TestCase):
+    def test_the_committed_windows_end_before_the_backtest(self):
+        doc = footfall.load()
+        footfall.assert_before_window(doc)
+        self.assertEqual(len(doc["community_areas"]), 77)
+        self.assertEqual(len(doc["backtest_areas"]), 12)
+        ids = {ds["id"] for ds in doc["datasets"]}
+        self.assertEqual(ids, {"m6dm-c72p", "fg6s-gzvg", "5neh-572f"})
+        self.assertIn("no divvy gender", doc["personal_data"].lower())
+        allowed = {"number", "name", "evening_dropoffs", "weekend_dropoffs", "divvy_ends", "cta_boardings"}
+        for row in doc["community_areas"]:
+            self.assertEqual(set(row), allowed)
+        self.assertIn("not a vetted address", footfall.signal(doc, "Wicker Park, Chicago")["sentence"])
+        self.assertGreater(sum(r["evening_dropoffs"] for r in doc["community_areas"]), 0)
+
+
 class Memo(unittest.TestCase):
     def test_the_sentence_does_not_change_the_five_field_fingerprint(self):
         entry = {"area": "Wicker Park, Chicago", "concept": "ramen shop", "verdict": "unscored",

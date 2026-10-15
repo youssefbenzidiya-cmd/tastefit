@@ -206,7 +206,7 @@ def _day_counts(day):
         "$where": where,
         "$group": "dropoff_community_area",
         "$limit": 100,
-    }, timeout=120, retries=2)
+    }, timeout=180, retries=2)
     part = _counts(rows)
     path.write_text(json.dumps(part))
     print(f"tnp day {day} {sum(part.values())}", flush=True)
@@ -239,6 +239,8 @@ def weekend_days(py_weekday, slug):
     gate = threading.Lock()
 
     def fetch(one):
+        if (Path("/tmp/tnp-cache") / f"day-{one}.json").is_file():
+            return _day_counts(one)
         with gate:
             time.sleep(1)
         return _day_counts(one)
@@ -260,13 +262,13 @@ def _divvy_rows(start, end, depth=0):
         return json.loads(path.read_text())
     try:
         rows = soda("fg6s-gzvg", {
-            "$select": "to_latitude as lat, to_longitude as lon, count(1) as n",
+            "$select": "to_latitude, to_longitude, count(1) as n",
             "$where": f"stop_time >= '{start}T00:00:00' AND stop_time < '{end}T00:00:00'",
             "$group": "to_latitude, to_longitude",
             "$limit": 5000,
         }, timeout=180, retries=1)
     except (TimeoutError, urllib.error.URLError):
-        if depth >= 2:
+        if depth >= 3:
             raise
         mid = _midpoint(start, end)
         print(f"divvy {start} split at {mid}", flush=True)
@@ -286,10 +288,14 @@ def divvy_by_area(areas):
         rows = _divvy_rows(start, end)
         print(f"divvy {start} {sum(int(float(r['n'])) for r in rows)}", flush=True)
         for row in rows:
-            lat, lon = float(row["lat"]), float(row["lon"])
+            n = int(float(row["n"]))
+            if not row.get("to_latitude") or not row.get("to_longitude"):
+                missed += n
+                continue
+            lat = float(row["to_latitude"])
+            lon = float(row["to_longitude"])
             points.add((round(lat, 5), round(lon, 5)))
             area = locate(areas, lon, lat)
-            n = int(float(row["n"]))
             if area is None:
                 missed += n
                 continue
@@ -386,7 +392,8 @@ def main():
              "measure": "Sum of station entries (rides). Stations located with dataset 8pix-ypme and placed in a community area.",
              "stations_dataset": "8pix-ypme",
              "start": "2022-01-01", "end": "2022-12-31",
-             "stations_unplaced": cta_missed},
+             "stations_outside_chicago": cta_missed,
+             "note": "Entries at L stations outside the 77 community areas. The system continues into the suburbs, so those rides are not a Chicago community-area count."},
         ],
         "boundaries": {"id": "igwz-8jzy", "name": "Boundaries - Community Areas",
                        "url": "https://data.cityofchicago.org/d/igwz-8jzy"},
