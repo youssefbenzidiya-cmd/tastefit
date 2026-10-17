@@ -2,6 +2,7 @@
 import datetime
 import json
 import unittest
+from pathlib import Path
 from unittest import mock
 
 import ledger
@@ -132,6 +133,34 @@ class PipelineTest(unittest.TestCase):
     def kinds(self, events, kind):
         return [d for k, d in events if k == kind]
 
+    def test_started_is_yielded_before_the_unit_scan_and_qloo(self):
+        seen = []
+
+        def unit(*_a, **_k):
+            seen.append("scan")
+            return 200, {"calibrated": True, "rent_ceiling": RENT, "currency": "USD", "note": "model", "cell": 7}
+
+        def taste(op, params, cache=None, timeout=90):
+            seen.append("qloo")
+            return self.fake(op, params, cache=cache, timeout=timeout)
+
+        with mock.patch("tenant.scan.unit", side_effect=unit), mock.patch.object(qloo, "exec_cached", side_effect=taste):
+            gen = tenant.run("chicago", lat=41.9, lon=-87.68, today=datetime.date(2026, 10, 13), chat_fn=chat_script())
+            kind, data = next(gen)
+            self.assertEqual((kind, data), ("started", {"phase": "locate"}))
+            self.assertEqual(seen, [])
+            rest = list(gen)
+        self.assertIn("scan", seen)
+        self.assertIn("qloo", seen)
+        self.assertEqual([k for k, _ in rest if k == "started"], [])
+        self.assertTrue(self.kinds(rest, "unit"))
+        self.assertNotIn("urn:", json.dumps(data))
+
+    def test_page_shows_the_opening_line_before_any_taste_result(self):
+        script = Path("static/app.js").read_text(encoding="utf-8")
+        self.assertIn("started: () => pushTraceRow('open'", script)
+        self.assertIn("No taste result yet.", script)
+
     def test_full_run_uses_eight_workflows_within_budget(self):
         ev = self.run_all(asking_rent=2800)
         budget = self.kinds(ev, "budget")[0]
@@ -220,7 +249,8 @@ class PipelineTest(unittest.TestCase):
     def test_unnamed_point_is_an_error(self):
         with mock.patch("tenant.geo.reverse", return_value=None):
             ev = self.run_all()
-        self.assertEqual(ev, [("error", "Could not name that point; type the neighborhood instead.")])
+        self.assertEqual(ev, [("started", {"phase": "locate"}),
+                              ("error", "Could not name that point; type the neighborhood instead.")])
 
     def test_portfolio_reuses_this_run_and_adds_no_qloo_call(self):
         base = self.run_all(asking_rent=2800)

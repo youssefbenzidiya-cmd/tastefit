@@ -693,12 +693,16 @@ def _public_concept(concept):
 
 def run(city, location=None, lat=None, lon=None, asking_rent=None, chat_fn=None, today=None, clock=time.monotonic,
         portfolio_rents=None, portfolio_k=1):
-    """Yields (kind, data): unit, step*, profile, candidates, shortlist, baseline, memo, budget; or error.
+    """Yields (kind, data): started, unit, step*, profile, candidates, shortlist, baseline, memo, budget; or error.
 
     portfolio_rents, when set, adds a Stable Street certificate for this unit plus those rents. It reuses
     this run's fit scores and audience overlap and makes no extra Qloo call.
+
+    The first event is started, before the area lookup, the City Scan unit read and any Qloo call,
+    so the stream is not silent while that work runs.
     """
     started = clock()
+    yield "started", {"phase": "locate"}
     chat_fn = chat_fn or deadline_chat(started, clock)
     today = today or datetime.date.today()
     led = Ledger()

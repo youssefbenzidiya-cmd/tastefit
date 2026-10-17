@@ -36,8 +36,19 @@ const ERRORS = {
 const state = {
   mode: 'broker', unit: null, phase: 'empty', tab: 'shortlist', run: null,
   steps: [], unitInfo: null, shortlist: null, baseline: null, budget: null, memo: null, scorecard: null, geo: null,
-  competitors: [], error: null, asking: null, streetRents: '', streetShort: false, concept: '', startedAt: 0, endedAt: 0, demo: null, portfolio: null, savedWhatIf: null,
+  competitors: [], error: null, asking: null, streetRents: '', streetShort: false, concept: '', startedAt: 0, lastEventAt: 0, endedAt: 0, demo: null, portfolio: null, savedWhatIf: null,
 };
+
+/* While a run is in flight, a quiet SSE stream must not look frozen. */
+const STALL_AFTER_MS = 8000;
+function stallOut(quietMs) {
+  if (quietMs <= STALL_AFTER_MS) return 'Working';
+  return `Still working… ${Math.floor(quietMs / 1000)}s on this step`;
+}
+function quietMs() {
+  const since = state.lastEventAt || state.startedAt || Date.now();
+  return Date.now() - since;
+}
 
 const COPY = {
   broker: {
@@ -353,7 +364,7 @@ function traceHTML() {
     return `<li class="step ${cls}${s.isNew ? ' enter' : ''}"><span class="dot">${s.fail ? icon('x') : icon('check')}</span><div>
       <div class="step-title">${esc(s.title)} ${wf}</div>${s.out ? `<div class="step-out">${esc(s.out)}</div>` : ''}${rec}</div></li>`;
   }).join('');
-  const live = running ? `<li class="step live"><span class="dot"></span><div><div class="step-title">${esc(nextTitle())}</div><div class="step-out">Working</div></div></li>` : '';
+  const live = running ? `<li class="step live" id="live-step"><span class="dot"></span><div><div class="step-title" id="live-title">${esc(nextTitle())}</div><div class="step-out" id="live-out">${esc(stallOut(quietMs()))}</div></div></li>` : '';
   const elapsed = Math.max(0, Math.round(((state.endedAt || Date.now()) - state.startedAt) / 1000));
   const calls = state.budget ? state.budget.qloo_calls : state.steps.reduce((a, s) => a + s.calls.filter(c => !c.cached && !c.skipped).length, 0);
   return `<section class="trace" aria-labelledby="trace-title">
@@ -642,6 +653,7 @@ function fail(code, text) {
 
 const HANDLERS = {
   demo: d => { state.demo = d; state.concept = d.concept; state.location = d.location; },
+  started: () => pushTraceRow('open', { kind: 'local', title: 'Opening the stream', out: 'The unit scan comes next. No taste result yet.' }),
   unit: d => { state.unitInfo = d; pushTraceRow('locate', { kind: 'local', out: [d.area, d.cell != null ? `City Scan cell ${d.cell}` : '', d.rent_note || ''].filter(Boolean).join('. ') }); },
   step: s => {
     if (state.mode === 'founder' || s.tool) {
@@ -694,9 +706,22 @@ function drawFounderGeo(g) {
 
 /* ---------------- run lifecycle ---------------- */
 let clockTimer;
+function tickRun() {
+  const el = $('#clock');
+  if (el && state.startedAt) {
+    const t = Math.round((Date.now() - state.startedAt) / 1000);
+    el.textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+  }
+  if (state.phase !== 'running') return;
+  const out = $('#live-out');
+  if (!out) return;
+  out.textContent = stallOut(quietMs());
+  const title = $('#live-title');
+  if (title) title.textContent = nextTitle();
+}
 function resetRun() {
   if (state.run) { state.run.stopped = true; state.run.ctrl.abort(); }
-  Object.assign(state, { phase: state.unit ? 'selected' : 'empty', run: null, steps: [], unitInfo: null, shortlist: null, portfolio: null, savedWhatIf: null, streetShort: false, baseline: null, budget: null, memo: null, scorecard: null, geo: null, competitors: [], error: null, demo: null, tab: 'shortlist', endedAt: 0 });
+  Object.assign(state, { phase: state.unit ? 'selected' : 'empty', run: null, steps: [], unitInfo: null, shortlist: null, portfolio: null, savedWhatIf: null, streetShort: false, baseline: null, budget: null, memo: null, scorecard: null, geo: null, competitors: [], error: null, demo: null, tab: 'shortlist', endedAt: 0, lastEventAt: 0 });
   clearInterval(clockTimer);
   if (layerHeat) layerHeat.clearLayers();
 }
@@ -752,14 +777,16 @@ async function startRun({ demo } = {}) {
     url = '/run?' + new URLSearchParams({ concept: c, location: loc });
   }
   const run = { stopped: false, ctrl: new AbortController() };
-  Object.assign(state, { run, phase: 'running', steps: [], portfolio: null, startedAt: Date.now(), endedAt: 0, error: null });
+  const started = Date.now();
+  Object.assign(state, { run, phase: 'running', steps: [], portfolio: null, startedAt: started, lastEventAt: started, endedAt: 0, error: null });
   clearInterval(clockTimer);
-  clockTimer = setInterval(() => { const el = $('#clock'); if (el) { const t = Math.round((Date.now() - state.startedAt) / 1000); el.textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; } }, 1000);
+  clockTimer = setInterval(tickRun, 1000);
   paintRun();
   let ended = false;
   try {
     for await (const [event, data] of sse(url, run.ctrl.signal)) {
       if (run.stopped) return;
+      state.lastEventAt = Date.now();
       if (HANDLERS[event]) HANDLERS[event](data);
       if (event === 'error') { ended = true; break; }
       if (event === 'memo') ended = true;
