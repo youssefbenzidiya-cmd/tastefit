@@ -651,6 +651,7 @@ function fail(code, text) {
 
 const HANDLERS = {
   demo: d => { state.demo = d; state.concept = d.concept; state.location = d.location; },
+  started: () => pushTraceRow('open', { kind: 'local', title: 'Opening the stream', out: 'The unit scan comes next. No taste result yet.' }),
   unit: d => { state.unitInfo = d; pushTraceRow('locate', { kind: 'local', out: [d.area, d.cell != null ? `City Scan cell ${d.cell}` : '', d.rent_note || ''].filter(Boolean).join('. ') }); },
   step: s => {
     if (state.mode === 'founder' || s.tool) {
