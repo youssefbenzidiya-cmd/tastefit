@@ -5,6 +5,7 @@ import json
 import os
 import re
 import threading
+import time
 import unittest
 import urllib.error
 import urllib.request
@@ -143,6 +144,26 @@ class Server(unittest.TestCase):
             code, body = self.get("/tenant?lat=41.9&lon=-87.68")
         self.assertEqual(code, 200)
         self.assertIn('event: error\ndata: "offline"', body)
+
+    def test_stream_pings_while_the_pipeline_is_blocked(self):
+        def fake_run(*_a, **_k):
+            time.sleep(0.25)
+            yield "unit", {"area": "Sample"}
+            yield "budget", {"qloo_calls": 0}
+
+        with mock.patch.object(app, "SSE_PING_S", 0.05), \
+             mock.patch.dict(os.environ, {"QLOO_API_KEY": "k"}), \
+             mock.patch.object(app.tenant, "run", fake_run):
+            code, body = self.get("/tenant?lat=41.9&lon=-87.68")
+        self.assertEqual(code, 200)
+        self.assertLess(body.index(": ping"), body.index("event: unit"))
+        kinds = [event for event, _data in sse_events(body) if event]
+        self.assertEqual(kinds, ["unit", "budget"])
+        script = (app.ROOT / "static" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("if (line.startsWith(':')) continue;", script)
+        self.assertIn("if (!named) continue;", script)
+        self.assertIn("data ? JSON.parse(data) : null", script)
+        self.assertIn("if (HANDLERS[event]) HANDLERS[event](data)", script)
 
     def test_tenant_streams_pipeline_events(self):
         def fake_run(city, location, lat, lon, rent, portfolio_rents=None, portfolio_k=1):
