@@ -156,6 +156,7 @@ class Server(unittest.TestCase):
              mock.patch.object(app.tenant, "run", fake_run):
             code, body = self.get("/tenant?lat=41.9&lon=-87.68")
         self.assertEqual(code, 200)
+        self.assertIn(": ping" + (" " * 100), body)
         self.assertLess(body.index(": ping"), body.index("event: unit"))
         kinds = [event for event, _data in sse_events(body) if event]
         self.assertEqual(kinds, ["unit", "budget"])
