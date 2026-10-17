@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import secrets
+import socket
 import threading
 import time
 import urllib.parse
@@ -35,7 +36,10 @@ DEMO_FILE = ROOT / "demo" / "sample-report.json"
 WICKER_FILE = ROOT / "demo" / "wicker-park.json"
 DEMO_DELAY_SCALE = float(os.environ.get("DEMO_DELAY_SCALE", "1"))
 # Comment pings while a run is blocked on the network. Proxies drop a silent stream.
+# The pad and TCP_NODELAY are what make a comment leave the process: an 8-byte
+# ping was held until the next real event on Cloud Run (measured 2026-10-17).
 SSE_PING_S = 10
+SSE_PING = b": ping" + b" " * 2048 + b"\n\n"
 
 STATIC = {
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
@@ -205,11 +209,19 @@ class Handler(BaseHTTPRequestHandler):
         self._send(429, "text/plain; charset=utf-8", message.encode(), headers=[("Retry-After", str(retry_after))])
 
     def _start_stream(self):
+        try:
+            self.connection.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        except OSError:
+            pass
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-cache")
         self.send_header("X-Accel-Buffering", "no")
         self.end_headers()
+        try:
+            self.wfile.flush()
+        except OSError:
+            pass
 
     def _event(self, kind, data):
         self.wfile.write(f"event: {kind}\ndata: {json.dumps(data)}\n\n".encode())
@@ -305,8 +317,7 @@ class Handler(BaseHTTPRequestHandler):
                     with lock:
                         if stop.is_set():
                             return
-                        self.wfile.write(b": ping\n\n")
-                        self.wfile.flush()
+                        self.connection.sendall(SSE_PING)
                 except OSError:
                     return
 
