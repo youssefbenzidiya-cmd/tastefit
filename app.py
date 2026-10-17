@@ -34,6 +34,8 @@ DEMO_FILE = ROOT / "demo" / "sample-report.json"
 # Aggregates-only saved example. No Qloo response is stored in this file.
 WICKER_FILE = ROOT / "demo" / "wicker-park.json"
 DEMO_DELAY_SCALE = float(os.environ.get("DEMO_DELAY_SCALE", "1"))
+# Comment pings while a run is blocked on the network. Proxies drop a silent stream.
+SSE_PING_S = 10
 
 STATIC = {
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
@@ -294,20 +296,40 @@ class Handler(BaseHTTPRequestHandler):
         if not run_slots.acquire(blocking=False):
             return self._too_many(BUSY_MSG, 60)
         events = None
+        stop = threading.Event()
+        lock = threading.Lock()
+
+        def ping():
+            while not stop.wait(SSE_PING_S):
+                try:
+                    with lock:
+                        if stop.is_set():
+                            return
+                        self.wfile.write(b": ping\n\n")
+                        self.wfile.flush()
+                except OSError:
+                    return
+
         try:
             self._start_stream()
+            threading.Thread(target=ping, daemon=True).start()
             events = start()
             for kind, data in events:
-                self._event(kind, data)
+                with lock:
+                    self._event(kind, data)
         except (BrokenPipeError, ConnectionResetError):
             log.info("client disconnected during a run")
         except Exception:  # noqa: BLE001  details go to the server log, never to the browser
             log.exception("run failed")
             try:
-                self._event("error", "internal")
+                with lock:
+                    self._event("error", "internal")
             except OSError:
                 pass
         finally:
+            stop.set()
+            with lock:
+                pass
             if hasattr(events, "close"):
                 events.close()
             run_slots.release()

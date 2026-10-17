@@ -632,11 +632,13 @@ async function* sse(url, signal) {
     while ((i = buf.indexOf('\n\n')) >= 0) {
       const block = buf.slice(0, i);
       buf = buf.slice(i + 2);
-      let event = 'message', data = '';
+      let event = 'message', data = '', named = false;
       for (const line of block.split('\n')) {
-        if (line.startsWith('event:')) event = line.slice(6).trim();
-        else if (line.startsWith('data:')) data += line.slice(5).trimStart();
+        if (line.startsWith(':')) continue;
+        if (line.startsWith('event:')) { event = line.slice(6).trim(); named = true; }
+        else if (line.startsWith('data:')) { data += line.slice(5).trimStart(); named = true; }
       }
+      if (!named) continue;
       yield [event, data ? JSON.parse(data) : null];
     }
   }
