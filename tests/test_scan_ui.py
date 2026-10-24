@@ -75,6 +75,7 @@ class ChicagoPage(unittest.TestCase):
         self.assertIn("youssefbenzidiya@gmail.com", self.js)
         self.assertIn("mailto:${esc(CONTACT)}", self.js)
         self.assertIn("Who this street loves", self.js)
+        self.assertIn("function isQlooPlace(", self.js)
         self.assertIn("R = b + αG", self.js)
         self.assertIn("ES 95%", self.js)
         self.assertIn("Kelly", self.js)

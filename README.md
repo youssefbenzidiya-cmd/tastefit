@@ -23,7 +23,7 @@ The pin is the only required action. Print memo is a one-page report from that p
 1. Open the live demo. The pin is Wicker Park. Read the big number: how many of 100 still open at this rent.
 2. Click another block. Census and the cell move. Licences do not: κ = 0.
 3. Drag “landlord share” toward 35%. 80% open is for sale as a share, not as a cheaper pin.
-4. Print memo. Hand it to a landlord. Limits stay on the page.
+4. Print memo. Qloo, the ACS tract, and the lease maths (EL, ES 95%, Merton, Kelly, Vasicek) are on one sheet, in English and in the desk’s language. Limits stay. Write youssefbenzidiya@gmail.com.
 
 A silent 60-second reel is at `/walkthrough` on the running app (source: [`demo/walkthrough.html`](demo/walkthrough.html)). Freeze a beat with `?scene=1` … `?scene=5`. A recorded cut is [`demo/tastefit-60s.mp4`](demo/tastefit-60s.mp4) (60 seconds, product only).
 
@@ -241,7 +241,7 @@ Tests: `python -m unittest discover -s tests -t . -v` (276 tests).
 
 **Live demo (Cloud Run, free tier):** https://tastefit-776637567140.us-central1.run.app (us-central1, 0 to 1 instances). The `deploy-gcp` job copies the signed, scanned CI image by digest to Artifact Registry and deploys that digest, authenticated by Workload Identity Federation (no stored key); `smoke-gcp` checks that `/health` returns the commit SHA.
 
-A second free Docker web service still deploys to Render from the same `Dockerfile` and commit SHA. Set the environment variables above in the host dashboard. Google Cloud Run is the URL to paste.
+Paste the Cloud Run URL. A Render service may still exist from earlier deploys; it is not the live demo.
 
 ## Agentic DevSecOps on GitLab
 

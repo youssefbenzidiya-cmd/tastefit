@@ -153,7 +153,7 @@ def _esc(value):
     return html.escape(str(value if value is not None else ""), quote=True)
 
 
-def page(doc=None):
+def page(doc=None, contact="youssefbenzidiya@gmail.com"):
     """HTML for /ledger. Every value from the file is escaped."""
     doc = load() if doc is None else doc
     protocol = doc.get("protocol") or {}
@@ -195,5 +195,6 @@ No Qloo payload and no personal data are stored here.</p>
 <p>""" + _esc(protocol.get("outcome")) + """</p>
 <p>""" + _esc(protocol.get("comparator")) + """</p>
 """ + body + """
+<p>Write <a href="mailto:""" + html.escape(contact) + """">""" + html.escape(contact) + """</a>.</p>
 </main></body></html>
 """

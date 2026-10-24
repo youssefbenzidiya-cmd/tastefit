@@ -133,14 +133,15 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/walkthrough":
             nonce = secrets.token_urlsafe(16)
             page = (ROOT / "demo" / "walkthrough.html").read_text(encoding="utf-8")
+            page = page.replace("{{CONTACT}}", html.escape(_CONTACT))
             scene = urllib.parse.parse_qs(query).get("scene", [""])[0]
             if scene in ("1", "2", "3", "4", "5"):
                 page = page.replace('<html lang="en">', f'<html lang="en" data-scene="{scene}">', 1)
             return 200, "text/html; charset=utf-8", page.encode(), CSP_PAGE.format(nonce=nonce)
         if path == "/ledger":
-            return 200, "text/html; charset=utf-8", ledger.page().encode(), CSP_LEDGER
+            return 200, "text/html; charset=utf-8", ledger.page(contact=_CONTACT).encode(), CSP_LEDGER
         if path == "/evidence":
-            return 200, "text/html; charset=utf-8", evidence.page().encode(), CSP_LEDGER
+            return 200, "text/html; charset=utf-8", evidence.page(contact=_CONTACT).encode(), CSP_LEDGER
         if path == "/wicker-example.json":
             return 200, "application/json", WICKER_FILE.read_bytes(), CSP_OTHER
         if path in STATIC:

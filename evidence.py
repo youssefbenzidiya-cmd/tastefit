@@ -177,7 +177,8 @@ def _live_street(doc):
             + ". Not a vetted address.</p><ul>" + events + "</ul>")
 
 
-def page(chicago=None, tgi=None, bias=None, ledger_doc=None, footfall=None, street_run=None):
+def page(chicago=None, tgi=None, bias=None, ledger_doc=None, footfall=None, street_run=None,
+         contact="youssefbenzidiya@gmail.com"):
     """HTML. Pass dicts in tests; otherwise the committed JSON files are read."""
     chicago = _load("backtest_chicago.json") if chicago is None else chicago
     tgi = _load("backtest_chicago_tgi.json") if tgi is None else tgi
@@ -288,6 +289,7 @@ beyond the hackathon keys already in the environment.</p>
           if no_gain else
           "The Chicago table above is the comparison. The conformal interval does not add a gain the table does not show.") + """</li>
 </ul>
+<p>Write <a href="mailto:""" + _esc(contact) + """">""" + _esc(contact) + """</a>.</p>
 </main></body></html>
 """,
     ]

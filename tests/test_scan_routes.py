@@ -221,6 +221,43 @@ class ScanRoutes(unittest.TestCase):
         self.assertEqual(d["places"][0]["name"], "Cafe Zero")
         self.assertEqual(d["loves"][0]["name"], "The Robey")
 
+    def test_taste_skips_harness_wrappers_and_tag_urns(self):
+        class Q:
+            @staticmethod
+            def find_tags(concept, limit=4):
+                return {"id": "urn:tag:cuisine:qloo:korean_fried_chicken"}
+
+            @staticmethod
+            def recommend_places(location, signal_tags=None, include_tags=None, limit=8):
+                return {
+                    "name": "Qloo native resolution",
+                    "results": [
+                        {"name": "urn:tag:cuisine:qloo:korean_fried_chicken"},
+                        {"name": "Qloo native resolution"},
+                        {"name": "Crisp", "affinity": 0.79, "entity_id": "P1"},
+                        {"name": "Honey Butter Fried Chicken", "affinity": 0.76, "entity_id": "P2"},
+                    ],
+                }
+
+            @staticmethod
+            def area_taste(location, limit=8):
+                return {"results": [
+                    {"name": "Qloo native resolution"},
+                    {"name": "Antique Taco", "affinity": 0.99},
+                    {"name": "Piece Brewery", "affinity": 0.88},
+                ]}
+
+        with mock.patch.dict(os.environ, {"QLOO_API_KEY": "x"}), \
+                mock.patch.dict(sys.modules, {"qloo": Q}):
+            code, d = scan.taste("Korean fried chicken", "Wicker Park, Chicago")
+        self.assertEqual(code, 200)
+        names = [p["name"] for p in d["places"] + d["loves"]]
+        self.assertEqual([p["name"] for p in d["places"]],
+                         ["Crisp", "Honey Butter Fried Chicken"])
+        self.assertEqual([p["name"] for p in d["loves"]], ["Antique Taco", "Piece Brewery"])
+        self.assertTrue(all(not n.startswith("urn:") for n in names))
+        self.assertNotIn("Qloo native resolution", names)
+
     def test_spot_http_is_json(self):
         code, headers, body = self.get("/spot?city=synthville&lat=10.005&lon=20.015")
         self.assertEqual(code, 200)

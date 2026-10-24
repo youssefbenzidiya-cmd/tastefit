@@ -47,6 +47,7 @@ class Page(unittest.TestCase):
 
     def test_no_gain_is_the_committed_interval(self):
         html = evidence.page()
+        self.assertIn("youssefbenzidiya@gmail.com", html)
         self.assertIn("Qloo's top-3 hit rate is 29%", html)
         self.assertIn("citywide baseline is 68%", html)
         self.assertIn("\u221266 to \u22124 points", html)
