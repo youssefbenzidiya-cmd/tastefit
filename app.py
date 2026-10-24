@@ -23,11 +23,9 @@ log = logging.getLogger("tastefit")
 ROOT = Path(__file__).parent
 SOURCE_URL = "https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit"
 
-_CONTACT = os.environ.get("CONTACT_EMAIL", "").strip()
-_CTA = (f'<a href="mailto:{html.escape(_CONTACT)}?subject=TasteFit%20early%20access">Request early access</a> '
-        "Tell us your city and how many sites you check a year."
-        if _CONTACT else
-        f'TasteFit is a hackathon prototype. Follow the project on <a class="plain" href="{SOURCE_URL}">GitLab</a>.')
+_CONTACT = os.environ.get("CONTACT_EMAIL", "youssefbenzidiya@gmail.com").strip() or "youssefbenzidiya@gmail.com"
+_CTA = (f'<a href="mailto:{html.escape(_CONTACT)}">Write {html.escape(_CONTACT)}</a> '
+        "A Chicago pin. Qloo taste. Licence survival. Not a vetted address.")
 # Synthetic replay for /demo; never real Qloo output (AGENTS.md rule 2).
 DEMO_FILE = ROOT / "demo" / "sample-report.json"
 # Aggregates-only saved example. No Qloo response is stored in this file.
@@ -101,6 +99,7 @@ def build_label():
 def render_index(nonce=""):
     page = ((ROOT / "index.html").read_text()
             .replace("{{CTA}}", _CTA).replace("{{SOURCE}}", SOURCE_URL)
+            .replace("{{CONTACT}}", html.escape(_CONTACT))
             .replace("{{BUILD}}", html.escape(build_label())).replace("{{NONCE}}", nonce))
     return page.encode()
 

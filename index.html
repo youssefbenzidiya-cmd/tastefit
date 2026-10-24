@@ -54,6 +54,7 @@
     <span class="brand-copy"><b>TasteFit</b><small>Chicago · drop a pin</small></span>
   </a>
   <div class="topbar-end">
+    <a class="mail-link" href="mailto:{{CONTACT}}">{{CONTACT}}</a>
     <button type="button" class="icon-btn" id="theme" aria-label="Switch to dark theme">
       <svg class="i i-sun"><use href="#i-sun"/></svg><svg class="i i-moon"><use href="#i-moon"/></svg>
     </button>
@@ -130,13 +131,13 @@
     <div id="tail"></div>
   </section>
   <footer class="foot" id="foot">
-    <span>TasteFit is open source under the MIT licence. <a href="{{SOURCE}}">Source on GitLab</a>. <a href="/walkthrough">60-second reel</a>. <a href="/evidence">Evidence</a>. <a href="/ledger">Ledger</a>. <button type="button" class="plain" data-action="wicker-example">Try the Wicker Park example</button>. <span class="build">TasteFit build {{BUILD}}</span></span>
+    <span>TasteFit is open source under the MIT licence. Write <a href="mailto:{{CONTACT}}">{{CONTACT}}</a>. <a href="{{SOURCE}}">Source on GitLab</a>. <a href="/walkthrough">60-second reel</a>. <a href="/evidence">Evidence</a>. <a href="/ledger">Ledger</a>. <button type="button" class="plain" data-action="wicker-example">Try the Wicker Park example</button>. <span class="build">TasteFit build {{BUILD}}</span></span>
     <!-- market share copy is escaped in JS as esc(u.market_share.note) -->
     <span>Map: © OpenStreetMap contributors. Survival: Chicago business licences. Tract economics: U.S. Census Bureau ACS 5-year. Taste exhibit: Qloo, when a key is set. A cell is a block to scout, not a vetted address.</span>
   </footer>
 </main>
 
-<p class="cta-line sr-only" id="cta-line">{{CTA}}</p>
+<p class="cta-line" id="cta-line">{{CTA}}</p>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <dialog class="memo" id="memo" aria-labelledby="memo-title">
   <div class="memo-bar">

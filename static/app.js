@@ -17,6 +17,7 @@ const GROUPS = ['restaurant', 'fast_food', 'bar_cafe'];
 const GROUP_NAME = { restaurant: 'Restaurant', fast_food: 'Fast food', bar_cafe: 'Bar & café' };
 const ASSET_RHO = 0.12;
 const WICKER = [41.9088, -87.6796];
+const CONTACT = 'youssefbenzidiya@gmail.com';
 
 const STALL_AFTER_MS = 8000;
 function stallOut(quietMs) {
@@ -770,52 +771,329 @@ function readBelief() {
   history.replaceState(null, '', '#' + shareQuery());
 }
 
+function memoCall(live, v) {
+  if (!v) return { tag: 'HOLD', kicker: 'The coin is still loading for this pin.', tone: 'hold' };
+  const a = v.alpha80 == null ? null : Math.round(100 * v.alpha80);
+  if (v.share > 0 && live >= 80) {
+    return { tag: 'JOINT VENTURE', tone: 'go',
+      kicker: `${live} of 100 stay open because you sold a share, not because the street is lucky. The landlord’s 36-month take is unchanged.` };
+  }
+  if (v.share > 0 && a != null && live < 80) {
+    return { tag: 'SHARE FURTHER', tone: 'adjust',
+      kicker: `This share still leaves ${live} of 100 open. 80% open is for sale at α ≥ ${a}%, holding the same harvest.` };
+  }
+  if (live >= 70) {
+    return { tag: 'OPEN TILT', tone: 'go',
+      kicker: `${live} of 100 still have a shop by year 3 at this rent. That is rare. The street did not buy it. The rent did.` };
+  }
+  if (live >= 50) {
+    return { tag: 'A COIN YOU CAN SEE', tone: 'adjust',
+      kicker: a == null
+        ? `${live} of 100 stay open. Price it as a coin, not as a vibe.`
+        : `${live} of 100 stay open as a rent. 80% open is not for sale as a cheaper pin. It is for sale as a share at α ≥ ${a}%.` };
+  }
+  return { tag: 'HARD COIN', tone: 'nogo',
+    kicker: `${live} of 100 stay open. Most paths have already spent the build-out. Cut the rent, sell a share, or walk.` };
+}
+
+function censusRead(c, asking, cur) {
+  if (!c) return 'Census tract did not load. Licences still answer survival.';
+  const bits = [];
+  if (c.median_income != null) {
+    bits.push(c.median_income >= 120000
+      ? `Households here report ${money(c.median_income)} median income — high for a Chicago tract. A full-service cheque has room, if the licences agree.`
+      : c.median_income < 50000
+        ? `Households here report ${money(c.median_income)} median income — thin for a full-service cheque. Price the plate, not the postcode.`
+        : `Households here report ${money(c.median_income)} median income — a middle Chicago tract, not a story.`);
+  }
+  if (c.median_gross_rent != null) {
+    const ratio = asking && c.median_gross_rent > 0 ? (asking / c.median_gross_rent) : null;
+    bits.push(ratio != null
+      ? `They pay ${money(c.median_gross_rent)}/mo in household rent. Your listing is ${money(asking, cur)}/mo commercial — ${ratio.toFixed(1)}× their home rent, and a different market.`
+      : `They pay ${money(c.median_gross_rent)}/mo in household rent. Your listing is ${money(asking, cur)}/mo commercial — a different market.`);
+  }
+  if (c.poverty_rate != null) {
+    const p = 100 * c.poverty_rate;
+    bits.push(p >= 25
+      ? `Poverty rate ${p.toFixed(0)}% — high. Do not read this as a licence forecast.`
+      : `Poverty rate ${p.toFixed(0)}%.`);
+  }
+  if (c.median_age != null) {
+    bits.push(c.median_age < 32
+      ? `Median age ${c.median_age} — a younger tract.`
+      : c.median_age > 42
+        ? `Median age ${c.median_age} — older than the city centre.`
+        : `Median age ${c.median_age}.`);
+  }
+  if (c.renter_hh != null && c.owner_hh != null) {
+    const tot = c.renter_hh + c.owner_hh;
+    const rp = tot > 0 ? Math.round(100 * c.renter_hh / tot) : null;
+    bits.push(`${Number(c.renter_hh).toLocaleString('en')} renter households, ${Number(c.owner_hh).toLocaleString('en')} owner${rp != null ? ` (${rp}% renter)` : ''}.`);
+  }
+  if (c.population != null) bits.push(`${Number(c.population).toLocaleString('en')} people in the tract.`);
+  bits.push('These are ACS tract aggregates, not a person, and not a survival forecast.');
+  return bits.join(' ');
+}
+
+function qlooRows(list) {
+  return (list || []).slice(0, 8).map(p =>
+    `<tr><td>${esc(p.name)}</td><td>${esc(aff(p))}</td></tr>`).join('');
+}
+
+function csvNames(list, n) {
+  return (list || []).slice(0, n || 5).map(p => p && p.name).filter(Boolean);
+}
+
+function qlooRead(t, concept, hood) {
+  if (!t || t.status !== 'ok') {
+    return {
+      head: 'Qloo did not return a taste exhibit for this pin. Survival still comes from Chicago licences.',
+      fit: 'When a key is set, only the concept and the place name go to the graph. Nothing personal.',
+    };
+  }
+  const loc = t.location || hood;
+  const loves = csvNames(t.loves, 5);
+  const places = csvNames(t.places, 5);
+  const tag = t.tag ? String(t.tag) : '';
+  let head = `Only the concept “${concept}” and the place “${loc}” went to Qloo. Nothing personal. Affinity is who belongs here, not who survives.`;
+  if (tag) head += ` find_tags matched the concept to ${tag}.`;
+  let fit;
+  if (loves.length && places.length) {
+    fit = `This block already over-indexes on ${loves.join(', ')}. Places Qloo ranks as kin to “${concept}”: ${places.join(', ')}. Read the names. If they feel like your room, the street already has the taste. If they do not, you are asking the block to learn you.`;
+  } else if (loves.length) {
+    fit = `This block already over-indexes on ${loves.join(', ')}. That is the taste of the street. Qloo did not return kin places for “${concept}” on this pin.`;
+  } else if (places.length) {
+    fit = `Places Qloo ranks as kin to “${concept}”: ${places.join(', ')}. The area-taste call did not return named loves for ${loc}.`;
+  } else {
+    fit = `Qloo returned no named places for ${loc}. The licences still answer survival.`;
+  }
+  return { head, fit };
+}
+
+function voices(call, v, live, who, cur, concept, hood) {
+  const a = v && v.alpha80 != null ? Math.round(100 * v.alpha80) : null;
+  const landlord = !v ? 'The lease has not loaded.'
+    : call.tag === 'JOINT VENTURE'
+      ? `Your 36-month take stays ${money(v.H0, cur)}. You co-invest ${money(-v.base, cur)}/mo and take ${(100 * v.share).toFixed(0)}% of contribution. Print this.`
+      : call.tag === 'SHARE FURTHER'
+        ? `Same harvest ${money(v.H0, cur)}. This share still leaves ${live} of 100 open. 80% open is for sale at α ≥ ${a}%.`
+        : call.tag === 'OPEN TILT'
+          ? `${live} of 100 ${who} still open at ${money(state.asking, cur)}/mo. Rare. Do not mark ${hood} as a vibe.`
+          : call.tag === 'HARD COIN'
+            ? `Most paths have already spent the build-out. Cut the rent, sell a share, or walk. Harvest today is ${money(v.H0, cur)}.`
+            : a == null
+              ? `${live} of 100 stay open. Price ${hood} as a coin. 80% open is not for sale at this harvest.`
+              : `${live} of 100 stay open as a rent. 80% open is a share at α ≥ ${a}%, not a cheaper pin.`;
+  const founder = !v ? 'Wait for the coin.'
+    : `${live} of 100 ${who} still have a door by year 3 if “${concept}” opens at ${money(state.asking, cur)}/mo. ${v.cityDead} of 100 close even at $0 rent — the street cannot buy those back. This rent buys ${v.extra} extra closures versus free.`;
+  return { landlord, founder };
+}
+
+function nextMove(call, v) {
+  const a = v && v.alpha80 != null ? Math.round(100 * v.alpha80) : null;
+  if (!v) return 'Wait until the 2,000 paths load, then print again.';
+  if (call.tag === 'JOINT VENTURE') return 'Take this sheet to the landlord. The harvest is the same. The coin is not.';
+  if (call.tag === 'SHARE FURTHER') {
+    return a == null
+      ? 'Drag the share and reprint. 80% open is not for sale at this harvest, even as a share.'
+      : `Drag the share to ${a}% or more, hold the harvest, and reprint.`;
+  }
+  if (call.tag === 'OPEN TILT') return 'Do not spend this coin on a story. Walk the block. The pin is a scout, not a vetted address.';
+  if (call.tag === 'HARD COIN') return 'Cut the rent, sell a share, or walk. Reprint after each change — this sheet is this pin, this rent, this concept.';
+  return a == null
+    ? 'Price it. 80% open is not for sale as a cheaper pin at this harvest.'
+    : `Price it, or buy 80% open as a share at α ≥ ${a}%.`;
+}
+
+function bookRows(v, live, cur) {
+  if (!v) return [];
+  const ddEn = v.dd == null ? 'Capacity versus rent did not resolve.'
+    : v.dd >= 2 ? `Mean licence capacity sits ${v.dd.toFixed(2)} SDs above this rent. Room.`
+      : v.dd >= 0.5 ? `Mean capacity is only ${v.dd.toFixed(2)} SDs above this rent. Tight.`
+        : v.dd >= 0 ? `Mean capacity is sitting on this rent (DD ${v.dd.toFixed(2)}).`
+          : `Mean capacity is already below this rent (DD ${v.dd.toFixed(2)}).`;
+  const kellyEn = state.belief == null
+    ? 'State a year-3 value to size the bankroll. Kelly is silent until then.'
+    : v.kelly == null || v.kelly <= 0
+      ? 'The coin does not pay enough versus the build-out to size a bankroll on the stated value.'
+      : `At most ${money(v.kelly, cur)} of bankroll on this coin, using the stated year-3 value.`;
+  return [
+    ['Still open (of 100)', `${live} shops in 100 still have a door at year 3.`, String(live)],
+    ['Expected loss (mean of 2,000 paths)', `The average of the rolls, not a bill that arrives. Most rolls lose $0.`, money(v.m.el, cur)],
+    ['Surety capital ES 95%', `If you land in the worst 5% of rolls, their average is this. Credit desks hold ES 95%, not P90 — P90 is not coherent.`, money(v.es95, cur)],
+    ['Unexpected loss (SD)', `How spread the 2,000 rolls are around the mean.`, money(v.m.ul, cur)],
+    ['Median path', `Half the rolls lose this or less. Often $0 because most shops live.`, money(v.m.p50, cur)],
+    ['P90 path', `Nine in ten rolls lose this or less. Not a capital number.`, money(v.m.p90, cur)],
+    ['Mean among the closed', `When a shop dies, this is the average spend of the corpse.`, money(v.m.ruined, cur)],
+    ['Closed even at $0 rent', `${v.cityDead} of 100 close even if the unit is free. The street cannot buy those back.`, `${v.cityDead} of 100`],
+    ['Extra closures this rent buys vs free', `This listing, versus $0 rent, buys ${v.extra} extra closures in 100.`, `${v.extra} of 100`],
+    ['Vs city-rate rent R*', `Versus the city-rate ceiling R* ${money(v.rStar, cur)}/mo, extra closures: ${v.extraStar} of 100.`, `${v.extraStar} of 100 · R* ${money(v.rStar, cur)}/mo`],
+    ['Distance to default', ddEn, v.dd != null ? v.dd.toFixed(2) : '—'],
+    [`Guarantee EL (${state.termYears} y)`, `Probability of death × committed capital (build-out + rent for the term).`, money(v.b.guarantee, cur)],
+    ['Time to know', v.b.ttk != null ? `About ${v.b.ttk.toFixed(1)} months of trading until the path has spoken.` : 'Not resolved on this pin.', v.b.ttk != null ? `${v.b.ttk.toFixed(1)} mo` : '—'],
+    ['Hurdle equity at 36 mo', `The living shop has to be worth this at year 3 before expected NPV turns positive.`, v.b.hurdle != null ? money(v.b.hurdle, cur) : '—'],
+    ['Kelly bankroll', kellyEn, v.kelly != null ? money(v.kelly, cur) : (state.belief == null ? 'State a year-3 value' : '0')],
+    ['Book of 10, Vasicek 99.9%', `Ten identical units, stated asset correlation ρ = ${ASSET_RHO}, not estimated. LGD = 1.`, money(v.book10, cur)],
+  ];
+}
+
 function memoHTML() {
   const card = state.cache[state.group];
   const v = state.view;
   const spot = state.spot;
   const c = spot && spot.census;
   const pl = spot && spot.place;
+  const share = spot && spot.market_share;
   const hood = (pl && pl.neighborhood) || 'Chicago';
   const live = v ? in100(1 - v.m.pd) : '–';
+  const liveN = typeof live === 'number' ? live : 0;
   const cur = (card && card.currency) || 'USD';
+  const who = GROUP_NAME[state.group] || state.group;
+  const call = memoCall(liveN, v);
+  const say = voices(call, v, liveN, who, cur, state.concept, hood);
+  const t = state.taste;
+  const q = qlooRead(t, state.concept, hood);
+  const loves = t && t.status === 'ok' ? (t.loves || []) : [];
+  const places = t && t.status === 'ok' ? (t.places || []) : [];
   const comps = ((pl && pl.competitors) || []).map(x => `${x.name} (${x.m} m)`).join('; ') || '—';
+  const reasons = ((pl && pl.reasons) || []).join('; ');
   const eighty = !v ? '' : v.alpha80 == null
     ? '80% open is not for sale at this harvest, even as a share.'
     : `80% open is not for sale as a rent. It is for sale as a share at α ≥ ${(100 * v.alpha80).toFixed(0)}%.`;
+  const partner = v && v.base < 0;
+  const contractLine = !v ? 'The lease has not loaded.'
+    : partner
+      ? `This is a joint venture. The landlord co-invests ${money(-v.base, cur)}/mo and takes ${(100 * v.share).toFixed(0)}% of contribution. Formula: R = b + αG, with G = A + fx·f.`
+      : v.share <= 0
+        ? `This is a flat rent of ${money(state.asking, cur)}/mo (α = 0). Drag the share to hold the landlord’s 36-month take and buy survival.`
+        : `Affine lease R = b + αG. Base b*(α) = ${money(v.base, cur)}/mo plus ${(100 * v.share).toFixed(0)}% of contribution. Same 36-month landlord take as the listing (${money(v.H0, cur)}).`;
+  const ranks = GROUPS.map(g => {
+    const cd = state.cache[g];
+    if (!cd || !cd.caps) return null;
+    const m = mix(pathLosses(cd, state.asking, state.capex));
+    return { g, el: m.el, pd: m.pd };
+  }).filter(Boolean).sort((a, b) => a.el - b.el);
   const when = new Date().toISOString().slice(0, 10);
+  const lines = bookRows(v, live, cur);
+  const nLic = card && card.n != null ? card.n : '5,692';
+  const alphaPct = Math.round(100 * state.share);
+  const plugged = v
+    ? `On this pin: R = ${money(state.asking, cur)}/mo, α = ${alphaPct}%, b*(α) = ${money(v.base, cur)}/mo, H₀ = ${money(v.H0, cur)}. G<sub>k</sub> = A<sub>k</sub> + fx·f. ES<sub>0.95</sub> = ${money(v.es95, cur)}. Merton DD = (μ<sub>capacity</sub> − R) / σ = ${v.dd != null ? esc(v.dd.toFixed(2)) : '—'}. Vasicek book of 10 at ρ = ${ASSET_RHO}: ${money(v.book10, cur)}.`
+    : 'The curve has not loaded, so the identities have nothing to plug.';
   return `<header class="memo-top">
       <div class="brand"><b>TasteFit</b><div class="memo-stamp">A model, not a forecast</div></div>
-      <p class="meta">${esc(when)}<br>${esc(hood)} · ${esc(state.lat.toFixed(4))}, ${esc(state.lon.toFixed(4))}<br>Not a vetted address</p>
+      <p class="meta">${esc(when)}<br>${esc(hood)} · ${esc(state.lat.toFixed(4))}, ${esc(state.lon.toFixed(4))}<br>Not a vetted address<br><a href="mailto:${esc(CONTACT)}">${esc(CONTACT)}</a></p>
     </header>
+    <p class="memo-kicker memo-kicker-${esc(call.tone)}">${esc(call.tag)}</p>
     <h1 id="memo-title">Who should rent this unit?</h1>
-    <p><b>${esc(live)} of 100</b> ${esc(GROUP_NAME[state.group] || state.group)} still open by year 3 at ${esc(money(state.asking, cur))}/mo. ${esc(eighty)}</p>
+    <p class="memo-lead">${esc(call.kicker)}</p>
+    <p class="memo-hero"><b>${esc(live)}</b><span> of 100 ${esc(who)} still open by year 3 at ${esc(money(state.asking, cur))}/mo · ${esc(state.concept)}</span></p>
+    <p>${esc(eighty)}</p>
+
+    <div class="memo-call">
+      <p><b>To the landlord.</b> ${esc(say.landlord)}</p>
+      <p><b>To the founder.</b> ${esc(say.founder)}</p>
+      <p><b>Next.</b> ${esc(nextMove(call, v))}</p>
+    </div>
+
+    <section class="memo-section">
+    <h2>How to read this (plain)</h2>
+    <ul class="memo-plain">
+      <li>We roll 2,000 versions of this lease on Chicago licences. The big number is how many still have a shop.</li>
+      <li>Expected loss is the average of those rolls — not a bill that arrives. Median is often $0 because most shops live.</li>
+      <li>Qloo says what this street loves. Licences say who dies. Census says who lives here. None of the three is a vetted address.</li>
+    </ul>
+    </section>
+
+    <section class="memo-section">
+    <h2>This sheet’s inputs</h2>
+    <p class="memo-plain">Every number below is this pin, this rent, this concept. Change any input and reprint. The sheet is not a city average.</p>
+    <table class="memo-table">
+      <tr><th>Concept</th><td>${esc(state.concept)} · ${esc(who)}</td></tr>
+      <tr><th>Pin</th><td>${esc(hood)} · ${esc(state.lat.toFixed(4))}, ${esc(state.lon.toFixed(4))} · not a vetted address</td></tr>
+      <tr><th>Asking / share / build-out / term</th><td>${esc(money(state.asking, cur))}/mo · ${esc(String(alphaPct))}% · ${esc(money(state.capex, cur))} · ${esc(String(state.termYears))} y</td></tr>
+      <tr><th>Stated year-3 value</th><td>${state.belief == null ? 'Not stated — Kelly and expected NPV stay silent' : esc(money(state.belief, cur))}</td></tr>
+      <tr><th>Census tract / GEOID</th><td>${c ? esc((c.name || '—') + (c.geoid ? ' · ' + c.geoid : '')) : 'Tract did not load'}</td></tr>
+      <tr><th>Qloo location / tag</th><td>${t && t.status === 'ok' ? esc((t.location || hood) + (t.tag ? ' · ' + t.tag : ' · find_tags unmatched')) : 'No Qloo exhibit on this request'}</td></tr>
+      <tr><th>Licences / seed</th><td>n = ${esc(nLic)} · seed 20261011 · κ = 0 · HR_loc = 1</td></tr>
+    </table>
+    </section>
+
+    <section class="memo-section">
     <h2>Who lives here</h2>
+    <p class="memo-plain">${esc(censusRead(c, state.asking, cur))}</p>
     <table class="memo-table">
       <tr><th>Census tract</th><td>${c ? esc(c.name || c.geoid || '—') : '—'}</td></tr>
+      <tr><th>GEOID</th><td>${c && c.geoid ? esc(c.geoid) : '—'}</td></tr>
       <tr><th>Median household income</th><td>${c ? esc(money(c.median_income)) : '—'}</td></tr>
       <tr><th>Median gross rent (household)</th><td>${c && c.median_gross_rent != null ? `${esc(money(c.median_gross_rent))}/mo` : '—'}</td></tr>
       <tr><th>Population</th><td>${c && c.population != null ? esc(Number(c.population).toLocaleString('en')) : '—'}</td></tr>
-      <tr><th>Vintage</th><td>${c ? esc(c.vintage || '') : '—'}</td></tr>
+      <tr><th>Median age</th><td>${c && c.median_age != null ? esc(String(c.median_age)) : '—'}</td></tr>
+      <tr><th>Poverty rate</th><td>${c && c.poverty_rate != null ? esc(`${(100 * c.poverty_rate).toFixed(0)}%`) : '—'}</td></tr>
+      <tr><th>Households</th><td>${c && c.renter_hh != null && c.owner_hh != null ? esc(`${Number(c.renter_hh).toLocaleString('en')} renter / ${Number(c.owner_hh).toLocaleString('en')} owner`) : '—'}</td></tr>
+      <tr><th>Vintage</th><td>${c ? esc(c.vintage || 'ACS 5-year via Census Reporter') : '—'}</td></tr>
     </table>
-    <p>Household gross rent is residential. The listing is commercial rent — a different market.</p>
+    <p class="memo-expert">U.S. Census Bureau ACS 5-year via Census Reporter (B19013, B25064, B01003, B01002, B17001, B25003). Tract aggregates, never a person. Income and household rent are not a licence forecast.</p>
+    </section>
+
+    <section class="memo-section">
     <h2>Who this street loves</h2>
-    <p>${(state.taste && state.taste.loves && state.taste.loves.length)
-      ? esc(state.taste.loves.map(p => p.name).slice(0, 6).join('; '))
-      : 'Qloo did not return places for this pin.'} Qloo taste graph, not survival.</p>
+    <p class="memo-plain">${esc(q.head)}</p>
+    <p class="memo-plain">${esc(q.fit)}</p>
+    ${loves.length ? `<table class="memo-table"><thead><tr><th>Qloo · what the area over-indexes on</th><th>Affinity</th></tr></thead><tbody>${qlooRows(loves)}</tbody></table>` : ''}
+    ${places.length ? `<table class="memo-table"><thead><tr><th>Qloo · places like ${esc(state.concept)}</th><th>Affinity</th></tr></thead><tbody>${qlooRows(places)}</tbody></table>` : ''}
+    <p class="memo-expert">Qloo Taste AI graph. find_tags → recommend (signal_tags) / area_taste. Affinity scores are not comparable across separate rank calls, so this sheet never mixes them. Qloo is taste, not survival.</p>
+    </section>
+
+    <section class="memo-section">
     <h2>Who is already here</h2>
-    <p>${esc(comps)}. OSM demand, not survival. ${pl && pl.huff ? esc(pl.huff) : ''}</p>
-    <h2>The coin</h2>
+    <p>${esc(comps)}. OSM demand, not survival.${reasons ? ` ${esc(reasons)}.` : ''} ${pl && pl.huff ? esc(pl.huff) : ''} ${pl && pl.suitability != null ? `Map fit ${Math.round(100 * pl.suitability)}.` : ''} ${share && share.note ? esc(share.note) : ''}</p>
+    <p class="memo-expert">OpenStreetMap contributors. A nearby name is a neighbour on the map, not a vetted comparable and not a Qloo entity unless it also appears in the taste tables above.</p>
+    </section>
+
+    <section class="memo-section">
+    <h2>The lease</h2>
+    <p class="memo-plain">${esc(contractLine)}</p>
     <table class="memo-table">
-      <tr><th>Expected loss</th><td>${v ? esc(money(v.m.el, cur)) : '—'}</td></tr>
-      <tr><th>Surety capital ES 95%</th><td>${v ? esc(money(v.es95, cur)) : '—'}</td></tr>
-      <tr><th>Matched base b*(α)</th><td>${v ? esc(money(v.base, cur)) + '/mo' : '—'}</td></tr>
-      <tr><th>Landlord 36-month take</th><td>${v ? esc(money(v.H0, cur)) : '—'}</td></tr>
+      <tr><th>Asking rent</th><td>${esc(money(state.asking, cur))}/mo</td></tr>
+      <tr><th>Share α</th><td>${esc(`${alphaPct}%`)}</td></tr>
+      <tr><th>Matched base b*(α)</th><td>${v ? `${esc(money(v.base, cur))}/mo` : '—'}</td></tr>
+      <tr><th>Build-out</th><td>${esc(money(state.capex, cur))}</td></tr>
+      <tr><th>Term</th><td>${esc(String(state.termYears))} years</td></tr>
+      <tr><th>Landlord 36-month take H₀</th><td>${v ? esc(money(v.H0, cur)) : '—'}</td></tr>
     </table>
+    </section>
+
+    <section class="memo-section">
+    <h2>The book</h2>
+    <p class="memo-plain">In English: how much this rent costs in closed shops. In the language credit desks use: EL, ES 95%, Merton distance to default, Kelly, Vasicek. Each line is this pin’s number, then the English.</p>
+    <table class="memo-table memo-book">
+      <thead><tr><th>Line</th><th>In English</th><th>This pin</th></tr></thead>
+      <tbody>${lines.map(r => `<tr><td>${esc(r[0])}</td><td class="memo-en">${esc(r[1])}</td><td>${esc(r[2])}</td></tr>`).join('')}</tbody>
+    </table>
+    <p class="memo-plain">${esc(npvLine(state.belief, v && v.b.hurdle, cur))}</p>
+    </section>
+
+    <section class="memo-section">
+    <h2>Who should rent, ranked</h2>
+    <p class="memo-plain">Same pin, same rent, same build-out. Only the licence family changes. Least expected loss first.</p>
+    <table class="memo-table">
+      <thead><tr><th>Concept family</th><th>Expected loss</th><th>Closed of 100</th></tr></thead>
+      <tbody>${ranks.map((r, i) => `<tr><td>${i === 0 ? '1 · ' : ''}${esc(GROUP_NAME[r.g])}${r.g === state.group ? ' · this memo' : ''}</td><td>${esc(money(r.el, cur))}</td><td>${esc(in100(r.pd))}</td></tr>`).join('')}</tbody>
+    </table>
+    </section>
+
+    <section class="memo-section">
+    <h2>The maths (for the desk)</h2>
+    <p class="memo-expert">Chicago business licences, n = ${esc(nLic)}. Mixture coin, κ = 0, HR_loc = 1: location did not predict 3-year survival in held-out licences. Affine lease R<sub>k</sub> = b + α G<sub>k</sub>, G<sub>k</sub> = A<sub>k</sub> + fx·f, harvest-matched b*(α) so E[H] stays H₀. ES<sub>0.95</sub> is the mean of the worst 5% of path losses (coherent; P90 is not). Merton DD = (mean capacity − rent) / SD. Kelly f* = p − (1−p)/(b−1) on the stated year-3 value. Vasicek on 10 identical units, stated ρ = ${ASSET_RHO}, not estimated. LGD = 1. Seed 20261011. ${card ? esc(card.note) : ''}</p>
+    <p class="memo-formula">${plugged}</p>
+    </section>
+
     <section class="memo-limits">
       <h2>Limits</h2>
-      <p>${card ? `${esc(card.source)}, n = ${esc(card.n)}. ${esc(card.note)}` : ''} Qloo is taste, not survival. A cell is a block to scout, not a vetted address.</p>
-    </section>`;
+      <p>${card ? `${esc(card.source)}, n = ${esc(card.n)}. ${esc(card.note)}` : ''} Qloo is taste, not survival. A cell is a block to scout, not a vetted address. Write ${esc(CONTACT)}.</p>
+    </section>
+    <p class="memo-foot">TasteFit · ${esc(hood)} · ${esc(when)} · Questions on this pin: <a href="mailto:${esc(CONTACT)}">${esc(CONTACT)}</a></p>`;
 }
 
 function runAgent() {
