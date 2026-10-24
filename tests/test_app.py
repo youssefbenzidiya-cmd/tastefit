@@ -100,6 +100,10 @@ class Server(unittest.TestCase):
         self.assertIn("Who should rent this unit", body)
         self.assertIn("animation-delay: 12s", body)
         self.assertIn('<html lang="en">', body)
+        self.assertIn("youssefbenzidiya@gmail.com", body)
+        self.assertNotIn("{{CONTACT}}", body)
+        self.assertIn("Antique Taco", body)
+        self.assertIn("What this street loves", body)
         code, body = self.get("/walkthrough?scene=2")
         self.assertEqual(code, 200)
         self.assertIn('<html lang="en" data-scene="2">', body)
@@ -139,6 +143,8 @@ class Server(unittest.TestCase):
         self.assertIn("No measurable gain", body)
         self.assertIn("Heckman (1979)", body)
         self.assertIn('href="/ledger"', body)
+        self.assertIn("youssefbenzidiya@gmail.com", body)
+        self.assertIn("youssefbenzidiya@gmail.com", self.get("/ledger")[1])
 
     def test_health(self):
         self.assertEqual(self.get("/health"), (200, "ok"))

@@ -250,27 +250,48 @@ def spot(city, lat, lon):
     }
 
 
+_TASTE_JUNK = re.compile(r"^qloo(\s+native\s+resolution)?$", re.I)
+
+
+def _taste_weight(o):
+    q = o.get("query") if isinstance(o.get("query"), dict) else {}
+    w = o.get("affinity", q.get("affinity"))
+    try:
+        return float(w) if w is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _taste_name(o):
+    name = o.get("name")
+    if not isinstance(name, str):
+        return None
+    name = name.strip()
+    if not name or name.startswith("urn:") or _TASTE_JUNK.match(name):
+        return None
+    return name
+
+
 def _taste_places(res):
-    """Named Qloo entities. Names without coordinates still count — the pin is the geography."""
+    """Named Qloo entities. Names without coordinates still count — the pin is the geography.
+
+    Harness wrappers (`Qloo native resolution`) and tag URNs are not places. A dict with a name
+    is a place only when it also carries affinity, an entity id, or a location; otherwise walk
+    into `results` so the real venues are not swallowed by the wrapper.
+    """
     out, seen = [], set()
 
     def walk(o):
         if len(out) >= 8:
             return
         if isinstance(o, dict):
-            name = o.get("name")
-            if isinstance(name, str):
-                name = name.strip()
-                if name and name not in seen:
+            name = _taste_name(o)
+            w = _taste_weight(o)
+            if name and (w is not None or o.get("entity_id") or o.get("location") or o.get("address")):
+                if name not in seen:
                     seen.add(name)
-                    q = o.get("query") if isinstance(o.get("query"), dict) else {}
-                    w = o.get("affinity", q.get("affinity"))
-                    try:
-                        w = float(w) if w is not None else None
-                    except (TypeError, ValueError):
-                        w = None
                     out.append({"name": name, "affinity": w})
-                    return
+                return
             for v in o.values():
                 walk(v)
         elif isinstance(o, list):
@@ -278,7 +299,8 @@ def _taste_places(res):
                 walk(v)
 
     walk(res)
-    return out
+    out.sort(key=lambda p: -(p["affinity"] if p["affinity"] is not None else -1.0))
+    return out[:8]
 
 
 def taste(concept, location):

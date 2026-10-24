@@ -536,12 +536,17 @@ function aff(p) {
   return Number.isFinite(n) ? `${Math.round(100 * n)}` : '—';
 }
 
+function isQlooPlace(p) {
+  const n = String((p && p.name) || '').trim();
+  return !!(n && !n.startsWith('urn:') && !/^qloo(\s+native\s+resolution)?$/i.test(n));
+}
+
 function tasteHTML(t) {
   if (!t || t.status !== 'ok') {
     return `<p class="census-miss">Qloo is waiting on a key. Licences still answer survival.</p>`;
   }
-  const loves = (t.loves || []).map(p => `<li><b>${esc(p.name)}</b><span>${esc(aff(p))}</span></li>`).join('');
-  const places = (t.places || []).map(p => `<li><b>${esc(p.name)}</b><span>${esc(aff(p))}</span></li>`).join('');
+  const loves = (t.loves || []).filter(isQlooPlace).map(p => `<li><b>${esc(p.name)}</b><span>${esc(aff(p))}</span></li>`).join('');
+  const places = (t.places || []).filter(isQlooPlace).map(p => `<li><b>${esc(p.name)}</b><span>${esc(aff(p))}</span></li>`).join('');
   if (!loves && !places) {
     return `<p class="census-miss">Qloo returned no places for ${esc(t.location || 'this pin')}.</p>`;
   }
@@ -836,12 +841,12 @@ function censusRead(c, asking, cur) {
 }
 
 function qlooRows(list) {
-  return (list || []).slice(0, 8).map(p =>
+  return (list || []).filter(isQlooPlace).slice(0, 8).map(p =>
     `<tr><td>${esc(p.name)}</td><td>${esc(aff(p))}</td></tr>`).join('');
 }
 
 function csvNames(list, n) {
-  return (list || []).slice(0, n || 5).map(p => p && p.name).filter(Boolean);
+  return (list || []).filter(isQlooPlace).slice(0, n || 5).map(p => p && p.name).filter(Boolean);
 }
 
 function qlooRead(t, concept, hood) {

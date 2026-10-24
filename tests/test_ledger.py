@@ -35,6 +35,7 @@ class Fingerprint(unittest.TestCase):
                             "lat": 41.9, "lon": -87.7, "note": "not a calibrated probability",
                             "forecasts": [{"concept": "Ramen & co", "verdict": "ADJUST", "p": 0.5}]}]}
         html = ledger.page(doc)
+        self.assertIn("youssefbenzidiya@gmail.com", html)
         self.assertIn("Brier 1950", html)
         self.assertNotIn("<script>", html)
         self.assertIn("&lt;script&gt;", html)
