@@ -1,49 +1,268 @@
-stages: [test, security, deploy, verify]
+stages: [test, build, security, package, deploy, verify, release]
+
+workflow:
+  auto_cancel:
+    on_new_commit: interruptible
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+
+default:
+  interruptible: true
 
 include:
   - template: Jobs/SAST.gitlab-ci.yml
   - template: Jobs/Secret-Detection.gitlab-ci.yml
+  - template: Jobs/Container-Scanning.gitlab-ci.yml
+  - template: Jobs/Dependency-Scanning.v2.gitlab-ci.yml
+    inputs:
+      stage: security
 
 variables:
   LIVE_URL: https://tastefit.onrender.com
+  IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+  CS_IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+  # Run the security templates inside merge request pipelines too.
+  AST_ENABLE_MR_PIPELINES: "true"
+  MAX_RESPONSE_SECONDS: "5"
+  # Google Cloud Run (free tier). No key: GitLab's OIDC token is exchanged through
+  # Workload Identity Federation, which only accepts protected `main` of this project.
+  GCP_PROJECT: tastefit-gcp-1011
+  GCP_REGION: us-central1
+  GCP_WIF_PROVIDER: projects/776637567140/locations/global/workloadIdentityPools/gitlab-pool/providers/gitlab-provider
+  GCP_SA: gitlab-deployer@tastefit-gcp-1011.iam.gserviceaccount.com
+  GCP_RUNTIME_SA: tastefit-runtime@tastefit-gcp-1011.iam.gserviceaccount.com
+  GCP_IMAGE: us-central1-docker.pkg.dev/tastefit-gcp-1011/tastefit/tastefit
+  GCP_URL: https://tastefit-776637567140.us-central1.run.app
+  CRANE_VERSION: v0.20.2
+  CRANE_SHA256: c14340087103ba9dadf61d45acd20675490fd0ccbd56ac7901fc1b502137f44b
+
+.main-only:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+.production:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $RENDER_DEPLOY_KEY
 
 unit-tests:
   stage: test
   image: python:3.12-slim
   script:
     - python -m unittest discover -s tests -t . -v
+    - pip install --quiet pytest pytest-cov
+    - python -m pytest tests -o 'python_files=test*.py' --junitxml=report.xml --cov=. --cov-report=term --cov-report=xml:coverage.xml
+  coverage: '/TOTAL.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  artifacts:
+    when: always
+    reports:
+      junit: report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
 
 lint:
   stage: test
   image: python:3.12-slim
   script:
     - pip install --quiet ruff
-    - ruff check --select E9,F63,F7,F82 .
+    - ruff check --select E9,F63,F7,F82,F401,F811,B006,B008 .
 
-docker-build:
+flows-lint:
   stage: test
+  image: python:3.12-slim
+  script:
+    - pip install --quiet pyyaml
+    - python ci/flows_lint.py
+
+policy-guard:
+  stage: test
+  image: alpine:3.22
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  variables:
+    GIT_DEPTH: "0"
+  script:
+    - apk add --no-cache git
+    - sh ci/policy_guard.sh
+
+image-build:
+  stage: build
   image: docker:27
   services: [docker:27-dind]
   script:
-    - docker build -t tastefit:$CI_COMMIT_SHORT_SHA .
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - docker build -t "$IMAGE" .
+    - docker run --rm "$IMAGE" node node_modules/.bin/qloo --help > /dev/null
+    - docker inspect --format '{{json .Config.Healthcheck}}' "$IMAGE" | grep -q /health
+    - docker run -d --name app -p 7860:7860 "$IMAGE"
+    - for i in $(seq 1 20); do wget -qO- http://docker:7860/health | grep -q "^ok" && break; sleep 1; done
+    - wget -qO- http://docker:7860/health | grep "^ok"
+    - docker push "$IMAGE"
+    - echo "IMAGE_DIGEST=$(docker inspect --format '{{index .RepoDigests 0}}' "$IMAGE")" | tee image.env
+  artifacts:
+    reports:
+      dotenv: image.env
+
+semgrep-sast:
+  stage: security
+
+secret_detection:
+  stage: security
+
+container_scanning:
+  stage: security
+  needs: [image-build]
+
+cve-gate:
+  stage: security
+  image: python:3.12-slim
+  needs:
+    - job: container_scanning
+      artifacts: true
+  script:
+    - python ci/cve_gate.py gl-container-scanning-report.json
+  artifacts:
+    when: always
+    reports:
+      metrics: cve-metrics.txt
+
+sbom:
+  stage: package
+  image:
+    name: aquasec/trivy:0.58.1
+    entrypoint: [""]
+  needs: [image-build]
+  rules: !reference [.main-only, rules]
+  variables:
+    TRIVY_USERNAME: $CI_REGISTRY_USER
+    TRIVY_PASSWORD: $CI_REGISTRY_PASSWORD
+    TRIVY_NO_PROGRESS: "true"
+  script:
+    - trivy image --format cyclonedx --output gl-sbom-image.cdx.json "$IMAGE_DIGEST"
+    - echo "SBOM_JOB_ID=$CI_JOB_ID" > sbom.env
+  artifacts:
+    expire_in: 1 year
+    paths: [gl-sbom-image.cdx.json]
+    reports:
+      cyclonedx: gl-sbom-image.cdx.json
+      dotenv: sbom.env
+
+sign-image:
+  stage: package
+  image: alpine:3.22
+  needs: [image-build]
+  rules: !reference [.main-only, rules]
+  interruptible: false
+  id_tokens:
+    SIGSTORE_ID_TOKEN:
+      aud: sigstore
+  script:
+    - apk add --no-cache cosign
+    - echo "$CI_REGISTRY_PASSWORD" | cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+    - cosign sign --yes -a "com.gitlab.ci.pipeline.url=$CI_PIPELINE_URL" -a "com.gitlab.ci.commit.sha=$CI_COMMIT_SHA" "$IMAGE_DIGEST"
+
+verify-signature:
+  stage: package
+  image: alpine:3.22
+  needs: [image-build, sign-image]
+  rules: !reference [.main-only, rules]
+  script:
+    - apk add --no-cache cosign
+    - echo "$CI_REGISTRY_PASSWORD" | cosign login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+    - cosign verify "$IMAGE_DIGEST" --certificate-identity "${CI_PROJECT_URL}//.gitlab-ci.yml@refs/heads/${CI_COMMIT_REF_NAME}" --certificate-oidc-issuer "$CI_SERVER_URL" > /dev/null
 
 deploy-render:
   stage: deploy
+  interruptible: false
   image: curlimages/curl:8.10.1
   rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $RENDER_DEPLOY_HOOK
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $RENDER_DEPLOY_KEY
   environment:
     name: production
     url: $LIVE_URL
+    deployment_tier: production
   script:
-    - curl -fsS -X POST "$RENDER_DEPLOY_HOOK" > /dev/null
+    - curl -fsS -X POST "https://api.render.com/deploy/${RENDER_SERVICE_ID}?key=${RENDER_DEPLOY_KEY}&ref=${CI_COMMIT_SHA}" > /dev/null
+
+deploy-gcp:
+  stage: deploy
+  interruptible: false
+  image: gcr.io/google.com/cloudsdktool/google-cloud-cli:alpine
+  needs: [image-build, verify-signature, cve-gate, secret_detection, semgrep-sast]
+  rules: !reference [.main-only, rules]
+  id_tokens:
+    GCP_ID_TOKEN:
+      aud: https://iam.googleapis.com/projects/776637567140/locations/global/workloadIdentityPools/gitlab-pool/providers/gitlab-provider
+  environment:
+    name: production-gcp
+    url: $GCP_URL
+    deployment_tier: production
+  script:
+    - wget -qO crane.tgz "https://github.com/google/go-containerregistry/releases/download/${CRANE_VERSION}/go-containerregistry_Linux_x86_64.tar.gz"
+    - echo "${CRANE_SHA256}  crane.tgz" | sha256sum -c -
+    - tar -xzf crane.tgz crane
+    - echo "$GCP_ID_TOKEN" > .gcp_jwt
+    - gcloud iam workload-identity-pools create-cred-config "$GCP_WIF_PROVIDER" --service-account="$GCP_SA" --credential-source-file=.gcp_jwt --output-file=.gcp_cred.json
+    - gcloud auth login --cred-file=.gcp_cred.json --quiet
+    # Copy the signed, scanned CI image by digest, so Cloud Run runs exactly those bytes.
+    - echo "$CI_REGISTRY_PASSWORD" | ./crane auth login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+    - gcloud auth print-access-token | ./crane auth login us-central1-docker.pkg.dev -u oauth2accesstoken --password-stdin
+    - DIGEST="${IMAGE_DIGEST#*@}"
+    - ./crane copy "$IMAGE_DIGEST" "$GCP_IMAGE:$CI_COMMIT_SHORT_SHA"
+    - >
+      gcloud run deploy tastefit --project "$GCP_PROJECT" --region "$GCP_REGION"
+      --image "$GCP_IMAGE@$DIGEST" --service-account "$GCP_RUNTIME_SA"
+      --min-instances 0 --max-instances 1 --memory 512Mi --cpu 1 --cpu-throttling
+      --concurrency 40 --timeout 300 --port 7860
+      --update-env-vars "RENDER_GIT_COMMIT=$CI_COMMIT_SHA" --quiet
+    # Free tier allows 0.5 GB of images: keep only the deployed one.
+    - >
+      gcloud artifacts docker images list "$GCP_IMAGE" --project "$GCP_PROJECT" --format='value(version)'
+      | { grep -v "$DIGEST" || true; } | xargs -r -I{} gcloud artifacts docker images delete "$GCP_IMAGE@{}" --project "$GCP_PROJECT" --delete-tags --quiet
+    - rm -f .gcp_jwt .gcp_cred.json
+
+smoke-gcp:
+  stage: verify
+  image: curlimages/curl:8.10.1
+  needs: [deploy-gcp]
+  rules: !reference [.main-only, rules]
+  environment:
+    name: production-gcp
+    url: $GCP_URL
+    action: verify
+  script:
+    - |
+      for i in $(seq 1 20); do
+        live=$(curl -fsS -m 30 "$GCP_URL/health" || true)
+        if [ "$live" = "ok $CI_COMMIT_SHA" ]; then break; fi
+        sleep 6
+      done
+      [ "$live" = "ok $CI_COMMIT_SHA" ] || { echo "Cloud Run is '$live', expected $CI_COMMIT_SHA"; exit 1; }
+    - curl -fsS "$GCP_URL/" | grep "Who should rent this unit" > /dev/null
+    - |
+      curl -fsS "$GCP_URL/scan/unit?city=chicago&lat=41.9&lon=-87.65" | grep '"currency": "USD"' > /dev/null
 
 smoke-test:
   stage: verify
   image: curlimages/curl:8.10.1
   needs: [deploy-render]
   rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $RENDER_DEPLOY_HOOK
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $RENDER_DEPLOY_KEY
+  environment:
+    name: production
+    url: $LIVE_URL
+    action: verify
   script:
     - |
       for i in $(seq 1 40); do
@@ -52,5 +271,67 @@ smoke-test:
         sleep 15
       done
       [ "$live" = "ok $CI_COMMIT_SHA" ] || { echo "live is '$live', expected $CI_COMMIT_SHA"; exit 1; }
-    - curl -fsS "$LIVE_URL/" | grep -q "Will your restaurant fit"
+    - curl -fsS "$LIVE_URL/" | grep "Who should rent this unit" > /dev/null
     - test "$(curl -s -o /dev/null -w '%{http_code}' "$LIVE_URL/run?concept=x")" = 400
+    - |
+      t_health=$(curl -fsS -o /dev/null -m 30 -w '%{time_total}' "$LIVE_URL/health")
+      t_home=$(curl -fsS -o /dev/null -m 30 -w '%{time_total}' "$LIVE_URL/")
+      printf 'health_response_seconds %s\nhome_response_seconds %s\n' "$t_health" "$t_home" | tee metrics.txt
+  artifacts:
+    when: always
+    reports:
+      metrics: metrics.txt
+
+uptime-check:
+  stage: verify
+  image: curlimages/curl:8.10.1
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  script:
+    - |
+      for i in 1 2 3 4 5 6; do
+        live=$(curl -fsS -m 60 "$LIVE_URL/health" || true)
+        case "$live" in ok*) break;; esac
+        sleep 20
+      done
+      echo "live: $live"
+      case "$live" in ok*) ;; *) echo "production is down"; exit 1;; esac
+    - test "$(curl -s -o /dev/null -w '%{http_code}' "$LIVE_URL/run?concept=x")" = 400
+    - |
+      t_health=$(curl -fsS -o /dev/null -m 30 -w '%{time_total}' "$LIVE_URL/health")
+      t_home=$(curl -fsS -o /dev/null -m 30 -w '%{time_total}' "$LIVE_URL/")
+      printf 'uptime_up 1\nhealth_response_seconds %s\nhome_response_seconds %s\n' "$t_health" "$t_home" | tee metrics.txt
+      [ "${t_health%%.*}" -lt "$MAX_RESPONSE_SECONDS" ] || { echo "/health took ${t_health}s (limit ${MAX_RESPONSE_SECONDS}s)"; exit 1; }
+  artifacts:
+    when: always
+    reports:
+      metrics: metrics.txt
+
+release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs: [smoke-test, image-build, sbom, verify-signature]
+  interruptible: false
+  rules: !reference [.production, rules]
+  script:
+    - echo "Releasing $CI_COMMIT_SHA ($IMAGE_DIGEST) as v1.$CI_PIPELINE_IID"
+  release:
+    tag_name: v1.$CI_PIPELINE_IID
+    name: TasteFit v1.$CI_PIPELINE_IID
+    ref: $CI_COMMIT_SHA
+    description: |
+      Production release of $CI_COMMIT_SHORT_SHA, live at $LIVE_URL.
+
+      - Pipeline: $CI_PIPELINE_URL (smoke test passed: /health returned ok $CI_COMMIT_SHA)
+      - Container image (signed with Sigstore keyless, verified in CI): $IMAGE_DIGEST
+      - SBOM (CycloneDX): $CI_PROJECT_URL/-/jobs/$SBOM_JOB_ID/artifacts/raw/gl-sbom-image.cdx.json
+
+      Render builds its own image from the same Dockerfile and commit; the signed registry image is the CI-tested build.
+    assets:
+      links:
+        - name: SBOM (CycloneDX JSON)
+          url: $CI_PROJECT_URL/-/jobs/$SBOM_JOB_ID/artifacts/raw/gl-sbom-image.cdx.json
+          link_type: other
+        - name: Pipeline and smoke test
+          url: $CI_PIPELINE_URL
+          link_type: runbook

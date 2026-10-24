@@ -1,0 +1,57 @@
+{
+ "window": [
+  "2023-01-01",
+  "2024-12-31"
+ ],
+ "survival_seen": "2025-04-01",
+ "radius_km": 1.2,
+ "k": 3,
+ "areas": 12,
+ "openings": 1751,
+ "classified": 200,
+ "survival_rate_all": 0.452,
+ "qloo_calls": 35,
+ "benchmarks": 10,
+ "qloo_rank_failures": {
+  "status ok: no usable ranking": 2
+ },
+ "llm_provider": null,
+ "random_hit_at_k": 0.3,
+ "areas_scored": [
+  "Wicker Park",
+  "Logan Square",
+  "Lincoln Park",
+  "West Loop",
+  "Hyde Park",
+  "Andersonville",
+  "Lakeview",
+  "Bridgeport",
+  "Uptown"
+ ],
+ "methods": {
+  "qloo": {
+   "areas": 9,
+   "hit_at_k": 0.29,
+   "survivors": 31,
+   "survival_top": 0.643,
+   "opened_top": 14,
+   "survival_rest": 0.44,
+   "opened_rest": 50,
+   "spearman": 0.022
+  },
+  "prior": {
+   "areas": 9,
+   "hit_at_k": 0.677,
+   "survivors": 31,
+   "survival_top": 0.488,
+   "opened_top": 43,
+   "survival_rest": 0.476,
+   "opened_rest": 21,
+   "spearman": 0.308
+  }
+ },
+ "qloo_minus_prior_ci90": [
+  -0.656,
+  -0.036
+ ]
+}

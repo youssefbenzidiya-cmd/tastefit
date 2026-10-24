@@ -1,31 +1,63 @@
+import http.client
+import json
 import os
+import re
 import threading
 import unittest
 import urllib.error
 import urllib.request
+from unittest import mock
 from http.server import ThreadingHTTPServer
 
 os.environ.pop("QLOO_API_KEY", None)
 import app  # noqa: E402
 
 
+def sse_events(body):
+    """[(event, data)] from a Server-Sent Events body."""
+    out = []
+    for block in body.strip().split("\n\n"):
+        lines = dict(line.split(": ", 1) for line in block.split("\n") if ": " in line)
+        out.append((lines.get("event"), json.loads(lines["data"]) if "data" in lines else None))
+    return out
+
+
 class Server(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.httpd = ThreadingHTTPServer(("127.0.0.1", 0), app.Handler)
-        cls.base = f"http://127.0.0.1:{cls.httpd.server_address[1]}"
+        cls.port = cls.httpd.server_address[1]
+        cls.base = f"http://127.0.0.1:{cls.port}"
         threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
 
     @classmethod
     def tearDownClass(cls):
         cls.httpd.shutdown()
+        cls.httpd.server_close()
+
+    def setUp(self):
+        for name, value in (("DEMO_DELAY_SCALE", 0), ("run_limiter", app.RateLimiter(1000, 600)),
+                            ("demo_limiter", app.RateLimiter(1000, 600)), ("run_slots", threading.BoundedSemaphore(2))):
+            p = mock.patch.object(app, name, value)
+            p.start()
+            self.addCleanup(p.stop)
 
     def get(self, path):
         try:
             with urllib.request.urlopen(self.base + path, timeout=5) as r:
                 return r.status, r.read().decode()
         except urllib.error.HTTPError as e:
-            return e.code, e.read().decode()
+            with e:
+                return e.code, e.read().decode()
+
+    def request(self, method, path):
+        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        try:
+            conn.request(method, path)
+            r = conn.getresponse()
+            return r.status, dict(r.getheaders()), r.read().decode()
+        finally:
+            conn.close()
 
     def test_index(self):
         code, body = self.get("/")
@@ -33,16 +65,225 @@ class Server(unittest.TestCase):
         self.assertIn("TasteFit", body)
         self.assertNotIn("{{CTA}}", body)
 
+    def test_index_has_the_ci_smoke_marker(self):
+        ci = (app.ROOT / ".gitlab-ci.yml").read_text()
+        markers = set(re.findall(r'_URL/" \| grep "([^"]+)"', ci))
+        self.assertTrue(markers)
+        body = self.get("/")[1]
+        for m in markers:
+            self.assertIn(m, body)
+
+    def test_static_assets_are_served_with_their_types(self):
+        for path, (_, ctype) in app.STATIC.items():
+            conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+            try:
+                conn.request("GET", path)
+                r = conn.getresponse()
+                body = r.read()
+            finally:
+                conn.close()
+            self.assertEqual((r.status, r.getheader("Content-Type")), (200, ctype), path)
+            age = "60" if path.endswith((".js", ".css")) else "86400"
+            self.assertEqual(r.getheader("Cache-Control"), f"public, max-age={age}", path)
+            self.assertGreater(len(body), 0, path)
+        self.assertEqual(self.get("/static/app.js")[0], 404)
+        self.assertEqual(self.get("/../app.py")[0], 404)
+
+    def test_walkthrough_is_the_sixty_second_reel(self):
+        code, body = self.get("/walkthrough")
+        self.assertEqual(code, 200)
+        self.assertIn("Who should rent this unit", body)
+        self.assertIn("animation-delay: 12s", body)
+        self.assertIn('<html lang="en">', body)
+        code, body = self.get("/walkthrough?scene=2")
+        self.assertEqual(code, 200)
+        self.assertIn('<html lang="en" data-scene="2">', body)
+
+    def test_page_csp_allows_self_hosted_font_and_script_only(self):
+        csp = self.request("GET", "/")[1]["Content-Security-Policy"]
+        self.assertIn("font-src 'self';", csp)
+        self.assertIn("script-src 'self' 'nonce-", csp)
+        self.assertNotIn("fonts.gstatic.com", csp)
+        self.assertNotIn("unsafe-eval", csp)
+
+    def test_page_has_no_unfilled_placeholders_and_absolute_og_image(self):
+        body = self.get("/")[1]
+        self.assertNotRegex(body, r"\{\{[A-Z]+\}\}")
+        self.assertRegex(body, r'property="og:image" content="https://[^"]+/og\.png"')
+        self.assertEqual(len(re.findall(r'<script nonce="[^"]+">', body)), 1)
+
+    def test_footer_build_dev_when_commit_unset(self):
+        with mock.patch.dict(os.environ):
+            os.environ.pop("RENDER_GIT_COMMIT", None)
+            body = self.get("/")[1]
+        self.assertIn("TasteFit build dev", body)
+        self.assertNotIn("{{BUILD}}", body)
+
+    def test_footer_build_uses_first_7_chars_of_commit(self):
+        with mock.patch.dict(os.environ, {"RENDER_GIT_COMMIT": "0123456789abcdef"}):
+            body = self.get("/")[1]
+        self.assertIn("TasteFit build 0123456<", body)
+
+    def test_footer_keeps_osm_attribution(self):
+        self.assertIn("OpenStreetMap", self.get("/")[1])
+
     def test_health(self):
         self.assertEqual(self.get("/health"), (200, "ok"))
 
+    def test_ask_chicago_restaurant_eighty_not_for_sale(self):
+        code, body = self.get("/ask?city=chicago&group=restaurant")
+        self.assertEqual(code, 200)
+        d = json.loads(body)
+        self.assertFalse(d["eighty_for_sale"])
+        self.assertEqual(d["currency"], "USD")
+        self.assertIn("OpenStreetMap", self.get("/")[1])
+
     def test_run_requires_inputs(self):
         self.assertEqual(self.get("/run?concept=x")[0], 400)
+
+    def test_tenant_validates_inputs(self):
+        for q in ("", "city=Chicago", "lat=41.9", "lat=x&lon=1", "lat=91&lon=0", "lat=41.9&lon=-87.6&rent=-5",
+                  "lat=41.9&lon=-87.6&rent=abc"):
+            self.assertEqual(self.get("/tenant?" + q)[0], 400, q)
+
+    def test_tenant_without_key_reports_offline(self):
+        with mock.patch.dict(os.environ):
+            os.environ.pop("QLOO_API_KEY", None)
+            code, body = self.get("/tenant?lat=41.9&lon=-87.68")
+        self.assertEqual(code, 200)
+        self.assertIn('event: error\ndata: "offline"', body)
+
+    def test_tenant_streams_pipeline_events(self):
+        def fake_run(city, location, lat, lon, rent):
+            yield "unit", {"city": city, "location": location, "lat": lat, "lon": lon, "rent": rent}
+            yield "budget", {"qloo_calls": 3}
+        with mock.patch.dict(os.environ, {"QLOO_API_KEY": "k"}), mock.patch.object(app.tenant, "run", fake_run):
+            code, body = self.get("/tenant?city=Paris&location=Le%20Marais&rent=4000")
+        self.assertEqual(code, 200)
+        self.assertIn('"city": "Paris", "location": "Le Marais", "lat": null, "lon": null, "rent": 4000.0', body)
+        self.assertIn("event: budget", body)
+
+    def test_head_on_tenant_not_allowed(self):
+        self.assertEqual(self.request("HEAD", "/tenant")[0], 405)
 
     def test_run_without_key_reports_offline(self):
         code, body = self.get("/run?concept=wine%20bar&location=Silver%20Lake")
         self.assertEqual(code, 200)
         self.assertIn('event: error\ndata: "offline"', body)
+
+    def test_index_security_headers_and_nonce(self):
+        code, headers, body = self.request("GET", "/")
+        self.assertEqual(code, 200)
+        csp = headers["Content-Security-Policy"]
+        nonce = re.search(r"'nonce-([^']+)'", csp).group(1)
+        self.assertIn(f'<script nonce="{nonce}">', body)
+        self.assertNotIn("{{NONCE}}", body)
+        self.assertIn("frame-ancestors 'none'", csp)
+        self.assertIn("https://tile.openstreetmap.org", csp)
+        self.assertNotIn("unsafe-inline", csp.split("script-src")[1].split(";")[0])
+        self.assertEqual(headers["X-Content-Type-Options"], "nosniff")
+        self.assertEqual(headers["X-Frame-Options"], "DENY")
+        self.assertIn("Referrer-Policy", headers)
+        self.assertEqual(headers["Server"], "TasteFit")
+        self.assertNotEqual(nonce, re.search(r"'nonce-([^']+)'", self.request("GET", "/")[1]["Content-Security-Policy"]).group(1))
+
+    def test_cdn_scripts_are_pinned_with_sri(self):
+        body = self.get("/")[1]
+        scripts = re.findall(r"<script (?:defer )?src=\"(https://[^\"]+)\"([^>]*)>", body)
+        self.assertEqual(len(scripts), 0)
+        self.assertEqual(re.findall(r"<script (?:defer )?src=\"(/[^\"]+)\"", body), ["/app.js"])
+        js = self.get("/app.js")[1]
+        self.assertIn("/ask?", js)
+        self.assertNotIn('"/run"', js)
+        self.assertIn("/tenant?", js)
+
+    def test_copy_has_no_pricing_promise_or_unsourced_claim(self):
+        body = self.get("/")[1]
+        self.assertNotIn("Paid plans open after judging", body)
+        self.assertNotIn("$3,500", body)
+        self.assertNotIn("github.com", body)
+        self.assertIn(app.SOURCE_URL, body)
+
+    def test_head_returns_headers_without_body(self):
+        code, headers, body = self.request("HEAD", "/")
+        self.assertEqual(code, 200)
+        self.assertEqual(body, "")
+        self.assertGreater(int(headers["Content-Length"]), 1000)
+        code, headers, body = self.request("HEAD", "/health")
+        self.assertEqual((code, body, headers["Content-Length"]), (200, "", "2"))
+
+    def test_wrong_methods_get_plain_405(self):
+        for method, path, allow in (("POST", "/", "GET, HEAD"), ("DELETE", "/health", "GET, HEAD"),
+                                    ("HEAD", "/run", "GET"), ("BREW", "/", "GET, HEAD")):
+            code, headers, body = self.request(method, path)
+            self.assertEqual(code, 405, method)
+            self.assertEqual(headers["Allow"], allow)
+            self.assertTrue(headers["Content-Type"].startswith("text/plain"))
+            self.assertNotIn("<html", body.lower())
+
+    def test_demo_streams_the_synthetic_report(self):
+        code, body = self.get("/demo")
+        self.assertEqual(code, 200)
+        kinds = [k for k, _ in sse_events(body)]
+        self.assertEqual(kinds[0], "demo")
+        self.assertEqual(kinds[-3:], ["geo", "scorecard", "memo"])
+        self.assertIn("synthetic", sse_events(body)[0][1]["notice"].lower())
+
+    def test_run_errors_are_generic_and_logged(self):
+        def broken(concept, location):
+            yield "step", {"tool": "find_tags", "args": {}, "names": [], "error": None, "site": None}
+            raise RuntimeError("stderr: /srv/secret-path token=abc")
+
+        with mock.patch.dict(os.environ, {"QLOO_API_KEY": "test"}), mock.patch.object(app.agent, "run", broken), \
+                self.assertLogs("tastefit", level="ERROR"):
+            code, body = self.get("/run?concept=a&location=b")
+        self.assertEqual(code, 200)
+        self.assertIn('event: error\ndata: "internal"', body)
+        self.assertNotIn("secret", body)
+
+    def test_concurrency_cap_returns_429(self):
+        gate, started = threading.Event(), threading.Semaphore(0)
+
+        def slow(concept, location):
+            started.release()
+            gate.wait(5)
+            yield "memo", "done"
+
+        results = []
+        with mock.patch.dict(os.environ, {"QLOO_API_KEY": "test"}), mock.patch.object(app.agent, "run", slow):
+            threads = [threading.Thread(target=lambda: results.append(self.get("/run?concept=a&location=b"))) for _ in range(2)]
+            for t in threads:
+                t.start()
+            self.assertTrue(started.acquire(timeout=5) and started.acquire(timeout=5))
+            code, body = self.get("/run?concept=a&location=b")
+            gate.set()
+            for t in threads:
+                t.join(5)
+            self.assertEqual(code, 429)
+            self.assertIn("sample report", body)
+            self.assertEqual([r[0] for r in results], [200, 200])
+            self.assertEqual(self.get("/run?concept=a&location=b")[0], 200)
+
+    def test_per_ip_rate_limit(self):
+        with mock.patch.dict(os.environ, {"QLOO_API_KEY": "test"}), \
+                mock.patch.object(app.agent, "run", lambda c, loc: iter([("memo", "ok")])), \
+                mock.patch.object(app, "run_limiter", app.RateLimiter(1, 600)):
+            self.assertEqual(self.get("/run?concept=a&location=b")[0], 200)
+            code, body = self.get("/run?concept=a&location=b")
+        self.assertEqual(code, 429)
+        self.assertIn("few minutes", body)
+
+
+class RateLimiterTest(unittest.TestCase):
+    def test_sliding_window_per_key(self):
+        now = [0.0]
+        rl = app.RateLimiter(2, 60, clock=lambda: now[0])
+        self.assertTrue(rl.allow("a"))
+        self.assertTrue(rl.allow("a"))
+        self.assertFalse(rl.allow("a"))
+        self.assertTrue(rl.allow("b"))
+        now[0] = 61
+        self.assertTrue(rl.allow("a"))
 
 
 if __name__ == "__main__":
