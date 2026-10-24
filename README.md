@@ -16,7 +16,7 @@ At a Chicago pin you get three exhibits on one sheet: who lives here (Census ACS
 
 The pin is the only required action. Print memo is a one-page report from that pin. A cell is a block to scout, not a vetted address.
 
-**Live demo:** https://tastefit.onrender.com (free instance; the first request after idle can take about 50 seconds to wake up).
+**Live demo:** https://tastefit-3fw52w2r2a-uc.a.run.app — pin Wicker Park, read the number, run the Qloo agent. `/walkthrough` is the silent reel.
 
 ## 60-second demo
 

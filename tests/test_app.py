@@ -195,7 +195,7 @@ class Server(unittest.TestCase):
         js = self.get("/app.js")[1]
         self.assertIn("/ask?", js)
         self.assertNotIn('"/run"', js)
-        self.assertNotIn("/tenant", js)
+        self.assertIn("/tenant?", js)
 
     def test_copy_has_no_pricing_promise_or_unsourced_claim(self):
         body = self.get("/")[1]

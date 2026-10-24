@@ -477,12 +477,25 @@ function censusHTML(c, status) {
   </dl><p class="acs-src">${esc(c.name || '')}. ${esc(c.vintage || '')}. Tract aggregates, not a person. ${esc(rentNote)}</p>`;
 }
 
+function aff(p) {
+  const n = Number(p && p.affinity);
+  return Number.isFinite(n) ? `${Math.round(100 * n)}` : '—';
+}
+
 function tasteHTML(t) {
-  if (!t || t.status !== 'ok' || !t.places || !t.places.length) {
-    return `<p class="census-miss">Taste exhibit offline. The licences do not wait for it.</p>`;
+  if (!t || t.status !== 'ok') {
+    return `<p class="census-miss">Qloo is waiting on a key. Licences still answer survival.</p>`;
   }
-  return `<ul class="exhibit">${t.places.map(p => `<li><b>${esc(p.name)}</b><span>VOID</span></li>`).join('')}</ul>
-    <p class="acs-src">Qloo affinity in ${esc(t.location)}. VOID: κ = 0, the street does not buy survival.</p>`;
+  const loves = (t.loves || []).map(p => `<li><b>${esc(p.name)}</b><span>${esc(aff(p))}</span></li>`).join('');
+  const places = (t.places || []).map(p => `<li><b>${esc(p.name)}</b><span>${esc(aff(p))}</span></li>`).join('');
+  if (!loves && !places) {
+    return `<p class="census-miss">Qloo returned no places for ${esc(t.location || 'this pin')}.</p>`;
+  }
+  return `<p class="hood"><b>What this street loves</b><small>Qloo taste graph · not survival</small></p>
+    ${loves ? `<ul class="exhibit">${loves}</ul>` : ''}
+    ${places ? `<p class="hood"><b>Places like ${esc(t.concept)}</b></p><ul class="exhibit">${places}</ul>` : ''}
+    <p class="acs-src">Affinity in ${esc(t.location)}. Survival is the licence coin above. Qloo answers who belongs here.</p>
+    <button type="button" class="btn btn-ink" data-action="agent">Run the Qloo agent on this pin</button>`;
 }
 
 function renderExhibits() {
@@ -733,6 +746,10 @@ function memoHTML() {
       <tr><th>Vintage</th><td>${c ? esc(c.vintage || '') : '—'}</td></tr>
     </table>
     <p>Household gross rent is residential. The listing is commercial rent — a different market.</p>
+    <h2>Who this street loves</h2>
+    <p>${(state.taste && state.taste.loves && state.taste.loves.length)
+      ? esc(state.taste.loves.map(p => p.name).slice(0, 6).join('; '))
+      : 'Qloo did not return places for this pin.'} Qloo taste graph, not survival.</p>
     <h2>Who is already here</h2>
     <p>${esc(comps)}. OSM demand, not survival. ${pl && pl.huff ? esc(pl.huff) : ''}</p>
     <h2>The coin</h2>
@@ -744,8 +761,38 @@ function memoHTML() {
     </table>
     <section class="memo-limits">
       <h2>Limits</h2>
-      <p>${card ? `${esc(card.source)}, n = ${esc(card.n)}. ${esc(card.note)}` : ''} Taste is VOID: κ = 0. A cell is a block to scout, not a vetted address.</p>
+      <p>${card ? `${esc(card.source)}, n = ${esc(card.n)}. ${esc(card.note)}` : ''} Qloo is taste, not survival. A cell is a block to scout, not a vetted address.</p>
     </section>`;
+}
+
+function runAgent() {
+  const box = $('#agent');
+  if (!box) return;
+  box.hidden = false;
+  box.innerHTML = '<p class="hood"><b>Qloo agent</b><small>find_tags → recommend → rank. One pin, one request.</small></p><ol class="agent-log"></ol>';
+  const ol = box.querySelector('ol');
+  const loc = (state.spot && state.spot.place && state.spot.place.neighborhood)
+    ? `${state.spot.place.neighborhood}, Chicago` : 'Chicago';
+  const es = new EventSource('/tenant?' + new URLSearchParams({
+    city: 'Chicago', location: loc, lat: String(state.lat), lon: String(state.lon), rent: String(state.asking),
+  }));
+  const add = t => { const li = document.createElement('li'); li.textContent = t; ol.appendChild(li); };
+  es.addEventListener('step', e => {
+    const d = JSON.parse(e.data);
+    const names = (d.names || []).slice(0, 3).join(', ');
+    add(`${d.workflow || d.source || 'Qloo'}${names ? ' · ' + names : ''}`);
+  });
+  es.addEventListener('shortlist', e => {
+    const d = JSON.parse(e.data);
+    const rows = d.concepts || d.rows || [];
+    add('Shortlist: ' + (rows.slice(0, 5).map(r => r.concept || r.name || r.label).filter(Boolean).join(', ') || 'ready'));
+  });
+  es.addEventListener('memo', () => { add('Memo on this pin. Taste from Qloo. Survival from licences.'); es.close(); });
+  es.addEventListener('error', e => {
+    if (e.data && e.data !== 'offline') add('Agent stopped.');
+    else add('Qloo agent offline.');
+    es.close();
+  });
 }
 
 function openMemo() {
@@ -797,6 +844,10 @@ document.addEventListener('click', e => {
   }
   if (e.target.closest('[data-action=print]')) {
     window.print();
+    return;
+  }
+  if (e.target.closest('[data-action=agent]')) {
+    runAgent();
   }
 });
 document.addEventListener('input', e => {

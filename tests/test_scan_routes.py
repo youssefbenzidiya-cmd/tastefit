@@ -3,6 +3,7 @@ import gzip
 import json
 import os
 import socket
+import sys
 import tempfile
 import threading
 import unittest
@@ -193,9 +194,32 @@ class ScanRoutes(unittest.TestCase):
 
     def test_taste_is_offline_without_a_key_and_requires_a_place(self):
         code, d = scan.taste("ramen", "Wicker Park, Chicago")
-        self.assertEqual((code, d["status"], d["places"]), (200, "offline", []))
+        self.assertEqual((code, d["status"], d["places"], d["loves"]), (200, "offline", [], []))
         self.assertEqual(scan.taste("", "Chicago")[0], 400)
         self.assertEqual(scan.taste("ramen", "")[0], 400)
+
+    def test_taste_uses_qloo_when_a_key_is_set(self):
+        class Q:
+            @staticmethod
+            def find_tags(concept, limit=4):
+                return {"id": "urn:tag:restaurant"}
+
+            @staticmethod
+            def recommend_places(location, include_tags=None, limit=8):
+                return {"kind": "places"}
+
+            @staticmethod
+            def area_taste(location, limit=8):
+                return {"kind": "loves"}
+
+        with mock.patch.dict(os.environ, {"QLOO_API_KEY": "x"}), \
+                mock.patch.dict(sys.modules, {"qloo": Q}), \
+                mock.patch("geo.extract", side_effect=lambda r: [{"name": r["kind"], "w": 0.81}]):
+            code, d = scan.taste("ramen", "Wicker Park, Chicago")
+        self.assertEqual(code, 200)
+        self.assertEqual(d["status"], "ok")
+        self.assertEqual(d["tag"], "urn:tag:restaurant")
+        self.assertTrue(d["places"] and d["loves"])
 
     def test_spot_http_is_json(self):
         code, headers, body = self.get("/spot?city=synthville&lat=10.005&lon=20.015")

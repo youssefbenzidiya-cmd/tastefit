@@ -235,25 +235,43 @@ def spot(city, lat, lon):
     }
 
 
+def _taste_places(res):
+    import geo as geo_mod
+    out = []
+    for p in geo_mod.extract(res)[:8]:
+        name = p.get("name")
+        if not name:
+            continue
+        w = p.get("w")
+        try:
+            w = float(w) if w is not None else None
+        except (TypeError, ValueError):
+            w = None
+        out.append({"name": name, "affinity": w})
+    return out
+
+
 def taste(concept, location):
-    """Qloo exhibit: only a concept and a place name. Never persisted. Offline when the key is missing."""
+    """Qloo on the pin: only a concept and a place name. Never persisted. Offline when the key is missing."""
     concept = (concept or "").strip()[:300]
     location = (location or "").strip()[:120]
     if not concept or not location:
         return 400, {"error": "concept and location are required"}
+    empty = {"status": "offline", "places": [], "loves": [], "concept": concept, "location": location, "tag": None}
     if not os.environ.get("QLOO_API_KEY"):
-        return 200, {"status": "offline", "places": [], "concept": concept, "location": location}
+        return 200, empty
     try:
-        import geo as geo_mod
         import qloo
         tag_res = qloo.find_tags(concept, limit=4)
         urn = _first_tag(tag_res)
-        rec = qloo.recommend_places(location, include_tags=[urn] if urn else None, limit=6)
-        places = [{"name": p.get("name") or "place", "affinity": p.get("w")}
-                  for p in geo_mod.extract(rec)[:6] if p.get("name")]
-        return 200, {"status": "ok", "places": places, "concept": concept, "location": location}
+        rec = qloo.recommend_places(location, include_tags=[urn] if urn else None, limit=8)
+        loves = qloo.area_taste(location, limit=8)
+        return 200, {
+            "status": "ok", "places": _taste_places(rec), "loves": _taste_places(loves),
+            "concept": concept, "location": location, "tag": urn,
+        }
     except Exception:
-        return 200, {"status": "offline", "places": [], "concept": concept, "location": location}
+        return 200, empty
 
 
 def _first_tag(obj):

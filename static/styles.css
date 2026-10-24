@@ -876,7 +876,9 @@ html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
   display: flex; justify-content: space-between; gap: 12px; align-items: baseline;
   padding: 8px 0; border-bottom: 1px solid var(--rule); font-size: var(--t-14);
 }
-.exhibit span { color: var(--nogo); font-weight: 800; font-size: var(--t-12); }
+.exhibit span { color: var(--ink); font-weight: 800; font-size: var(--t-12); font-variant-numeric: tabular-nums; }
+.agent { margin: var(--s-4) 0; }
+.agent-log { margin: 8px 0 0; padding-left: 1.2em; font-size: var(--t-13); color: var(--ink-2); display: grid; gap: 4px; }
 @media (max-width: 800px) {
   .dock {
     top: auto; height: min(70vh, 100%); width: 100%; max-width: none;
