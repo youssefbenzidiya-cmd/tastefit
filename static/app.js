@@ -18,6 +18,57 @@ const GROUP_NAME = { restaurant: 'Restaurant', fast_food: 'Fast food', bar_cafe:
 const ASSET_RHO = 0.12;
 const WICKER = [41.9088, -87.6796];
 
+const STALL_AFTER_MS = 8000;
+function stallOut(quietMs) {
+  if (quietMs <= STALL_AFTER_MS) return 'Working';
+  return `Still working… ${Math.floor(quietMs / 1000)}s on this step`;
+}
+function quietMs() {
+  const since = state.lastEventAt || state.startedAt || Date.now();
+  return Date.now() - since;
+}
+function nextTitle() { return 'Qloo agent'; }
+let clockTimer = null;
+function tickRun() {
+  const out = $('#live-out');
+  if (out) out.textContent = stallOut(quietMs());
+}
+function pushTraceRow(key, row) {
+  const ol = $('#agent .agent-log');
+  if (!ol) return;
+  const li = document.createElement('li');
+  li.textContent = (row && (row.title || row.out)) || key;
+  ol.appendChild(li);
+}
+const HANDLERS = {
+  started: () => pushTraceRow('open', { kind: 'local', title: 'Opening the stream', out: 'The unit scan comes next. No taste result yet.' }),
+  step: d => pushTraceRow('step', { title: (d && (d.workflow || d.source)) || 'Qloo' }),
+  shortlist: d => pushTraceRow('shortlist', { title: 'Shortlist' }),
+  memo: () => pushTraceRow('memo', { title: 'Memo on this pin' }),
+  error: () => pushTraceRow('error', { title: 'Agent stopped' }),
+};
+function consumeSSE(text) {
+  let event = 'message', payload = null;
+  for (const line of String(text).split('\n')) {
+    if (line.startsWith(':')) continue;
+    const named = line.startsWith('event:') || line.startsWith('data:');
+    if (!named) continue;
+    if (line.startsWith('event:')) event = line.slice(6).trim();
+    if (line.startsWith('data:')) payload = line.slice(5).trim();
+  }
+  const parseData = data => data ? JSON.parse(data) : null;
+  const data = parseData(payload);
+  if (HANDLERS[event]) HANDLERS[event](data);
+}
+function wickerHTML(W) {
+  if (!W) return '';
+  const rows = ((W.shortlist || {}).concepts || []).slice(0, 3).map(c =>
+    `<li><b>${esc(c.concept)}</b><span>Example rank ${esc(c.position)} of ${esc(c.of)}</span></li>`).join('');
+  return `<p class="hood"><b>Wicker Park · stated example</b><small>saved example from 2026-10-15</small></p>
+    <ul class="exhibit">${rows}</ul>
+    <p class="acs-src">saved example, aggregates only, no Qloo call. Sources: stated example.</p>`;
+}
+
 const state = {
   asking: 4200,
   capex: 450000,
@@ -451,10 +502,12 @@ function placeHTML(spot) {
     `<li><b>${esc(c.name)}</b><span>${esc(c.m)} m</span></li>`).join('');
   const reasons = ((pl && pl.reasons) || []).map(r => `<li>${esc(r)}</li>`).join('');
   const suit = pl && pl.suitability != null ? `${Math.round(100 * pl.suitability)}` : null;
+  const m = spot.market_share;
   return `<p class="hood"><b>${esc(hood)}</b>${suit ? `<small>OSM fit ${esc(suit)} · map demand, not survival</small>` : ''}</p>
     ${comps ? `<ul class="chips">${comps}</ul>` : ''}
     ${reasons ? `<ul class="why">${reasons}</ul>` : ''}
-    ${pl && pl.huff ? `<p class="acs-src">${esc(pl.huff)}</p>` : ''}`;
+    ${pl && pl.huff ? `<p class="acs-src">${esc(pl.huff)}</p>` : ''}
+    ${m && m.note ? `<p class="acs-src">${esc(m.note)}</p>` : ''}`;
 }
 
 function censusHTML(c, status) {
@@ -769,30 +822,76 @@ function runAgent() {
   const box = $('#agent');
   if (!box) return;
   box.hidden = false;
-  box.innerHTML = '<p class="hood"><b>Qloo agent</b><small>find_tags → recommend → rank. One pin, one request.</small></p><ol class="agent-log"></ol>';
+  state.startedAt = Date.now();
+  state.lastEventAt = Date.now();
+  box.innerHTML = `<p class="hood" id="live-title">${esc(nextTitle())}<small>find_tags → recommend → rank. One pin, one request.</small></p>
+    <p id="live-out">${esc(stallOut(quietMs()))}</p>
+    <span id="clock"></span>
+    <ol class="agent-log"></ol>`;
   const ol = box.querySelector('ol');
+  clearInterval(clockTimer);
+  clockTimer = setInterval(tickRun, 1000);
+  HANDLERS.started();
   const loc = (state.spot && state.spot.place && state.spot.place.neighborhood)
     ? `${state.spot.place.neighborhood}, Chicago` : 'Chicago';
   const es = new EventSource('/tenant?' + new URLSearchParams({
     city: 'Chicago', location: loc, lat: String(state.lat), lon: String(state.lon), rent: String(state.asking),
   }));
   const add = t => { const li = document.createElement('li'); li.textContent = t; ol.appendChild(li); };
+  const bump = () => { state.lastEventAt = Date.now(); tickRun(); };
   es.addEventListener('step', e => {
+    bump();
     const d = JSON.parse(e.data);
+    HANDLERS.step(d);
     const names = (d.names || []).slice(0, 3).join(', ');
     add(`${d.workflow || d.source || 'Qloo'}${names ? ' · ' + names : ''}`);
   });
   es.addEventListener('shortlist', e => {
+    bump();
     const d = JSON.parse(e.data);
+    HANDLERS.shortlist(d);
     const rows = d.concepts || d.rows || [];
     add('Shortlist: ' + (rows.slice(0, 5).map(r => r.concept || r.name || r.label).filter(Boolean).join(', ') || 'ready'));
   });
-  es.addEventListener('memo', () => { add('Memo on this pin. Taste from Qloo. Survival from licences.'); es.close(); });
-  es.addEventListener('error', e => {
-    if (e.data && e.data !== 'offline') add('Agent stopped.');
-    else add('Qloo agent offline.');
+  es.addEventListener('memo', () => {
+    bump();
+    HANDLERS.memo();
+    add('Memo on this pin. Taste from Qloo. Survival from licences.');
+    clearInterval(clockTimer);
     es.close();
   });
+  es.addEventListener('error', e => {
+    bump();
+    HANDLERS.error();
+    if (e.data && e.data !== 'offline') add('Agent stopped.');
+    else add('Qloo agent offline.');
+    clearInterval(clockTimer);
+    es.close();
+  });
+}
+
+let wickerLoad = 0;
+async function openWicker() {
+  const token = ++wickerLoad;
+  try {
+    const res = await fetch('/wicker-example.json', { headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error('missing');
+    const W = await res.json();
+    if (token !== wickerLoad) return;
+    state.lat = WICKER[0];
+    state.lon = WICKER[1];
+    if (W.asking_rent) state.asking = W.asking_rent;
+    dropPin(state.lat, state.lon, { fly: true });
+    const box = $('#agent');
+    if (box) {
+      box.hidden = false;
+      box.innerHTML = wickerHTML(W);
+    }
+    toast('Wicker Park example · aggregates only');
+  } catch (err) {
+    if (token !== wickerLoad) return;
+    toast('The saved example did not load');
+  }
 }
 
 function openMemo() {
@@ -848,6 +947,10 @@ document.addEventListener('click', e => {
   }
   if (e.target.closest('[data-action=agent]')) {
     runAgent();
+    return;
+  }
+  if (e.target.closest('[data-action=wicker-example]')) {
+    openWicker();
   }
 });
 document.addEventListener('input', e => {

@@ -51,7 +51,7 @@ Hotspot cells come with coordinates; places carry an address, geocoded with Open
 
 The map uses Leaflet with OpenStreetMap tiles. The suggested spot points to a block to scout, not a vetted address.
 
-The memo only cites places, tags and numbers returned by Qloo, plus OpenStreetMap supply counts attributed as such in tenant memos, keeps Qloo results separate from interpretation, and ends with a **Limits** section: Qloo describes aggregate group affinities, not foot traffic, rents or individual behaviour. No personal data is sent to Qloo; inputs are a concept and a place name.
+The memo cites places, tags and numbers returned by Qloo, OpenStreetMap supply counts attributed as such, and, when the city is Chicago, the committed City of Chicago Data Portal community-area footfall shares with their dataset id and date range. It does not attach those Chicago counts to another city, and a name such as South Loop is not given the Loop's totals. It keeps Qloo results separate from interpretation, and ends with a **Limits** section: Qloo describes aggregate group affinities, not foot traffic, rents or individual behaviour. No personal data is sent to Qloo; inputs are a concept and a place name. The footfall line is a community-area total, not a count at the door and not a vetted address.
 
 ### City Scan and rent ceiling (`/scan`, `/scan/unit`)
 
@@ -63,6 +63,7 @@ Two read-only JSON endpoints serve prebuilt city packs (`packs/`, built offline 
   - Paris scores 0.84 (INSEE SIRENE).
   - Chicago scores 0.88 (City of Chicago business licences).
   - Philadelphia scores 0.60 (L&I commercial activity licences), so it is shipped as data-thin.
+- **Does captured spend cover the asking rent?** Chicago and Philadelphia only. Census tracts in Cook County and Philadelphia County (ACS 2024 5-year, B19001 household income and B01003 population; public summary file) whose centroids fall within 1.2 km are multiplied by BLS Consumer Expenditure Survey 2024 Table 1203 mean food-away-from-home dollars for the matching income band. The ACS $60,000 to $74,999 bin crosses the CEX $70,000 line, so those households are left out and the spend is a lower bound. Share is 1/(1+n) among the new place and every OpenStreetMap food venue within 1.2 km (equal utility, the conditional logit when utilities are tied, McFadden 1974; food-away-from-home is not split by cuisine). Monthly captured spend is that annual figure times the share, divided by 12, with no discounting. It is a rough ceiling under those assumptions, before costs, not profit and not a forecast: missing mapped venues push it up, and workers and visitors are not counted, which pushes it down. One household is treated as one consumer unit. Cities below the 0.70 map-quality gate still get no opportunity scores and no rent ceilings. Philadelphia's spend note adds that its venue file failed that check, so a missing venue would overstate the share. A Chicago backtest of 2023-2024 openings found no measurable gain over a citywide baseline; this estimate does not change that. Outside the US the field is "not available". The cached aggregate is `data/us_fafh.json` (`build_us_fafh.py`).
 - Without a register, the check falls back to the share of food places confirmed by two map sources (below 40% fails, a provisional threshold). Casablanca (18%) is shipped as that case.
 - The Chicago calibration replicates the Paris finding: measured location demand does not predict 3-year survival in either city. So the ceiling mostly reflects each tenant type's calibrated revenue against its costs, and Chicago figures are city-level per tenant type rather than a location signal (`METHOD.md`, section 11).
 
@@ -133,7 +134,37 @@ The backtest (`--food`, results in `backtest_chicago_tgi.json`) uses an OSM snap
 
 Result: **no measurable gain**. The index beats the plain Qloo rank by 19 points, but the 90% interval of that difference (−13 to +42 points) includes zero, and every TGI variant is below the citywide baseline (index minus baseline: −36 to −6 points; adding the index to the baseline makes it worse, −22 to −6). On 9 areas, what is opening everywhere in Chicago predicts better than local taste or local gaps. The app still shows the index, labelled uncalibrated, because it is the clearest way to explain a recommendation; OSM supply also replaces four Qloo calls per run.
 
+**Footfall ("demand already there").** `build_chicago_footfall.py` writes `data/chicago_footfall.json`. Counts only, from the City of Chicago Data Portal, under the city's data disclaimer. No trip rows, no rider identifiers, and no Divvy gender or birth year. Every window ends before 2023-01-01.
+
+| Series | Dataset | Window |
+|---|---|---|
+| TNP evening drop-offs, trip end hour 17 through 21 | m6dm-c72p | 2022-01-01 to 2022-12-31 |
+| TNP weekend drop-offs, each Saturday and Sunday | m6dm-c72p | 2022-01-01 to 2022-12-31 |
+| Divvy trip ends, placed by the station coordinate | fg6s-gzvg | 2019-01-01 to 2019-12-31 |
+| CTA 'L' station entries, stations from 8pix-ypme | 5neh-572f | 2022-01-01 to 2022-12-31 |
+
+The Divvy portal file ends 2020-01-21, so 2019 is its last full year and is still before the backtest. A Saturday evening trip is in both the evening series and the weekend series. A point is counted in the community area whose polygon contains it (boundaries igwz-8jzy). L stations outside the 77 areas, including the suburban ends of the system, are left out: 5,105,024 entries. A zero means the polygon contains no station, not that the file is missing. Hyde Park's polygon contains none in this join.
+
+The concept score is a stated weight vector (`footfall.WEIGHTS`, each row sums to 1, fixed before this run, not fitted) dotted with the area's share of each citywide total. Dinner concepts load on evening and weekend drop-offs. Daytime concepts load on CTA entries and Divvy ends. The area total is the same for every concept; the weights are what change the order.
+
+`backtest_chicago.py --footfall` rescores the same 9 areas and 31 survivors with the OpenStreetMap food snapshot dated 2023-01-01. No Qloo call. Over-index D is 0, so the Taste Gap column here is the supply leg plus footfall, not the published Taste Gap Index.
+
+| Ordering | Top-3 hit rate | 90% interval versus this run's citywide baseline |
+|---|---|---|
+| Footfall alone | 39% | −52 to +3 points |
+| Footfall + Taste Gap supply | 39% | −44 to −15 points |
+| Footfall + citywide baseline | 68% | 0 to 0 points |
+| This run's citywide baseline | 68% | |
+
+No footfall variant beats the citywide 68%. Adding footfall to the baseline did not change the top-3 hits. The counts are community-area totals, not a count at the door and not a vetted address. The page at `/evidence` quotes `backtest_chicago_footfall.json`. A tenant run reads the committed file and adds no Qloo call.
+
 What this means for the product: Qloo is useful here as evidence a broker can show (what the area loves, who already serves it, where the audience is), not as a validated predictor of tenant survival. Every tenant memo's Limits section reports this backtest result (`tenant.BACKTEST_NOTE`, added by code if the LLM leaves it out).
+
+**Survivorship and intervals** (`backtest_bias.py`, numbers in `backtest_bias.json`). A Heckman selection correction (Heckman 1979) is not estimated. It needs an exclusion restriction, and this file has none: a licence is missing from the survivor count because it closed, because it was not inspected again, or because its name matched no catalog keyword. Those are not separable from survival, and applications that never opened are not in the register.
+
+Inverse-probability weights (Horvitz and Thompson 1952) are used instead. The propensity in a concept-by-area cell is survivors / openings. A cell with openings and no survivor is dropped, not filled in. The weights cover keyword-matched licences only. On a register pull with no Qloo call (10 areas that have a survivor, including River North, which the 9-area Qloo table left out), the citywide baseline's top-3 hit rate is 0.686 on 35 survivors and 0.766 after weighting (64 weighted openings; 10 openings dropped because the propensity was 0). Weighting does not reverse the published result. The Qloo column was not recomputed: rank orders are not stored, and this pull made no Qloo call.
+
+A split-conformal interval (Vovk, Gammerman and Shafer 2005) around the leave-one-area citywide survivor share, 90%, has quantile 1 and mean width 2 on a rate that lives in [0, 1]. Coverage on the test half is 1 because the interval is the whole range. It does not tighten the claim, and it is not an interval for a Qloo fit score. Those scores are not stored.
 
 ### Decision layer (`decision.py`)
 
@@ -153,6 +184,11 @@ Three additions turn the evidence into a decision. None of them uses an extra Ql
   - A check is shown only when its value exceeds twice a noise floor, measured with a random input.
   - The figures are monthly, with no discounting and no interest.
   - They come from TasteFit's stated assumptions, not the user's own numbers. For example, a Chicago restaurant at 6,000/month: covers per day dominates.
+- **Test before you lease.** The top concept gets a pop-up of 4, 6 or 8 weeks. Eight weeks when two or more checks sit above the value-of-information noise floor. Four weeks when the top check is at least half of the monthly value of perfect information. Six weeks otherwise. There is no discount rate and no interest in that choice. Success is the mode break-even at the rent-first central ceiling (`rent_max`) on that concept's own top check, or covers per day when that concept has no value-of-information result. Another concept's check is not reused. A NO-GO top concept does not get a pop-up, and a non-positive line is omitted. The figures use TasteFit's stated cost assumptions, not the reader's. The line is: covers per day, ticket or days at least that line, or staff, other fixed costs or a cost share at most that line. The memo also states the line at the top of the ceiling's 90% range. The plan's SHA-256 covers the area, the concept, the check, the direction, the ceiling, the threshold, the weeks and the UTC time. The outcome log (observed value, weeks run, cleared) has a second hash. Neither is inside the five-field prediction fingerprint, so the Chicago batch hash is unchanged. A pop-up is not a vetted address.
+- **Stable Street.** Three to five monthly rents are a line of neighbouring units (about 100 m, or one mall floor; the distance is not measured). Stand-alone value v(t, u) is this run's fit score plus a stated shift for the rent-first call at that unit: GO 0, ADJUST −15, NO-GO −40. The neighbour effect is an uncalibrated map of audience overlap already in the run: a(t, s) = ±25 × min(overlap_t, overlap_s)/100 × fit_s/100, negative when the categories match (cannibalisation) and half that size and positive when they differ (the complement proxy). It scales with the neighbour's fit, so a(t, s) and a(s, t) can differ. Missing overlap contributes 0. No extra Qloo call. With negotiable rent the street surplus is an exact potential, so local search over replacements and swaps stops at a stable assignment (Monderer and Shapley 1996; Bogomolnaia and Jackson 2002). In that surplus only the symmetric part of a appears. Existence with externalities is prior work (Pycia and Yenmez, UZH econ WP 392), as are mall deferred acceptance with transfers, potential maximisation for retail agglomeration (Osawa et al., arXiv 2011.06778), and mall contracts that internalise externalities (Prendergast, Gould and Pashigian, CEPR DP3598). TasteFit claims the overlap matrix, the fixed-rent line "This street needs rent flexibility to settle.", the public certificate "No improving move: N replacements and M swaps checked", and a street-certificate hash in the memo (unit ids, rents, assigned concepts, move counts, and that flag). The five-field prediction fingerprint is separate. The request still accepts k from 1 to 5; cannibalisation is the neighbour effect, and k is not a diversity cap. N is capped at 5. The 2023-2024 Chicago backtest found no measurable gain, so the certificate is not a survival forecast. A simulation in the tests is not a proven bound. The open challenge is `python3 docs/verify_certificate.py docs/published-street.json`: exit 0 when no replacement or swap raises the surplus. That file is stated scores and rents, not a Qloo response, and the units are an example line, not vetted addresses. On 2026-10-15 the server ran four representative monthly rents (2600, 2400, 2200, 2000 USD) at the example point near Milwaukee Avenue, Wicker Park. They are not confirmed vacancies and not a vetted address. `/evidence` keeps the street-certificate line and the event kinds with timings. No Qloo response is stored. One step hit a rate limit. Production `/tenant` returned offline, so the run used this server locally.
+- **What-if.** After a certified mix, the page can add one name or remove one concept and re-solve the street from the concepts already on the page. A name with no fit and no overlap in this run gets fit 0 and neighbour effect 0. Stand-alone value is that fit plus the rent-first shift, which is −40 when the missing score is read as NO-GO. The page says there is no taste data and no extra Qloo call. The result lists who gains or loses value and repeats the certificate, including the flexibility sentence when the street has no fixed-rent stable assignment. The request is `GET /street`. It makes no Qloo call. The app's access log records the path and not the query. A platform request log can still store the full URL.
+- **Suggested rent split.** On a certified mix, each tenant's neighbour contribution is the symmetric part of the neighbour effect, summed over the occupied neighbours. One uncalibrated currency unit per surplus point above the street average comes off that tenant's rent, and a point below the average is added. The scale shrinks if a suggested rent would not stay positive, and the page says when that happens. The role follows the street average: above average pays less, below average pays more. The shifts are recentered so the monthly total stays the asking total. An anchor pays less. A free-rider pays more. The page labels the split "suggested, uncalibrated". The amounts are fixed monthly rents: no interest and no discounting.
+- **Prediction fingerprint.** Every memo ends with the SHA-256 of the concept, the area, the shortlist verdicts and the UTC time. The hash does not cover Qloo payloads, and `data/ledger.json` does not store fit scores. Committed batches are on `/ledger`. The pre-registered score is the Brier score (Brier 1950): the mean of (p - o) squared. p is a fixed map of the verdict label already inside the fingerprint (GO 0.66, ADJUST 0.50, NO-GO 0.33), not a Qloo fit score and not a calibrated probability of opening. A batch with any other verdict has no p. o is 1 only when a new Chicago food licence matching the frozen keyword appears before the check date. Skill is the Brier score of one constant citywide rate, computed on the check date from the same public file, minus TasteFit's Brier score. The 2023-2024 backtest found no measurable gain, so a negative skill score stays a possible result. The Chicago batch registered on 2026-10-14 has verdict `unscored`: the rank call returned a rate limit, so no GO / ADJUST / NO-GO label was produced, and the Brier score is not defined for that batch. The first listed concept is a catalog entry, not a ranking. The registered point is a map point, not a vetted address.
 
 ### Limits
 
@@ -171,10 +207,11 @@ git clone https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248
 npm ci                             # installs @qloo/qloo-harness locally (no Python packages needed)
 export QLOO_API_KEY=...            # Qloo hackathon key, never commit it
 export QLOO_BASE_URL=https://hackathon.api.qloo.com
-export GEMINI_API_KEY=...          # optional: free Google AI Studio key, tried first (gemini-3.8-flash)
+export GEMINI_API_KEY=...          # optional: free Google AI Studio key. Tries gemini-3.8-flash (8s), then gemini-3.1-flash-lite
 export LLM_BASE_URL=...            # optional fallback: any OpenAI-compatible endpoint (default: a free keyless one)
 python app.py                      # http://localhost:8000 (broker mode: /?mode=broker)
 python backtest_chicago.py --no-llm  # optional: the Qloo backtest above (public Chicago data, about 35 Qloo calls)
+python backtest_chicago.py --public-only  # register only: IPW and conformal, no Qloo call
 python tgi.py build chicago 2023-01-01 /tmp/chicago_2023.json.gz && \
   python backtest_chicago.py --no-llm --food /tmp/chicago_2023.json.gz  # optional: with the Taste Gap Index
 ```
@@ -183,13 +220,20 @@ The API keys stay on the server; the browser only receives the streamed steps an
 
 CLI: `python agent.py "Korean fried chicken counter" "Austin, TX"`
 
+**MCP server** (`mcp_server.py`, standard library, stdio JSON-RPC): exposes `tenant_match`, `city_scan` and `city_scan_unit` to any MCP client. The key comes from the client's environment and is redacted from every tool result.
+
+```json
+{"mcpServers": {"tastefit": {"command": "python3", "args": ["/path/to/tastefit/mcp_server.py"],
+  "env": {"QLOO_API_KEY": "...", "QLOO_BASE_URL": "https://hackathon.api.qloo.com"}}}}
+```
+
 **Tenant match** (`GET /tenant?lat=41.9088&lon=-87.6796&rent=4000`, or `?city=Paris&location=Le%20Marais`): for a vacant unit, which food concepts the local audience wants that nobody nearby serves, and whether each can pay the rent. A fixed pipeline of at most 25 Qloo calls (8 workflows; a cache that lives for one request only, so repeated calls within a run are free and nothing Qloo returns outlives the request) streams each step, then a scored shortlist, a "without Qloo" comparison and a memo (`tenant.py`).
 
 **Claim ledger** (the "without Qloo" panel): the same LLM, with no tools, suggests concepts and names up to 5 competitors within 500 m. Each concept is marked confirmed (Taste Gap "white space", or "neutral" with a positive over-index), contradicted ("proven demand, crowded", "empty for a reason", "avoid"), partly supported, or not tested by this run. Each named venue is looked up in OpenStreetMap within 500 m with City Scan's name matcher (similarity >= 0.6 found, 0.45-0.6 ambiguous); Qloo's own area favourites that read as food venues go through the same check (1.5 km, since they are area-level; the OSM file holds food venues only). The page shows counts, and calls them agreement with the run's evidence and existence in open data, not accuracy: OSM misses real venues too. Supply estimates whose city-wide prior carries >= 80% of the weight are badged "Data coverage: low": the local OSM count barely moves them. This happens when the expected count near the unit is small or the city's block counts vary little; it is not a measure of how complete OSM mapping is.
 
-Front end: `index.html` plus `static/` (`app.js`, `styles.css`, icons, and the Schibsted Grotesk font under the SIL Open Font License, served from the app itself), no build step. The map starts from a few example points; they are places on a map, not vacancy listings. "Read a sample memo" replays `/demo` (synthetic data, labelled as such).
+Front end: `index.html` plus `static/` (`app.js`, `styles.css`, icons, and the Schibsted Grotesk font under the SIL Open Font License, served from the app itself), no build step. The map starts from a few example points; they are places on a map, not vacancy listings. "Try the Wicker Park example" loads `demo/wicker-park.json` at once (`GET /wicker-example.json`): stated scores, the City Scan rent ceiling, a Stable Street certificate, the rent split, a what-if, and the pop-up line, labelled "saved example from 2026-10-15". The file stores no Qloo response. "Read a sample memo" replays `/demo` (synthetic data, labelled as such).
 
-Tests: `python -m unittest discover -s tests -t . -v` (266 tests).
+Tests: `python -m unittest discover -s tests -t . -v` (276 tests).
 
 ## Deploy
 

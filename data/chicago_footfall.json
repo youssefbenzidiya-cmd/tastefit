@@ -1,0 +1,750 @@
+{
+ "source": "City of Chicago Data Portal",
+ "terms": "https://www.chicago.gov/city/en/narr/foia/data_disclaimer.html",
+ "portal": "https://data.cityofchicago.org/",
+ "personal_data": "Counts only. No trip rows, no rider identifiers, no Divvy gender or birth year.",
+ "leakage": "Every series ends before 2023-01-01, the first day of the Chicago backtest window.",
+ "datasets": [
+  {
+   "id": "m6dm-c72p",
+   "name": "Transportation Network Providers - Trips (2018 - 2022)",
+   "url": "https://data.cityofchicago.org/d/m6dm-c72p",
+   "measure": "Drop-offs grouped by dropoff_community_area.",
+   "evening": "Trip end hour 17 through 21, date_extract_hh.",
+   "weekend": "Each Saturday and Sunday in 2022, by trip end timestamp. A Saturday evening trip is also in the evening series.",
+   "start": "2022-01-01",
+   "end": "2022-12-31"
+  },
+  {
+   "id": "fg6s-gzvg",
+   "name": "Divvy Trips",
+   "url": "https://data.cityofchicago.org/d/fg6s-gzvg",
+   "measure": "Trip ends grouped by station coordinate, then summed into the community area that contains the station.",
+   "start": "2019-01-01",
+   "end": "2019-12-31",
+   "note": "This portal file ends 2020-01-21. 2019 is its last full year and is before the backtest window.",
+   "stations_outside_chicago": 24653,
+   "station_points": 646
+  },
+  {
+   "id": "5neh-572f",
+   "name": "CTA - Ridership - 'L' Station Entries - Daily Totals",
+   "url": "https://data.cityofchicago.org/d/5neh-572f",
+   "measure": "Sum of station entries (rides). Stations located with dataset 8pix-ypme and placed in a community area.",
+   "stations_dataset": "8pix-ypme",
+   "start": "2022-01-01",
+   "end": "2022-12-31",
+   "stations_outside_chicago": 5105024,
+   "note": "Entries at L stations outside the 77 community areas. The system continues into the suburbs, so those rides are not a Chicago community-area count."
+  }
+ ],
+ "boundaries": {
+  "id": "igwz-8jzy",
+  "name": "Boundaries - Community Areas",
+  "url": "https://data.cityofchicago.org/d/igwz-8jzy"
+ },
+ "community_areas": [
+  {
+   "number": "1",
+   "name": "ROGERS PARK",
+   "evening_dropoffs": 229403,
+   "weekend_dropoffs": 250488,
+   "divvy_ends": 27218,
+   "cta_boardings": 2600236
+  },
+  {
+   "number": "2",
+   "name": "WEST RIDGE",
+   "evening_dropoffs": 168412,
+   "weekend_dropoffs": 166860,
+   "divvy_ends": 6623,
+   "cta_boardings": 0
+  },
+  {
+   "number": "3",
+   "name": "UPTOWN",
+   "evening_dropoffs": 474146,
+   "weekend_dropoffs": 497780,
+   "divvy_ends": 88727,
+   "cta_boardings": 2096765
+  },
+  {
+   "number": "4",
+   "name": "LINCOLN SQUARE",
+   "evening_dropoffs": 201633,
+   "weekend_dropoffs": 225307,
+   "divvy_ends": 51962,
+   "cta_boardings": 1582850
+  },
+  {
+   "number": "5",
+   "name": "NORTH CENTER",
+   "evening_dropoffs": 226469,
+   "weekend_dropoffs": 254530,
+   "divvy_ends": 38388,
+   "cta_boardings": 705217
+  },
+  {
+   "number": "6",
+   "name": "LAKE VIEW",
+   "evening_dropoffs": 1477976,
+   "weekend_dropoffs": 1798409,
+   "divvy_ends": 319819,
+   "cta_boardings": 6450989
+  },
+  {
+   "number": "7",
+   "name": "LINCOLN PARK",
+   "evening_dropoffs": 1227212,
+   "weekend_dropoffs": 1354279,
+   "divvy_ends": 469826,
+   "cta_boardings": 2722019
+  },
+  {
+   "number": "8",
+   "name": "NEAR NORTH SIDE",
+   "evening_dropoffs": 3473209,
+   "weekend_dropoffs": 3767634,
+   "divvy_ends": 768596,
+   "cta_boardings": 8557373
+  },
+  {
+   "number": "9",
+   "name": "EDISON PARK",
+   "evening_dropoffs": 21014,
+   "weekend_dropoffs": 27515,
+   "divvy_ends": 0,
+   "cta_boardings": 0
+  },
+  {
+   "number": "10",
+   "name": "NORWOOD PARK",
+   "evening_dropoffs": 60033,
+   "weekend_dropoffs": 80607,
+   "divvy_ends": 0,
+   "cta_boardings": 408194
+  },
+  {
+   "number": "11",
+   "name": "JEFFERSON PARK",
+   "evening_dropoffs": 49827,
+   "weekend_dropoffs": 60585,
+   "divvy_ends": 0,
+   "cta_boardings": 1042823
+  },
+  {
+   "number": "12",
+   "name": "FOREST GLEN",
+   "evening_dropoffs": 24968,
+   "weekend_dropoffs": 34438,
+   "divvy_ends": 0,
+   "cta_boardings": 0
+  },
+  {
+   "number": "13",
+   "name": "NORTH PARK",
+   "evening_dropoffs": 40148,
+   "weekend_dropoffs": 43221,
+   "divvy_ends": 2390,
+   "cta_boardings": 0
+  },
+  {
+   "number": "14",
+   "name": "ALBANY PARK",
+   "evening_dropoffs": 127112,
+   "weekend_dropoffs": 142657,
+   "divvy_ends": 5786,
+   "cta_boardings": 1256504
+  },
+  {
+   "number": "15",
+   "name": "PORTAGE PARK",
+   "evening_dropoffs": 128197,
+   "weekend_dropoffs": 141821,
+   "divvy_ends": 546,
+   "cta_boardings": 0
+  },
+  {
+   "number": "16",
+   "name": "IRVING PARK",
+   "evening_dropoffs": 185482,
+   "weekend_dropoffs": 209236,
+   "divvy_ends": 13182,
+   "cta_boardings": 1314934
+  },
+  {
+   "number": "17",
+   "name": "DUNNING",
+   "evening_dropoffs": 54372,
+   "weekend_dropoffs": 61160,
+   "divvy_ends": 0,
+   "cta_boardings": 0
+  },
+  {
+   "number": "18",
+   "name": "MONTCLARE",
+   "evening_dropoffs": 21768,
+   "weekend_dropoffs": 24028,
+   "divvy_ends": 0,
+   "cta_boardings": 0
+  },
+  {
+   "number": "19",
+   "name": "BELMONT CRAGIN",
+   "evening_dropoffs": 137870,
+   "weekend_dropoffs": 154279,
+   "divvy_ends": 0,
+   "cta_boardings": 0
+  },
+  {
+   "number": "20",
+   "name": "HERMOSA",
+   "evening_dropoffs": 48830,
+   "weekend_dropoffs": 53330,
+   "divvy_ends": 883,
+   "cta_boardings": 0
+  },
+  {
+   "number": "21",
+   "name": "AVONDALE",
+   "evening_dropoffs": 197127,
+   "weekend_dropoffs": 221856,
+   "divvy_ends": 8517,
+   "cta_boardings": 826171
+  },
+  {
+   "number": "22",
+   "name": "LOGAN SQUARE",
+   "evening_dropoffs": 723785,
+   "weekend_dropoffs": 780608,
+   "divvy_ends": 107891,
+   "cta_boardings": 2547568
+  },
+  {
+   "number": "23",
+   "name": "HUMBOLDT PARK",
+   "evening_dropoffs": 154787,
+   "weekend_dropoffs": 174560,
+   "divvy_ends": 3464,
+   "cta_boardings": 0
+  },
+  {
+   "number": "24",
+   "name": "WEST TOWN",
+   "evening_dropoffs": 1226836,
+   "weekend_dropoffs": 1337657,
+   "divvy_ends": 263218,
+   "cta_boardings": 2919628
+  },
+  {
+   "number": "25",
+   "name": "AUSTIN",
+   "evening_dropoffs": 264625,
+   "weekend_dropoffs": 269376,
+   "divvy_ends": 1845,
+   "cta_boardings": 1139834
+  },
+  {
+   "number": "26",
+   "name": "WEST GARFIELD PARK",
+   "evening_dropoffs": 61611,
+   "weekend_dropoffs": 62636,
+   "divvy_ends": 542,
+   "cta_boardings": 513102
+  },
+  {
+   "number": "27",
+   "name": "EAST GARFIELD PARK",
+   "evening_dropoffs": 85582,
+   "weekend_dropoffs": 89388,
+   "divvy_ends": 2777,
+   "cta_boardings": 833835
+  },
+  {
+   "number": "28",
+   "name": "NEAR WEST SIDE",
+   "evening_dropoffs": 1900754,
+   "weekend_dropoffs": 1708297,
+   "divvy_ends": 563847,
+   "cta_boardings": 4597162
+  },
+  {
+   "number": "29",
+   "name": "NORTH LAWNDALE",
+   "evening_dropoffs": 142517,
+   "weekend_dropoffs": 153115,
+   "divvy_ends": 2017,
+   "cta_boardings": 682927
+  },
+  {
+   "number": "30",
+   "name": "SOUTH LAWNDALE",
+   "evening_dropoffs": 110158,
+   "weekend_dropoffs": 122712,
+   "divvy_ends": 3089,
+   "cta_boardings": 290906
+  },
+  {
+   "number": "31",
+   "name": "LOWER WEST SIDE",
+   "evening_dropoffs": 247722,
+   "weekend_dropoffs": 261831,
+   "divvy_ends": 34687,
+   "cta_boardings": 1191416
+  },
+  {
+   "number": "32",
+   "name": "LOOP",
+   "evening_dropoffs": 1529975,
+   "weekend_dropoffs": 1619246,
+   "divvy_ends": 649945,
+   "cta_boardings": 19255145
+  },
+  {
+   "number": "33",
+   "name": "NEAR SOUTH SIDE",
+   "evening_dropoffs": 433254,
+   "weekend_dropoffs": 551170,
+   "divvy_ends": 133239,
+   "cta_boardings": 2278025
+  },
+  {
+   "number": "34",
+   "name": "ARMOUR SQUARE",
+   "evening_dropoffs": 128284,
+   "weekend_dropoffs": 122871,
+   "divvy_ends": 16182,
+   "cta_boardings": 1544260
+  },
+  {
+   "number": "35",
+   "name": "DOUGLAS",
+   "evening_dropoffs": 101121,
+   "weekend_dropoffs": 114851,
+   "divvy_ends": 37824,
+   "cta_boardings": 271895
+  },
+  {
+   "number": "36",
+   "name": "OAKLAND",
+   "evening_dropoffs": 27895,
+   "weekend_dropoffs": 27110,
+   "divvy_ends": 0,
+   "cta_boardings": 0
+  },
+  {
+   "number": "37",
+   "name": "FULLER PARK",
+   "evening_dropoffs": 10682,
+   "weekend_dropoffs": 13165,
+   "divvy_ends": 764,
+   "cta_boardings": 856502
+  },
+  {
+   "number": "38",
+   "name": "GRAND BOULEVARD",
+   "evening_dropoffs": 104634,
+   "weekend_dropoffs": 105598,
+   "divvy_ends": 4947,
+   "cta_boardings": 539267
+  },
+  {
+   "number": "39",
+   "name": "KENWOOD",
+   "evening_dropoffs": 98921,
+   "weekend_dropoffs": 86014,
+   "divvy_ends": 9787,
+   "cta_boardings": 0
+  },
+  {
+   "number": "40",
+   "name": "WASHINGTON PARK",
+   "evening_dropoffs": 62471,
+   "weekend_dropoffs": 59246,
+   "divvy_ends": 2053,
+   "cta_boardings": 180055
+  },
+  {
+   "number": "41",
+   "name": "HYDE PARK",
+   "evening_dropoffs": 446090,
+   "weekend_dropoffs": 381098,
+   "divvy_ends": 72287,
+   "cta_boardings": 0
+  },
+  {
+   "number": "42",
+   "name": "WOODLAWN",
+   "evening_dropoffs": 160462,
+   "weekend_dropoffs": 153776,
+   "divvy_ends": 11289,
+   "cta_boardings": 194267
+  },
+  {
+   "number": "43",
+   "name": "SOUTH SHORE",
+   "evening_dropoffs": 178699,
+   "weekend_dropoffs": 175954,
+   "divvy_ends": 2267,
+   "cta_boardings": 0
+  },
+  {
+   "number": "44",
+   "name": "CHATHAM",
+   "evening_dropoffs": 120294,
+   "weekend_dropoffs": 127912,
+   "divvy_ends": 850,
+   "cta_boardings": 1389216
+  },
+  {
+   "number": "45",
+   "name": "AVALON PARK",
+   "evening_dropoffs": 25855,
+   "weekend_dropoffs": 25299,
+   "divvy_ends": 133,
+   "cta_boardings": 0
+  },
+  {
+   "number": "46",
+   "name": "SOUTH CHICAGO",
+   "evening_dropoffs": 60375,
+   "weekend_dropoffs": 60745,
+   "divvy_ends": 210,
+   "cta_boardings": 0
+  },
+  {
+   "number": "47",
+   "name": "BURNSIDE",
+   "evening_dropoffs": 8038,
+   "weekend_dropoffs": 8617,
+   "divvy_ends": 0,
+   "cta_boardings": 0
+  },
+  {
+   "number": "48",
+   "name": "CALUMET HEIGHTS",
+   "evening_dropoffs": 27919,
+   "weekend_dropoffs": 28150,
+   "divvy_ends": 0,
+   "cta_boardings": 0
+  },
+  {
+   "number": "49",
+   "name": "ROSELAND",
+   "evening_dropoffs": 103017,
+   "weekend_dropoffs": 102853,
+   "divvy_ends": 0,
+   "cta_boardings": 1330341
+  },
+  {
+   "number": "50",
+   "name": "PULLMAN",
+   "evening_dropoffs": 22673,
+   "weekend_dropoffs": 28668,
+   "divvy_ends": 0,
+   "cta_boardings": 0
+  },
+  {
+   "number": "51",
+   "name": "SOUTH DEERING",
+   "evening_dropoffs": 34142,
+   "weekend_dropoffs": 33337,
+   "divvy_ends": 0,
+   "cta_boardings": 0
+  },
+  {
+   "number": "52",
+   "name": "EAST SIDE",
+   "evening_dropoffs": 10635,
+   "weekend_dropoffs": 11841,
+   "divvy_ends": 0,
+   "cta_boardings": 0
+  },
+  {
+   "number": "53",
+   "name": "WEST PULLMAN",
+   "evening_dropoffs": 58942,
+   "weekend_dropoffs": 57162,
+   "divvy_ends": 0,
+   "cta_boardings": 0
+  },
+  {
+   "number": "54",
+   "name": "RIVERDALE",
+   "evening_dropoffs": 21291,
+   "weekend_dropoffs": 18703,
+   "divvy_ends": 0,
+   "cta_boardings": 0
+  },
+  {
+   "number": "55",
+   "name": "HEGEWISCH",
+   "evening_dropoffs": 6615,
+   "weekend_dropoffs": 6893,
+   "divvy_ends": 0,
+   "cta_boardings": 0
+  },
+  {
+   "number": "56",
+   "name": "GARFIELD RIDGE",
+   "evening_dropoffs": 209354,
+   "weekend_dropoffs": 294339,
+   "divvy_ends": 0,
+   "cta_boardings": 1377794
+  },
+  {
+   "number": "57",
+   "name": "ARCHER HEIGHTS",
+   "evening_dropoffs": 27237,
+   "weekend_dropoffs": 32044,
+   "divvy_ends": 0,
+   "cta_boardings": 0
+  },
+  {
+   "number": "58",
+   "name": "BRIGHTON PARK",
+   "evening_dropoffs": 62059,
+   "weekend_dropoffs": 67286,
+   "divvy_ends": 0,
+   "cta_boardings": 619023
+  },
+  {
+   "number": "59",
+   "name": "MCKINLEY PARK",
+   "evening_dropoffs": 32485,
+   "weekend_dropoffs": 38884,
+   "divvy_ends": 2268,
+   "cta_boardings": 477257
+  },
+  {
+   "number": "60",
+   "name": "BRIDGEPORT",
+   "evening_dropoffs": 86058,
+   "weekend_dropoffs": 95070,
+   "divvy_ends": 14824,
+   "cta_boardings": 405877
+  },
+  {
+   "number": "61",
+   "name": "NEW CITY",
+   "evening_dropoffs": 75096,
+   "weekend_dropoffs": 85161,
+   "divvy_ends": 2441,
+   "cta_boardings": 0
+  },
+  {
+   "number": "62",
+   "name": "WEST ELSDON",
+   "evening_dropoffs": 22769,
+   "weekend_dropoffs": 26143,
+   "divvy_ends": 0,
+   "cta_boardings": 820022
+  },
+  {
+   "number": "63",
+   "name": "GAGE PARK",
+   "evening_dropoffs": 44589,
+   "weekend_dropoffs": 49313,
+   "divvy_ends": 0,
+   "cta_boardings": 627572
+  },
+  {
+   "number": "64",
+   "name": "CLEARING",
+   "evening_dropoffs": 25735,
+   "weekend_dropoffs": 29154,
+   "divvy_ends": 0,
+   "cta_boardings": 0
+  },
+  {
+   "number": "65",
+   "name": "WEST LAWN",
+   "evening_dropoffs": 47621,
+   "weekend_dropoffs": 50269,
+   "divvy_ends": 0,
+   "cta_boardings": 0
+  },
+  {
+   "number": "66",
+   "name": "CHICAGO LAWN",
+   "evening_dropoffs": 96129,
+   "weekend_dropoffs": 97728,
+   "divvy_ends": 0,
+   "cta_boardings": 0
+  },
+  {
+   "number": "67",
+   "name": "WEST ENGLEWOOD",
+   "evening_dropoffs": 77136,
+   "weekend_dropoffs": 76173,
+   "divvy_ends": 412,
+   "cta_boardings": 145954
+  },
+  {
+   "number": "68",
+   "name": "ENGLEWOOD",
+   "evening_dropoffs": 84489,
+   "weekend_dropoffs": 84239,
+   "divvy_ends": 613,
+   "cta_boardings": 464030
+  },
+  {
+   "number": "69",
+   "name": "GREATER GRAND CROSSING",
+   "evening_dropoffs": 121225,
+   "weekend_dropoffs": 123448,
+   "divvy_ends": 765,
+   "cta_boardings": 627587
+  },
+  {
+   "number": "70",
+   "name": "ASHBURN",
+   "evening_dropoffs": 54329,
+   "weekend_dropoffs": 56264,
+   "divvy_ends": 0,
+   "cta_boardings": 0
+  },
+  {
+   "number": "71",
+   "name": "AUBURN GRESHAM",
+   "evening_dropoffs": 129271,
+   "weekend_dropoffs": 122423,
+   "divvy_ends": 0,
+   "cta_boardings": 0
+  },
+  {
+   "number": "72",
+   "name": "BEVERLY",
+   "evening_dropoffs": 23904,
+   "weekend_dropoffs": 34992,
+   "divvy_ends": 0,
+   "cta_boardings": 0
+  },
+  {
+   "number": "73",
+   "name": "WASHINGTON HEIGHTS",
+   "evening_dropoffs": 61984,
+   "weekend_dropoffs": 61371,
+   "divvy_ends": 0,
+   "cta_boardings": 0
+  },
+  {
+   "number": "74",
+   "name": "MOUNT GREENWOOD",
+   "evening_dropoffs": 12309,
+   "weekend_dropoffs": 21771,
+   "divvy_ends": 0,
+   "cta_boardings": 0
+  },
+  {
+   "number": "75",
+   "name": "MORGAN PARK",
+   "evening_dropoffs": 40202,
+   "weekend_dropoffs": 47155,
+   "divvy_ends": 0,
+   "cta_boardings": 0
+  },
+  {
+   "number": "76",
+   "name": "OHARE",
+   "evening_dropoffs": 581609,
+   "weekend_dropoffs": 983701,
+   "divvy_ends": 0,
+   "cta_boardings": 2856606
+  },
+  {
+   "number": "77",
+   "name": "EDGEWATER",
+   "evening_dropoffs": 298050,
+   "weekend_dropoffs": 325700,
+   "divvy_ends": 44392,
+   "cta_boardings": 1660736
+  }
+ ],
+ "backtest_areas": [
+  {
+   "area": "Wicker Park",
+   "lat": 41.9088,
+   "lon": -87.6796,
+   "community_area_number": "24",
+   "community_area_name": "WEST TOWN"
+  },
+  {
+   "area": "Logan Square",
+   "lat": 41.9217,
+   "lon": -87.7005,
+   "community_area_number": "22",
+   "community_area_name": "LOGAN SQUARE"
+  },
+  {
+   "area": "Pilsen",
+   "lat": 41.8564,
+   "lon": -87.656,
+   "community_area_number": "31",
+   "community_area_name": "LOWER WEST SIDE"
+  },
+  {
+   "area": "Lincoln Park",
+   "lat": 41.9214,
+   "lon": -87.6513,
+   "community_area_number": "7",
+   "community_area_name": "LINCOLN PARK"
+  },
+  {
+   "area": "West Loop",
+   "lat": 41.8826,
+   "lon": -87.6476,
+   "community_area_number": "28",
+   "community_area_name": "NEAR WEST SIDE"
+  },
+  {
+   "area": "Hyde Park",
+   "lat": 41.7943,
+   "lon": -87.5907,
+   "community_area_number": "41",
+   "community_area_name": "HYDE PARK"
+  },
+  {
+   "area": "Andersonville",
+   "lat": 41.98,
+   "lon": -87.6685,
+   "community_area_number": "77",
+   "community_area_name": "EDGEWATER"
+  },
+  {
+   "area": "Lakeview",
+   "lat": 41.94,
+   "lon": -87.654,
+   "community_area_number": "6",
+   "community_area_name": "LAKE VIEW"
+  },
+  {
+   "area": "Bridgeport",
+   "lat": 41.838,
+   "lon": -87.651,
+   "community_area_number": "60",
+   "community_area_name": "BRIDGEPORT"
+  },
+  {
+   "area": "Uptown",
+   "lat": 41.9666,
+   "lon": -87.6533,
+   "community_area_number": "3",
+   "community_area_name": "UPTOWN"
+  },
+  {
+   "area": "Chinatown",
+   "lat": 41.8517,
+   "lon": -87.6338,
+   "community_area_number": "34",
+   "community_area_name": "ARMOUR SQUARE"
+  },
+  {
+   "area": "River North",
+   "lat": 41.8924,
+   "lon": -87.6341,
+   "community_area_number": "8",
+   "community_area_name": "NEAR NORTH SIDE"
+  }
+ ]
+}

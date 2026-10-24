@@ -1,8 +1,11 @@
+import contextlib
 import http.client
+import io
 import json
 import os
 import re
 import threading
+import time
 import unittest
 import urllib.error
 import urllib.request
@@ -127,6 +130,14 @@ class Server(unittest.TestCase):
     def test_footer_keeps_osm_attribution(self):
         self.assertIn("OpenStreetMap", self.get("/")[1])
 
+    def test_evidence_is_linked_and_quotes_the_negative_result(self):
+        self.assertIn('href="/evidence"', self.get("/")[1])
+        code, body = self.get("/evidence")
+        self.assertEqual(code, 200)
+        self.assertIn("No measurable gain", body)
+        self.assertIn("Heckman (1979)", body)
+        self.assertIn('href="/ledger"', body)
+
     def test_health(self):
         self.assertEqual(self.get("/health"), (200, "ok"))
 
@@ -143,7 +154,8 @@ class Server(unittest.TestCase):
 
     def test_tenant_validates_inputs(self):
         for q in ("", "city=Chicago", "lat=41.9", "lat=x&lon=1", "lat=91&lon=0", "lat=41.9&lon=-87.6&rent=-5",
-                  "lat=41.9&lon=-87.6&rent=abc"):
+                  "lat=41.9&lon=-87.6&rent=abc", "lat=41.9&lon=-87.6&portfolio=nope",
+                  "lat=41.9&lon=-87.6&portfolio=100&k=9"):
             self.assertEqual(self.get("/tenant?" + q)[0], 400, q)
 
     def test_tenant_without_key_reports_offline(self):
@@ -153,9 +165,31 @@ class Server(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertIn('event: error\ndata: "offline"', body)
 
+    def test_stream_pings_while_the_pipeline_is_blocked(self):
+        def fake_run(*_a, **_k):
+            time.sleep(0.25)
+            yield "unit", {"area": "Sample"}
+            yield "budget", {"qloo_calls": 0}
+
+        with mock.patch.object(app, "SSE_PING_S", 0.05), \
+             mock.patch.dict(os.environ, {"QLOO_API_KEY": "k"}), \
+             mock.patch.object(app.tenant, "run", fake_run):
+            code, body = self.get("/tenant?lat=41.9&lon=-87.68")
+        self.assertEqual(code, 200)
+        self.assertIn(": ping" + (" " * 100), body)
+        self.assertLess(body.index(": ping"), body.index("event: unit"))
+        kinds = [event for event, _data in sse_events(body) if event]
+        self.assertEqual(kinds, ["unit", "budget"])
+        script = (app.ROOT / "static" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("if (line.startsWith(':')) continue;", script)
+        self.assertIn("if (!named) continue;", script)
+        self.assertIn("data ? JSON.parse(data) : null", script)
+        self.assertIn("if (HANDLERS[event]) HANDLERS[event](data)", script)
+
     def test_tenant_streams_pipeline_events(self):
-        def fake_run(city, location, lat, lon, rent):
-            yield "unit", {"city": city, "location": location, "lat": lat, "lon": lon, "rent": rent}
+        def fake_run(city, location, lat, lon, rent, portfolio_rents=None, portfolio_k=1):
+            yield "unit", {"city": city, "location": location, "lat": lat, "lon": lon, "rent": rent,
+                           "portfolio_rents": portfolio_rents, "k": portfolio_k}
             yield "budget", {"qloo_calls": 3}
         with mock.patch.dict(os.environ, {"QLOO_API_KEY": "k"}), mock.patch.object(app.tenant, "run", fake_run):
             code, body = self.get("/tenant?city=Paris&location=Le%20Marais&rent=4000")
@@ -211,6 +245,65 @@ class Server(unittest.TestCase):
         self.assertGreater(int(headers["Content-Length"]), 1000)
         code, headers, body = self.request("HEAD", "/health")
         self.assertEqual((code, body, headers["Content-Length"]), (200, "", "2"))
+
+    def test_street_whatif_makes_no_qloo_call(self):
+        payload = {"units": [{"id": "A", "rent": 2000}, {"id": "B", "rent": 2000}, {"id": "C", "rent": 2000}],
+                   "concepts": [{"id": "ramen", "category": "restaurant", "fit": 80, "overlap": 10},
+                                {"id": "coffee", "category": "cafe", "fit": 70, "overlap": 10},
+                                {"id": "books", "category": "retail", "fit": 60, "overlap": 10}],
+                   "remove": "books", "add": None}
+        path = "/street?payload=" + urllib.parse.quote(json.dumps(payload))
+        with mock.patch("qloo.exec_cached", side_effect=AssertionError("qloo")):
+            code, body = self.get(path)
+        self.assertEqual(code, 200)
+        data = json.loads(body)
+        self.assertEqual(data["qloo_calls"], 0)
+        self.assertIn("No improving move:", data["after"]["proof"])
+        code, body = self.get("/street?payload=" + urllib.parse.quote(json.dumps({"units": [], "concepts": []})))
+        self.assertEqual(code, 400)
+        code, body = self.get("/street?payload=" + urllib.parse.quote(json.dumps({"units": payload["units"], "concepts": None})))
+        self.assertEqual(code, 400)
+        self.assertNotIn("<html", body.lower())
+        handler = app.Handler.__new__(app.Handler)
+        handler.command = "GET"
+        handler.client_address = ("127.0.0.1", 0)
+        handler.path = "/street?payload=" + urllib.parse.quote(json.dumps({"fit": 80, "overlap": 10}))
+        handler.requestline = "GET " + handler.path + " HTTP/1.1"
+        buf = io.StringIO()
+        with contextlib.redirect_stderr(buf):
+            handler.log_request(200, 3)
+        log = buf.getvalue()
+        self.assertIn("GET /street", log)
+        self.assertNotIn("overlap", log)
+        self.assertNotIn("payload", log)
+        units = payload["units"]
+        for bad in ({"id": "ramen", "fit": float("nan"), "overlap": 10},
+                    {"id": "ramen", "fit": 80, "overlap": float("inf")},
+                    {"id": "ramen", "fit": 101, "overlap": 10}):
+            raw = json.dumps({"units": units, "concepts": [bad], "add": "noodles"})
+            code, body = self.get("/street?payload=" + urllib.parse.quote(raw))
+            self.assertEqual(code, 400, bad)
+            self.assertNotIn("NaN", body)
+            self.assertNotIn("Infinity", body)
+        huge = json.dumps({"units": [{"id": "A", "rent": 10 ** 400}, {"id": "B", "rent": 2000},
+                                     {"id": "C", "rent": 2000}],
+                           "concepts": [{"id": "ramen", "fit": 10 ** 400, "overlap": 10 ** 400}],
+                           "add": "noodles"})
+        code, body = self.get("/street?payload=" + urllib.parse.quote(huge))
+        self.assertEqual(code, 400)
+        self.assertNotIn("Traceback", body)
+        for rent_row in ({"viable": True}, {"viable": True, "rent_max": 2800, "ci90": "nope"}):
+            raw = json.dumps({"units": units, "concepts": [{"id": "ramen", "fit": 80, "overlap": 10,
+                                                            "rent_row": rent_row}], "add": "noodles"})
+            code, body = self.get("/street?payload=" + urllib.parse.quote(raw))
+            self.assertEqual(code, 400, rent_row)
+            self.assertNotIn("Traceback", body)
+        good = json.dumps({"units": units, "concepts": [{"id": "ramen", "fit": 80, "overlap": 10,
+                                                         "rent_row": {"viable": True, "rent_max": 2800,
+                                                                      "ci90": [2000, 3200]}}],
+                           "add": "noodles"})
+        code, body = self.get("/street?payload=" + urllib.parse.quote(good))
+        self.assertEqual(code, 200)
 
     def test_wrong_methods_get_plain_405(self):
         for method, path, allow in (("POST", "/", "GET, HEAD"), ("DELETE", "/health", "GET, HEAD"),
