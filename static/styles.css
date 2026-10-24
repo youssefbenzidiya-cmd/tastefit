@@ -525,7 +525,7 @@ body:has(#layer-street:checked) .lab { display: none; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
 /* ---------- memo (screen + print) ---------- */
-.memo { width: min(860px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 0; border-radius: var(--r-xl); background: var(--paper); color: var(--ink); box-shadow: var(--sh-3); }
+.memo { width: min(920px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 0; border-radius: var(--r-xl); background: var(--paper); color: var(--ink); box-shadow: var(--sh-3); }
 .memo::backdrop { background: rgba(15, 22, 38, .55); backdrop-filter: blur(3px); }
 .memo[open] { animation: enter 260ms var(--ease-out); }
 .memo-bar { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center; padding: var(--s-3) var(--s-4); background: var(--paper); border-bottom: 1px solid var(--rule); }
@@ -547,16 +547,39 @@ body:has(#layer-street:checked) .lab { display: none; }
 .memo-table td:last-child, .memo-table th:last-child { white-space: nowrap; padding-right: 0; }
 .memo-limits { margin-top: var(--s-6); padding-top: var(--s-3); border-top: 1px solid var(--rule); color: var(--ink-2); }
 .memo-limits li, .memo-limits p { font-size: var(--t-12); }
+.memo-kicker { display: inline-block; font-weight: 800; font-size: var(--t-12); letter-spacing: 0.08em; padding: 3px 10px; border: 1.5px solid #15203B; border-radius: var(--r-xs); margin: var(--s-5) 0 0; }
+.memo-kicker-go { background: #E3F3E9; color: #17703F; }
+.memo-kicker-adjust { background: #FBEFD3; color: #8A5A00; }
+.memo-kicker-nogo { background: #FCE4E1; color: #B42318; }
+.memo-kicker-hold { background: #FFD84D; color: #15203B; }
+.memo-lead { font-size: var(--t-16); max-width: 62ch; }
+.memo-hero { display: flex; align-items: baseline; gap: 12px; margin: var(--s-4) 0; font-size: var(--t-16); }
+.memo-hero b { font-size: clamp(3rem, 8vw, 5rem); letter-spacing: -0.06em; line-height: 0.85; font-weight: 800; }
+.memo-plain { max-width: 72ch; text-wrap: pretty; }
+.memo-expert { font-size: var(--t-12); color: var(--ink-2); max-width: 78ch; }
+.memo-foot { margin-top: var(--s-6); font-size: var(--t-12); color: var(--ink-2); }
+.memo-page a { color: inherit; }
+.memo-page h1 { text-wrap: balance; }
+.memo-call { border: 2px solid #15203B; padding: var(--s-4) var(--s-5); margin: var(--s-5) 0; background: #FFD84D; color: #15203B; }
+.memo-call p { font-size: var(--t-14); max-width: none; margin: 0 0 var(--s-3); }
+.memo-call p:last-child { margin-bottom: 0; }
+.memo-section { margin-top: var(--s-2); }
+.memo-formula { font-size: var(--t-12); background: #F3F5F7; border: 1px solid #DDE2E8; padding: var(--s-3) var(--s-4); color: #15203B; max-width: none; }
+.memo-en { font-weight: 400 !important; color: var(--ink-2); white-space: normal; }
+.memo-book td:last-child, .memo-book th:last-child { font-variant-numeric: tabular-nums; }
+.mail-link { font-size: var(--t-12); font-weight: 700; color: var(--ink); text-underline-offset: 3px; white-space: nowrap; }
 
 @media print {
-  @page { size: A4; margin: 14mm; }
+  @page { size: letter; margin: 14mm; }
   body > *:not(.memo) { display: none !important; }
   .memo { position: static; display: block; width: auto; max-height: none; box-shadow: none; background: #fff; border-radius: 0; }
   .memo:not([open]) { display: none !important; }
   .memo::backdrop { display: none; }
   .memo-bar { display: none; }
   .memo-page { margin: 0; padding: 0; box-shadow: none; }
-  .memo-table tr, .memo-page h2 { break-inside: avoid; break-after: avoid; }
+  .memo-table tr, .memo-page h2, .memo-call, .memo-section { break-inside: avoid; }
+  .memo-page h2 { break-after: avoid; }
+  .memo-hero { break-inside: avoid; }
   #map, .topbar, .dock { display: none !important; }
 }
 
@@ -587,6 +610,7 @@ body:has(#layer-street:checked) .lab { display: none; }
 }
 @media (max-width: 420px) {
   .brand-copy small { display: none; }
+  .mail-link { font-size: 11px; max-width: 42vw; overflow: hidden; text-overflow: ellipsis; }
   .hero-actions .btn { width: 100%; }
   .verdict-card { grid-template-columns: 1fr; justify-items: start; }
 }

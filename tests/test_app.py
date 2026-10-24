@@ -67,6 +67,8 @@ class Server(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertIn("TasteFit", body)
         self.assertNotIn("{{CTA}}", body)
+        self.assertNotIn("{{CONTACT}}", body)
+        self.assertIn("youssefbenzidiya@gmail.com", body)
 
     def test_index_has_the_ci_smoke_marker(self):
         ci = (app.ROOT / ".gitlab-ci.yml").read_text()
