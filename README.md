@@ -12,11 +12,11 @@ license: mit
 
 Click the map. One number answers **Who should rent this unit?**
 
-At a Chicago pin you get three exhibits on one sheet: who lives here (Census ACS 5-year), who dies (official business licences, n = 5,692), and what the street likes (Qloo — stamped VOID, because location did not predict survival). OSM competitors sit on the map as geography, not as a survival claim. 80% open is not for sale as a rent. It is for sale as a share.
+At a Chicago pin you get three exhibits on one sheet: who lives here (Census ACS 5-year), who dies (official business licences, n = 5,692), and what the street loves (Qloo taste graph). OSM competitors sit on the map as geography, not as a survival claim. 80% open is not for sale as a rent. It is for sale as a share.
 
-The pin is the only required action. Print memo is a one-page report from that pin. A cell is a block to scout, not a vetted address.
+The pin is the only required action. Print memo is a one-page report from that pin. A cell is a block to scout, not a vetted address. Qloo answers who belongs here. Licences answer survival: location did not predict it (κ = 0).
 
-**Live demo:** https://tastefit-3fw52w2r2a-uc.a.run.app — pin Wicker Park, read the number, run the Qloo agent. `/walkthrough` is the silent reel.
+**Live demo:** https://tastefit-776637567140.us-central1.run.app — pin Wicker Park, read the number, run the Qloo agent. Silent reel: https://tastefit-776637567140.us-central1.run.app/walkthrough.
 
 ## 60-second demo
 
@@ -25,7 +25,9 @@ The pin is the only required action. Print memo is a one-page report from that p
 3. Drag “landlord share” toward 35%. 80% open is for sale as a share, not as a cheaper pin.
 4. Print memo. Hand it to a landlord. Limits stay on the page.
 
-A silent 60-second reel is at `/walkthrough` on the running app (source: [`demo/walkthrough.html`](demo/walkthrough.html)). Freeze a beat with `?scene=1` … `?scene=5`. A recorded cut is [`demo/tastefit-60s.mp4`](demo/tastefit-60s.mp4).
+A silent 60-second reel is at `/walkthrough` on the running app (source: [`demo/walkthrough.html`](demo/walkthrough.html)). Freeze a beat with `?scene=1` … `?scene=5`. A recorded cut is [`demo/tastefit-60s.mp4`](demo/tastefit-60s.mp4) (60 seconds, product only).
+
+GitLab's under-3-minute automation ask is the live pipeline and Duo flows, not this reel. There is no pipeline screen recording in the repo. Paste [pipeline 2984949822](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipelines/2984949822) and the flows in [`.gitlab/duo/flows/`](.gitlab/duo/flows) (Issue Planner, Developer, Domain Reviewer, Pipeline Medic, Release Scribe).
 
 ## How it works
 
@@ -237,15 +239,15 @@ Tests: `python -m unittest discover -s tests -t . -v` (276 tests).
 
 ## Deploy
 
-Deployed on Render (free Docker web service) from the `Dockerfile`; set the environment variables above in the Render dashboard. On GitLab, CI triggers the deploy with the exact commit SHA (see below).
+**Live demo (Cloud Run, free tier):** https://tastefit-776637567140.us-central1.run.app (us-central1, 0 to 1 instances). The `deploy-gcp` job copies the signed, scanned CI image by digest to Artifact Registry and deploys that digest, authenticated by Workload Identity Federation (no stored key); `smoke-gcp` checks that `/health` returns the commit SHA.
 
-**Google Cloud:** also live on Cloud Run at https://tastefit-776637567140.us-central1.run.app (us-central1, 0 to 1 instances, free tier). The `deploy-gcp` job copies the signed, scanned CI image by digest to Artifact Registry and deploys that digest, authenticated by Workload Identity Federation (no stored key); `smoke-gcp` checks that `/health` returns the commit SHA.
+A second free Docker web service still deploys to Render from the same `Dockerfile` and commit SHA. Set the environment variables above in the host dashboard. Google Cloud Run is the URL to paste.
 
 ## Agentic DevSecOps on GitLab
 
 TasteFit started on GitHub (https://github.com/youssefbenzidiya-cmd/tastefit) with no CI, no tests and no post-deploy check. On GitLab, every commit goes through a 7-stage pipeline, and four custom GitLab Duo Agent Platform flows plan, fix, review and release the project when events happen, without being asked. A person merges every change.
 
-**Pipeline** ([`.gitlab-ci.yml`](.gitlab-ci.yml)): `test` → `build` → `security` → `package` → `deploy` → `verify` → `release`. On the latest `main` pipeline ([2935652252](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipelines/2935652252)) all 15 jobs passed: `unit-tests`, `lint`, `flows-lint`, `image-build`, `semgrep-sast`, `secret_detection`, `dependency-scanning`, `container_scanning`, `cve-gate`, `sbom`, `sign-image`, `verify-signature`, `deploy-render`, `smoke-test`, `release`. A daily schedule (06:00 UTC) rebuilds and rescans the image and checks that production is up.
+**Pipeline** ([`.gitlab-ci.yml`](.gitlab-ci.yml)): `test` → `build` → `security` → `package` → `deploy` → `verify` → `release`. Latest `main` pipeline: [2984949822](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipelines/2984949822) (merge of `feat/pin-first`). An earlier `main` pipeline ([2935652252](https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipelines/2935652252)) passed all 15 jobs then listed: `unit-tests`, `lint`, `flows-lint`, `image-build`, `semgrep-sast`, `secret_detection`, `dependency-scanning`, `container_scanning`, `cve-gate`, `sbom`, `sign-image`, `verify-signature`, `deploy-render`, `smoke-test`, `release`. A daily schedule (06:00 UTC) rebuilds and rescans the image and checks that production is up.
 
 ### GitLab stages covered
 

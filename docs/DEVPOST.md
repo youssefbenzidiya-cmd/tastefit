@@ -7,6 +7,12 @@ checks that can show the answer is wrong. A run makes at most 25 Qloo calls. At 
 LLM calls are cut short so the memo can still finish inside a 300 second host limit. The process is
 not killed. No discounting and no interest.
 
+## Try it
+
+- **Live demo:** https://tastefit-776637567140.us-central1.run.app — pin a Chicago block. The pin is a cell to scout, not a vetted address.
+- **Walkthrough:** https://tastefit-776637567140.us-central1.run.app/walkthrough (60-second product reel). Recorded cut: `demo/tastefit-60s.mp4` (60 seconds). Qloo is taste, not survival.
+- **GitLab automation:** https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipelines/2984949822. Duo flows live in `.gitlab/duo/flows/`. The 60s reel is product-only; there is no pipeline screen recording in this repo.
+
 ## Surprise ladder
 
 ### 1. What Qloo adds
@@ -54,18 +60,17 @@ listed concept is not a ranking.
 ### 6. Agent-native
 
 `mcp_server.py` exposes `tenant_match`, `city_scan` and `city_scan_unit` over stdio. A tool result is
-not written to disk. The click-by-click client steps are a separate change. This commit does not add
-`docs/MCP-DEMO.md`.
+not written to disk. Setup notes: `docs/MCP-DEMO.md`.
 
 ### 7. Evidence page
 
-A separate change adds `/evidence`, linked from the landing page, quoting the committed backtests.
-This commit does not add that route.
+`/evidence`, linked from the landing page, quotes the committed backtests. Qloo's top-3 hit rate is
+29%. The citywide baseline is 68%. Qloo is taste, not survival.
 
 ## Infrastructure
 
-$0. Standard-library server. Committed JSON for the ledger and the backtests. Cloud Run free tier.
-No database.
+$0. Standard-library server. Committed JSON for the ledger and the backtests. Cloud Run free tier
+at https://tastefit-776637567140.us-central1.run.app. No database. No paid APIs.
 
 ## What not to claim
 
@@ -76,7 +81,7 @@ Chicago batch as a probability.
 
 ## Screenshots
 
-Screenshot from the separate evidence change, served locally from the committed backtest files. This commit does not add `/evidence`. Qloo's top-3 hit rate is 29%. The citywide baseline is 68%.
+Screenshot of `/evidence`, served from the committed backtest files. Qloo's top-3 hit rate is 29%. The citywide baseline is 68%.
 
 ![Evidence page with the Chicago backtest](evidence-page.webp)
 
