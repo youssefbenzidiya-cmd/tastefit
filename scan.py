@@ -5,8 +5,12 @@ Each function returns (status, payload). A payload with an "error" key is a plai
 import functools
 import gzip
 import json
+import os
 import re
 from pathlib import Path
+
+import census
+import cityscan_breakeven as be
 
 PACKS = Path(__file__).parent / "packs"
 SLUG = re.compile(r"[a-z0-9-]{1,40}")
@@ -121,3 +125,196 @@ def unit(city, lat, lon):
                " Same figure in every cell of this city: location did not predict survival in held-out data here.")
             + " A model, not a forecast.")
     return 200, out | {"calibrated": True, "currency": units["currency"], "rent_ceiling": rows, "note": note}
+
+
+def cell_box(grid, j):
+    s, w, n, e = grid["bbox"]
+    r, c = divmod(int(j), grid["cols"])
+    south = s + r * grid["dlat"]
+    west = w + c * grid["dlon"]
+    return [south, west, min(south + grid["dlat"], n), min(west + grid["dlon"], e)]
+
+
+def _uniq_comps(rows, n=3):
+    out, seen = [], set()
+    for row in rows or []:
+        name = (row or {}).get("name")
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        out.append(row)
+        if len(out) >= n:
+            break
+    return out
+
+
+def _cell_card(scan, top):
+    c = top.get("centroid") or {}
+    return {
+        "neighborhood": top.get("neighborhood"),
+        "concept": scan.get("concept"),
+        "competitors": _uniq_comps(top.get("nearest_competitors")),
+        "suitability": top.get("suitability"),
+        "huff": top.get("market_en"),
+        "reasons": (top.get("reasons_en") or [])[:3],
+        "watch": (top.get("watch_out_en") or [])[:2],
+        "centroid": {"lat": c["lat"], "lon": c["lon"]} if c.get("lat") is not None and c.get("lon") is not None else None,
+        "cell": top.get("id"),
+    }
+
+
+def nearest_top(pack, lat, lon):
+    """Closest ranked cell in the pack's scans: neighborhood, OSM reasons, Huff, competitors."""
+    best, best_d = None, None
+    for s in pack.get("scans") or []:
+        for t in s.get("top") or []:
+            c = t.get("centroid") or {}
+            if c.get("lat") is None or c.get("lon") is None:
+                continue
+            d = (c["lat"] - lat) ** 2 + (c["lon"] - lon) ** 2
+            if best_d is None or d < best_d:
+                best, best_d = _cell_card(s, t), d
+    return best
+
+
+def nearby_cells(pack, lat, lon, n=8):
+    """Distinct neighborhood centroids around the pin, for the map. Pack data, no extra network."""
+    ranked = []
+    for s in pack.get("scans") or []:
+        for t in s.get("top") or []:
+            c = t.get("centroid") or {}
+            if c.get("lat") is None or c.get("lon") is None:
+                continue
+            d = (c["lat"] - lat) ** 2 + (c["lon"] - lon) ** 2
+            ranked.append((d, s, t))
+    ranked.sort(key=lambda x: x[0])
+    seen, out = set(), []
+    for _, s, t in ranked:
+        hood = t.get("neighborhood") or ""
+        if hood in seen:
+            continue
+        seen.add(hood)
+        card = _cell_card(s, t)
+        out.append({k: card[k] for k in ("neighborhood", "concept", "centroid", "suitability")})
+        if len(out) >= n:
+            break
+    return out
+
+
+def spot(city, lat, lon):
+    """Pin on the scanned city: Census tract + pack cell. Census is live; failures degrade to the pack."""
+    if not city or lat in (None, "") or lon in (None, ""):
+        return 400, {"error": "city, lat and lon are required"}
+    try:
+        lat, lon = float(lat), float(lon)
+    except ValueError:
+        return 400, {"error": "lat and lon must be numbers"}
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        return 400, {"error": "lat or lon out of range"}
+    p = pack(city[:120])
+    if p is None:
+        return _no_pack(city[:120])
+    if not p["quality"]["gate_passed"]:
+        return 200, _thin(p)
+    j = cell_of(p["grid"], lat, lon)
+    if j is None or j not in p["study"]:
+        return 400, {"error": f"That point is outside the scanned area of {p['city']['name']}."}
+    demo = None
+    try:
+        demo = census.card(lat, lon)
+    except Exception:
+        demo = None
+    place = nearest_top(p, lat, lon)
+    nearby = nearby_cells(p, lat, lon)
+    return 200, {
+        "city": p["city"]["name"], "data_thin": False,
+        "point": {"lat": lat, "lon": lon}, "cell": j, "bounds": cell_box(p["grid"], j),
+        "census": demo, "place": place, "nearby": nearby,
+        "attribution": p["attribution"],
+        "note": "A cell is a block to scout, not a vetted address. Census figures are ACS tract aggregates.",
+    }
+
+
+def taste(concept, location):
+    """Qloo exhibit: only a concept and a place name. Never persisted. Offline when the key is missing."""
+    concept = (concept or "").strip()[:300]
+    location = (location or "").strip()[:120]
+    if not concept or not location:
+        return 400, {"error": "concept and location are required"}
+    if not os.environ.get("QLOO_API_KEY"):
+        return 200, {"status": "offline", "places": [], "concept": concept, "location": location}
+    try:
+        import geo as geo_mod
+        import qloo
+        tag_res = qloo.find_tags(concept, limit=4)
+        urn = _first_tag(tag_res)
+        rec = qloo.recommend_places(location, include_tags=[urn] if urn else None, limit=6)
+        places = [{"name": p.get("name") or "place", "affinity": p.get("w")}
+                  for p in geo_mod.extract(rec)[:6] if p.get("name")]
+        return 200, {"status": "ok", "places": places, "concept": concept, "location": location}
+    except Exception:
+        return 200, {"status": "offline", "places": [], "concept": concept, "location": location}
+
+
+def _first_tag(obj):
+    found = []
+
+    def walk(o):
+        if found:
+            return
+        if isinstance(o, dict):
+            u = o.get("id") or o.get("urn")
+            if isinstance(u, str) and u.startswith("urn:tag"):
+                found.append(u)
+                return
+            for v in o.values():
+                walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+
+    walk(obj)
+    return found[0] if found else None
+
+
+GROUPS = tuple(be.GROUP_PROFILE)
+
+
+@functools.lru_cache(maxsize=8)
+def _ask_card(city, group):
+    calib = be.calibration(city, be.GROUP_PROFILE[group])
+    if calib is None:
+        return None
+    rel = 1.0
+    # asking=12000 only stretches the curve past real Chicago listings; it is not returned.
+    card = be.rent_ceiling_card(rel, calib, asking=12000, n=2000, seed=20261011)
+    s_free = card["curve"][0][1]
+    r80 = card["ceilings"]["80"]["rent_max"]
+    return {
+        "city": city, "group": group, "label_en": be.GROUP_LABEL[group][0],
+        "currency": card["currency"], "city_s3": card["city_s3"], "city_s1": calib["official"]["s1"],
+        "n": calib["official"]["n"], "source": calib["official"]["source"],
+        "kappa": round(float(calib.get("kappa") or 0.0), 3),
+        "location_hr": card["location_hr"],
+        "s_free": s_free, "eighty_for_sale": r80 > 0,
+        "capex_default": calib["inputs"]["capex"]["mode"],
+        "ceilings": card["ceilings"], "curve": card["curve"],
+        "caps": card["caps"], "fx": card["fx"], "draws_n": len(card["caps"]),
+        "buffer_months": card["buffer_months"],
+        "note": ("Location did not predict 3-year survival in held-out Chicago licences "
+                 "(κ = 0, HR_loc = 1). The street does not change these odds. A model, not a forecast."),
+    }
+
+
+def ask(city, group):
+    """Chicago (and other calibrated cities) survival-vs-rent curve. No map, no Qloo. Cached."""
+    if not city or not group:
+        return 400, {"error": "city and group are required"}
+    slug = slugify(city[:120])
+    g = group[:40].strip().lower().replace("-", "_").replace(" ", "_")
+    if g not in GROUPS:
+        return 400, {"error": f"group must be one of {', '.join(GROUPS)}"}
+    card = _ask_card(slug, g)
+    if card is None:
+        return 404, {"error": f"No survival calibration for {slug}/{g}."}
+    return 200, card

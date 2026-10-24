@@ -480,6 +480,23 @@ The card shows:
 - the city baseline as a horizontal line;
 - the asking rent as a marker, with its gap to the city norm in points;
 - €/m² per month and per year when a surface is entered.
+- the 2,000 rent capacities $A_k$ from the same draws as the curve (ranked on the client: below asking = closed by year 3);
+- expected cash already sitting in a restaurant closed by year 3, from the same draws:
+
+$$C = K\cdot P(\text{dead by 36}) + \text{rent}\cdot \frac1N\sum_k \min(\tau_k,36)\,1_{A_k < \text{rent}}$$
+
+where $K$ is the user's build-out (default: the cost-profile mode) and $\tau_k$ is the runway death time of section 11 ($\pi_k = A_k - \text{rent} - K_k b/36$, $\tau_k = -b K_k/\pi_k$ when $\pi_k < 0$). This is a Chicago figure: $HR_{loc}=1$, so the indicator matches published $P$.
+
+Credit overlay (`credit_book`, LGD = 1):
+
+- drawn $C$ as above (cash spent by month 36 on paths already closed);
+- guarantee $G = P(\text{dead})\,(K + \text{rent}\times T)$ if the tenant's name is on a $T$-month term;
+- time-to-know $\bar\tau = C_{\text{months}} / P(\text{dead})$, mean months open among the dead;
+- hurdle $H = C / P(\text{open})$: equity the living restaurant must be worth at month 36 for $E[\mathrm{NPV}]=0$.
+
+$G$ is not $C$. $C$ stops the clock at death; $G$ keeps the remaining term owed.
+
+**Mixture.** Each draw's cash already spent by month 36 is $L_k = (K + \text{rent}\cdot\tau_k)\,1_{A_k < \text{rent}}$ (`path_losses`). EL $= \bar L$ is the mean of a coin: most $L_k = 0$ (still open), the rest sit near the build-out. In Chicago, fewer than half the restaurant paths are dead at any landlord rent, so the median path is $0$, while P90 is already the full build-out at $0$ rent (city death mass $\approx 25\%$). Rent moves mass from $0$ onto the ruined pile (extra closures). It does not make the tail small. 80% open remains not for sale. The page draws the $L_k$ in strength order of $A_k$ so the shops do not reshuffle.
 
 Tests check that the curve is monotone, that $R^*$ is monotone in the target, that bisection matches the order
 statistic, and that $R^* = \theta r m - K(1 - b/36)$ exactly when every input is deterministic.
@@ -536,6 +553,51 @@ stated default covers and tickets, which are assumptions, and the page labels th
 profile*. It is not a market rent. If the asking rent is above $R^*$, then either the operator must beat the cost
 profile (ticket, staff) or accept below-norm survival odds.
 
+## 13. TasteFit contract: the instrument is the sharing rule, not the street
+
+Section 12's $R^*$ is the inverse of a **fixed** rent. In Chicago, $R^*(0.80)\le 0$: 80% open is not for sale as a rent. The listing still has another instrument. US restaurant leases already mix a base with a percentage of sales (ICSC / BOMA percentage-rent forms). TasteFit writes the linear member of that family on the same 2,000 draws.
+
+Each draw has monthly contribution (gross margin dollars before rent)
+
+$$G_k = A_k + K_k\bigl(1-b/36\bigr),$$
+
+the $A_k$ of section 12 plus the buffer already inside the capacity. The **affine lease** is
+
+$$R_k = b + \alpha G_k,\qquad \alpha\in[0,1).$$
+
+α here is the landlord's share of contribution, not the Huff attractiveness of section 4.
+
+$\alpha=0$ is the coin of section 12. The tenant is still open at 36 months iff $(1-\alpha)G_k - b \ge K_k(1-b_{\text{buffer}}/36)$, i.e. iff the shared capacity $S_k(\alpha)=(1-\alpha)A_k - \alpha K_k(1-b_{\text{buffer}}/36)$ clears the floor $b$. Death time is the same runway inversion with $\pi_k = S_k - b - K_k b_{\text{buffer}}/36$. Tenant path loss is $L_k = (K + R_k\tau_k)\,1_{S_k<b}$. Landlord **harvest** (undiscounted 36-month take) is $\mathcal H_k = R_k(36\cdot 1_{\text{open}} + \tau_k 1_{\text{dead}})$.
+
+**TasteFit theorem (Cheung on a Melitz cutoff).** Let $\mathcal H(r)$ be mean harvest of the fixed rent $r$. For Chicago restaurant draws, harvest is increasing in $b$ on $(-40\,\text{k},+20\,\text{k})$, so there is a unique $b^*(\alpha)$ with $\mathbb E[\mathcal H]=\mathcal H(r)$. $b^*$ is strictly decreasing in $\alpha$, and $P(\text{open}\mid b^*(\alpha),\alpha)$ is strictly increasing. On the $n=2000$, seed $20261011$ restaurant book at $r=\$4{,}200$, $K=\$450{,}000$:
+
+- $\alpha=0$: $b=\$4{,}200$, $P(\text{open})=0.639$, EL $=\$189{,}209$, $\mathcal H=\$123{,}075$.
+- $\alpha=0.08$: $b=\$277>0$ (still a landlord), $P=0.675$, EL $=\$160{,}317$.
+- $\alpha=0.10$: $b$ crosses 0 (joint venture).
+- $\alpha=0.34$: $b\approx -\$11{,}600$, $P\ge 0.80$. 80% open is for sale as a share.
+
+A percentage *on top of the listing floor* ($\alpha>0$, $b=r$) does the opposite: it taxes contribution without lowering the floor and raises death. That is why a LoopNet overage clause is not this contract.
+
+This is the sharecropping result (Cheung 1969; Stiglitz 1974) on a Melitz (2003) exit cutoff, with $\kappa=0$ (section 11) so location is not an instrument. The landlord who wants 80% open has to become a partner, not a better pin.
+
+**Coherent tail.** $L_k$ is a mixture: most mass at 0, ruined mass near $K$. EL is the mean of a coin. P90 is already $\approx K$ at $r=0$ (city death mass $\approx 25\%$). Surety capital is expected shortfall $\mathrm{ES}_{0.95}=\frac1k\sum_{i=1}^{k} L_{(i)}$ with $k=\lceil 0.05N\rceil$ (Acerbi–Tasche; Artzner, Delbaen, Eber, Heath 1999). ES is coherent; VaR / P90 is not. On the same restaurant book at $\$4{,}200$, $\mathrm{ES}_{0.95}\approx\$577{,}000$ against EL $\$189{,}000$.
+
+**Distance to default.** $\mathrm{DD}=(\bar A - r)/s_A$ (Merton 1974; KMV). $A$ is not Gaussian; $\Phi(-\mathrm{DD})$ is a diagnostic. At $\$4{,}200$, $\mathrm{DD}\approx 0.46$ and $\Phi(-\mathrm{DD})\approx 0.32$ against empirical PD $0.36$.
+
+**Kelly bankroll.** Binary: stake $K$, win a shop worth $V$, else 0. $f^*=p-q/(V/K-1)$ (Kelly 1956; Thorp). $W^*=K/f^*$ is the book on which this build-out is the growth-optimal stake. $f^*\le 0$ when $V\le K$ or when $V=K/p$ (zero edge). All-in on one shop with LGD $=1$ is never Kelly.
+
+**Vasicek book.** For $N$ identical units with stated asset correlation $\rho=0.12$ (Basel retail range; not estimated from the licences), the one-factor default rate at a systematic quantile $q$ is (Vasicek 2002)
+
+$$K_q=\Phi\!\left(\frac{\Phi^{-1}(\mathrm{PD})+\sqrt{\rho}\,\Phi^{-1}(q)}{\sqrt{1-\rho}}\right).$$
+
+$\rho=0$ recovers PD. The page reports $N=10$, $q=0.999$, EAD $=$ ruined mean. $\rho$ is an assumption, labelled as such.
+
+Functions: `affine_capacity`, `affine_paths`, `match_base`, `expected_shortfall`, `distance_to_default`, `kelly_bankroll`, `vasicek_k`. The page recomputes them from the same `caps` and `fx` as section 12. Tests lock $\alpha=0$ onto `path_losses`, harvest-matched dominance, ES $\ge$ P90, Kelly at $V=K/p$ is undefined, and Vasicek at $\rho=0$ equals PD.
+
+## 14. The pin: Census, pack, taste
+
+The happy path is a map click. `GET /spot` reverse-geocodes the point with the Census Bureau geocoder and pulls ACS 5-year tract aggregates (median household income, median gross rent, population, age, poverty, tenure) through Census Reporter — census.gov's data API now requires a key; the estimates remain ACS, vintage is the Reporter release name. Live Census HTTP is an in-memory LRU (`fetch_live`); nothing is written to disk. Geocoder success with ACS failure still returns the tract. Failures degrade: licences still serve. `/ask` is cached in process and for 300 s on the wire. The same pin reads the unused pack cell (bounds, nearest scan neighborhood, OSM reasons, Huff line, competitors, nearby centroids). `GET /taste` sends only a concept and a place name to Qloo (AGENTS.md rule 3) and is never written to disk (rule 2); without `QLOO_API_KEY` it returns `offline`. Taste stamps on the page are VOID: section 11, $\kappa=0$. Household gross rent is labelled as residential, not as the commercial listing. Print memo is generated in the browser from the current pin; it is not stored. GET `/walkthrough` is the 60-second reel (freeze a beat with `?scene=1` … `5`). A cell is a block to scout, not a vetted address. OSM attribution stays on the map.
+
 ## Parameters (`cityscan.PARAMS`)
 
 | Symbol | Value | Meaning |
@@ -590,6 +652,14 @@ profile (ticket, staff) or accept below-norm survival odds.
   1029–1054.
 - Ricardo, D. (1817). *On the Principles of Political Economy and Taxation*, ch. 2 "On Rent". John Murray.
 - Alonso, W. (1964). *Location and Land Use: Toward a General Theory of Land Rent*. Harvard University Press.
+- Cheung, S. N. S. (1969). *The Theory of Share Tenancy*. University of Chicago Press.
+- Stiglitz, J. E. (1974). Incentives and risk sharing in sharecropping. *Review of Economic Studies* 41(2), 219–255.
+- Melitz, M. J. (2003). The impact of trade on intra-industry reallocations and aggregate industry productivity. *Econometrica* 71(6), 1695–1725.
+- Artzner, P., Delbaen, F., Eber, J.-M., Heath, D. (1999). Coherent measures of risk. *Mathematical Finance* 9(3), 203–228.
+- Acerbi, C., Tasche, D. (2002). On the coherence of expected shortfall. *Journal of Banking & Finance* 26(7), 1487–1503.
+- Merton, R. C. (1974). On the pricing of corporate debt: the risk structure of interest rates. *Journal of Finance* 29(2), 449–470.
+- Kelly, J. L. (1956). A new interpretation of information rate. *Bell System Technical Journal* 35(4), 917–926.
+- Vasicek, O. (2002). The distribution of loan portfolio value. *Risk* 15(12), 160–162.
 - DGFiP / Etalab, Demandes de valeurs foncières géolocalisées (DVF), Paris 2021–2025, Licence Ouverte 2.0.
 - INSEE, base SIRENE des entreprises et de leurs établissements (Licence Ouverte 2.0), extraction 2026.
 - Rent-to-revenue: L'Hôtellerie-Restauration (8–12%, 12–15% premium); ProRestauration, ratios de gestion 2026

@@ -10,15 +10,26 @@ license: mit
 
 # TasteFit
 
-A taste-market-fit agent for new restaurants and cafes.
+Click the map. One number answers **Who should rent this unit?**
+
+At a Chicago pin you get three exhibits on one sheet: who lives here (Census ACS 5-year), who dies (official business licences, n = 5,692), and what the street likes (Qloo — stamped VOID, because location did not predict survival). OSM competitors sit on the map as geography, not as a survival claim. 80% open is not for sale as a rent. It is for sale as a share.
+
+The pin is the only required action. Print memo is a one-page report from that pin. A cell is a block to scout, not a vetted address.
 
 **Live demo:** https://tastefit.onrender.com (free instance; the first request after idle can take about 50 seconds to wake up).
 
-Before a founder signs a lease, or a commercial broker proposes a unit, TasteFit checks whether the planned concept fits the local taste of a specific neighborhood. It uses the Qloo Taste AI API to read what the area's audience likes, who already serves it, and where demand concentrates, then writes an investment-style **GO / ADJUST / NO-GO** memo with a fit score, the best location, a positioning plan and the key risks.
+## 60-second demo
+
+1. Open the live demo. The pin is Wicker Park. Read the big number: how many of 100 still open at this rent.
+2. Click another block. Census and the cell move. Licences do not: κ = 0.
+3. Drag “landlord share” toward 35%. 80% open is for sale as a share, not as a cheaper pin.
+4. Print memo. Hand it to a landlord. Limits stay on the page.
+
+A silent 60-second reel is at `/walkthrough` on the running app (source: [`demo/walkthrough.html`](demo/walkthrough.html)). Freeze a beat with `?scene=1` … `?scene=5`. A recorded cut is [`demo/tastefit-60s.mp4`](demo/tastefit-60s.mp4).
 
 ## How it works
 
-An LLM agent runs a tool loop over the official Qloo hackathon harness (`qloo exec`):
+The judging page is the pin. `/spot` (Census + pack), `/ask` (licences), `/taste` (Qloo exhibit, offline without a key). An older LLM agent still runs a tool loop over the official Qloo hackathon harness (`qloo exec`) at `/run` and `/tenant`:
 
 | Agent tool | Qloo workflow | Purpose |
 |---|---|---|

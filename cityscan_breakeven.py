@@ -16,7 +16,7 @@ import json
 import math
 import os
 import random
-from statistics import NormalDist
+from statistics import NormalDist, pstdev
 
 import cityscan_math as cm
 
@@ -498,6 +498,177 @@ def survival_at_rent(caps, rent, hr=1.0):
     return (sum(1 for a in caps if a >= rent) / len(caps)) ** hr
 
 
+def corpse_months(caps, draws, rent, buffer_months=BUFFER_MONTHS, horizon=36):
+    """Mean months of rent paid by draws already closed at `horizon`.
+
+    Closed iff rent capacity A_k < rent — the same event as survival_at_rent with HR=1
+    (Chicago). Death time is the runway inversion of METHOD.md §11: still open at τ iff
+    π ≥ −bK/τ. Capex is not in this number; the client adds K × P(dead).
+    """
+    if not caps:
+        return 0.0
+    paid, frac = 0.0, buffer_months / horizon
+    for a, (_, fx, _, _) in zip(caps, draws):
+        if a >= rent:
+            continue
+        pi = a - rent - fx * frac
+        if pi >= 0:
+            continue
+        paid += min(max(-buffer_months * fx / pi, 0.0), horizon)
+    return paid / len(caps)
+
+
+def path_losses(caps, draws, rent, capex, buffer_months=BUFFER_MONTHS, horizon=36):
+    """Cash already spent by month 36 on each draw. Live paths are 0; dead paths are K + rent × τ_k."""
+    capex, rent = max(0.0, float(capex)), max(0.0, float(rent))
+    frac = buffer_months / horizon
+    out = []
+    for a, (_, fx, _, _) in zip(caps, draws):
+        if a >= rent:
+            out.append(0.0)
+            continue
+        pi = a - rent - fx * frac
+        tau = 0.0 if pi >= 0 else min(max(-buffer_months * fx / pi, 0.0), horizon)
+        out.append(capex + rent * tau)
+    return out
+
+
+def loss_book(losses):
+    """Mixture of the path losses: EL, UL, percentiles, ruined mean. Median is 0 while fewer than half are dead."""
+    n = len(losses)
+    if not n:
+        return {"n": 0, "n_dead": 0, "p_dead": 0.0, "el": 0.0, "ul": 0.0,
+                "p50": 0.0, "p90": 0.0, "p99": 0.0, "ruined_mean": 0.0}
+    dead = [x for x in losses if x > 0]
+    el = sum(losses) / n
+    return {
+        "n": n, "n_dead": len(dead), "p_dead": len(dead) / n, "el": el,
+        "ul": pstdev(losses) if n > 1 else 0.0,
+        "p50": cm.percentile(losses, 0.5), "p90": cm.percentile(losses, 0.9),
+        "p99": cm.percentile(losses, 0.99),
+        "ruined_mean": (sum(dead) / len(dead)) if dead else 0.0,
+    }
+
+
+# ----------------------------------------------------------------------------------------------------------------
+# TasteFit contract (METHOD.md §13): the instrument is the sharing rule, not the street.
+#
+# Affine lease R_k = b + α G_k, G_k = A_k + K_k (1 − buffer/36). α = 0 recovers the fixed-rent coin.
+# Harvest-matched b*(α) is decreasing; P(open) is increasing. 80% open is not for sale as a rent;
+# it is for sale as a joint venture. Surety capital is ES_0.95 (Artzner et al. 1999), not EL.
+# Kelly bankroll sizes the book on which the build-out is the growth-optimal stake. Vasicek (2002)
+# one-factor book uses a stated asset correlation ASSET_RHO.
+
+ASSET_RHO = 0.12
+
+
+def _share(share):
+    return min(max(float(share), 0.0), 0.99)
+
+
+def affine_capacity(caps, draws, share, buffer_months=BUFFER_MONTHS, horizon=36):
+    """Highest base b at which draw k is still open at `horizon` under R = b + α G."""
+    a, f = _share(share), runway_factor(horizon, buffer_months)
+    return [(1.0 - a) * cap - a * fx * f for cap, (_, fx, _, _) in zip(caps, draws)]
+
+
+def affine_paths(caps, draws, base, share, capex, buffer_months=BUFFER_MONTHS, horizon=36):
+    """Path losses and 36-month landlord harvest under the affine lease. α = 0, b = rent is path_losses."""
+    a, capex, base = _share(share), max(0.0, float(capex)), float(base)
+    f, frac = runway_factor(horizon, buffer_months), buffer_months / horizon
+    losses, harvest = [], []
+    for cap, (_, fx, _, _) in zip(caps, draws):
+        g = cap + fx * f
+        rent = base + a * g
+        s = (1.0 - a) * cap - a * fx * f
+        if s >= base:
+            losses.append(0.0)
+            harvest.append(horizon * rent)
+            continue
+        pi = s - base - fx * frac
+        tau = 0.0 if pi >= 0 else min(max(-buffer_months * fx / pi, 0.0), horizon)
+        losses.append(capex + rent * tau)
+        harvest.append(rent * tau)
+    return losses, harvest
+
+
+def match_base(caps, draws, share, target_harvest, capex, buffer_months=BUFFER_MONTHS, horizon=36,
+               lo=-40000.0, hi=20000.0, iters=40):
+    """Largest base (hence least survival) is not the object: harvest rises in base on the Chicago
+    restaurant book until well past any listing rent, so bisection recovers the unique b with
+    E[harvest] = target. At α = 0 the target of the asking rent's harvest returns the asking rent."""
+    target = float(target_harvest)
+    for _ in range(iters):
+        mid = (lo + hi) / 2
+        _, harvest = affine_paths(caps, draws, mid, share, capex, buffer_months, horizon)
+        lo, hi = (mid, hi) if (sum(harvest) / len(harvest) if harvest else 0.0) < target else (lo, mid)
+    return (lo + hi) / 2
+
+
+def expected_shortfall(losses, level=0.95):
+    """Empirical ES_α: mean of the worst ceil((1 − α) n) path losses (Acerbi–Tasche). ES_0 is EL."""
+    n = len(losses)
+    if not n:
+        return 0.0
+    level = min(max(float(level), 0.0), 1.0 - 1.0 / n)
+    k = max(1, int(math.ceil((1.0 - level) * n)))
+    return sum(sorted(losses, reverse=True)[:k]) / k
+
+
+def distance_to_default(caps, rent):
+    """Merton–KMV distance (A − r) / sd(A) on the rent-capacity draws. A is not Gaussian; normal_pd
+    is a diagnostic, not the model's PD."""
+    n = len(caps)
+    if n < 2:
+        return {"mean": 0.0, "sd": 0.0, "dd": None, "normal_pd": None}
+    mu = sum(caps) / n
+    sd = pstdev(caps)
+    dd = (mu - float(rent)) / sd if sd else None
+    return {"mean": mu, "sd": sd, "dd": dd,
+            "normal_pd": None if dd is None else NormalDist().cdf(-dd)}
+
+
+def kelly_bankroll(p_open, value, capex):
+    """Wealth W* on which the Kelly stake equals the build-out. Binary: win V, lose K.
+    f* = p − q / (V/K − 1). None when the edge is non-positive (including V = K / p)."""
+    p, k, v = min(max(float(p_open), 0.0), 1.0), float(capex), float(value)
+    if k <= 0 or v <= k or p <= 0:
+        return None
+    f = p - (1.0 - p) / (v / k - 1.0)
+    return None if f <= 1e-9 else k / f
+
+
+def vasicek_k(pd, rho, quantile=0.999):
+    """One-factor default rate at a systematic quantile (Vasicek 2002). ρ = 0 recovers PD."""
+    nd = NormalDist()
+    p = min(max(float(pd), 1e-9), 1.0 - 1e-9)
+    r = min(max(float(rho), 0.0), 0.999)
+    q = min(max(float(quantile), 1e-9), 1.0 - 1e-9)
+    return nd.cdf((nd.inv_cdf(p) + math.sqrt(r) * nd.inv_cdf(q)) / math.sqrt(1.0 - r))
+
+
+def credit_book(p_open, corpse_months, capex, rent, term_months=60):
+    """Credit identities on one listing. LGD = 1.
+
+    Drawn C is cash spent by month 36 on paths already closed (METHOD §12).
+    Guarantee is PD × (K + rent × term): the name on the lease still owes the term.
+    Hurdle is equity at month 36 on the living path that makes E[NPV] = 0: C / P(open).
+    Time-to-know is E[τ | dead by 36] = corpse_months / PD.
+    """
+    p = min(1.0, max(0.0, float(p_open)))
+    pd = 1.0 - p
+    capex, rent = max(0.0, float(capex)), max(0.0, float(rent))
+    months, term = max(0.0, float(corpse_months)), max(0.0, float(term_months))
+    drawn = capex * pd + rent * months
+    committed = capex + rent * term
+    return {
+        "p_dead": pd, "drawn": drawn, "dead_capex": capex * pd, "dead_rent": rent * months,
+        "committed": committed, "guarantee": pd * committed,
+        "ttk": (months / pd) if pd > 1e-12 else None,
+        "hurdle": (drawn / p) if p > 1e-12 else None,
+    }
+
+
 def rent_ceiling(caps, target, hr=1.0, tol=1.0):
     """Largest rent R* with P(open at 36 months) = share(caps >= R*)^hr >= target, by bisection on a curve that is
     non-increasing in rent. With common random numbers R* moves smoothly with the parameters. May be negative:
@@ -552,9 +723,13 @@ def rent_ceiling_card(rel_demand, calib, z_same=0.0, z_poi=0.0, target=None, ask
         rent = top * i / (curve_points - 1)
         vals = [_surv_sorted(c, rent) ** h for c, h in boots]
         lo, hi = _interval(vals)
-        curve.append([round(rent), round(survival_at_rent(caps, rent, hr), 4), round(lo, 4), round(hi, 4)])
+        curve.append([round(rent), round(survival_at_rent(caps, rent, hr), 4), round(lo, 4), round(hi, 4),
+                      round(corpse_months(caps, draws, rent, b), 2)])
     out = {"group": calib["group"], "currency": calib["currency"], "city_s3": base3, "location_hr": round(hr, 3),
-           "target": chosen, "ceilings": ceilings, "curve": curve, "surface_m2": surface_m2}
+           "target": chosen, "ceilings": ceilings, "curve": curve, "surface_m2": surface_m2,
+           "caps": [int(round(a)) for a in caps],
+           "fx": [int(round(fx)) for _, fx, _, _ in draws],
+           "buffer_months": b}
     if asking is not None:
         p = survival_at_rent(caps, asking, hr)
         d = 100 * (p - base3)

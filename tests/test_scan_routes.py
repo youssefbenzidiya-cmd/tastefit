@@ -14,13 +14,19 @@ from unittest import mock
 
 os.environ.pop("QLOO_API_KEY", None)
 import app  # noqa: E402
+import census  # noqa: E402
 import cityscan_breakeven as be  # noqa: E402
 import scan  # noqa: E402
 
 GRID = {"bbox": [10.0, 20.0, 10.02, 20.02], "rows": 2, "cols": 2, "cell_m": 1000, "dlat": 0.01, "dlon": 0.01}
 QUALITY_OK = {"gate_passed": True, "data_confidence_food": 0.6, "threshold": 0.4, "threshold_note": "synthetic",
               "reason": None}
-TOP = [{"id": k, "neighborhood": f"Synthetic {k}", "opportunity": {"point": 90 - k}} for k in range(30)]
+TOP = [{"id": k, "neighborhood": f"Synthetic {k}",
+        "centroid": {"lat": 10.005 + 0.001 * k, "lon": 20.015},
+        "nearest_competitors": [{"name": "Cafe Zero", "m": 40}],
+        "reasons_en": ["+1: nearby cafes"], "market_en": "Huff line",
+        "suitability": 0.8,
+        "opportunity": {"point": 90 - k}} for k in range(30)]
 CEILING = [{"group": "restaurant", "label_en": "restaurants", "rent_max": 8000.0, "ci90": [7000.0, 9000.0],
             "rent_max_80": 7500.0},
            {"group": "bar_cafe", "label_en": "bars and cafés", "rent_max": 300.0, "ci90": [-200.0, 900.0],
@@ -72,6 +78,9 @@ class ScanRoutes(unittest.TestCase):
         p = mock.patch.object(app, "scan_limiter", app.RateLimiter(1000, 600))
         p.start()
         self.addCleanup(p.stop)
+        c = mock.patch.object(census, "card", return_value=None)
+        c.start()
+        self.addCleanup(c.stop)
 
     def get(self, path):
         try:
@@ -166,11 +175,40 @@ class ScanRoutes(unittest.TestCase):
             self.assertIn(code, (400, 404))
         self.assertEqual(scan.slugify("../../etc/passwd"), "etc-passwd")
 
+    def test_spot_joins_census_and_the_pack_cell(self):
+        fake = {"geoid": "17031240100", "name": "Census Tract 2401", "median_income": 87234,
+                "median_gross_rent": 1650, "population": 4120, "poverty_rate": 0.14,
+                "vintage": "ACS 2023 5-year"}
+        with mock.patch.object(census, "card", return_value=fake):
+            code, d = scan.spot("synthville", 10.005, 20.015)
+        self.assertEqual(code, 200)
+        self.assertEqual(d["census"]["median_income"], 87234)
+        self.assertEqual(len(d["bounds"]), 4)
+        self.assertLess(d["bounds"][0], d["bounds"][2])
+        self.assertIn("not a vetted address", d["note"])
+        self.assertEqual(d["place"]["neighborhood"], "Synthetic 0")
+        self.assertEqual(d["place"]["competitors"][0]["name"], "Cafe Zero")
+        self.assertTrue(d["nearby"])
+        self.assertEqual(d["nearby"][0]["centroid"]["lon"], 20.015)
+
+    def test_taste_is_offline_without_a_key_and_requires_a_place(self):
+        code, d = scan.taste("ramen", "Wicker Park, Chicago")
+        self.assertEqual((code, d["status"], d["places"]), (200, "offline", []))
+        self.assertEqual(scan.taste("", "Chicago")[0], 400)
+        self.assertEqual(scan.taste("ramen", "")[0], 400)
+
+    def test_spot_http_is_json(self):
+        code, headers, body = self.get("/spot?city=synthville&lat=10.005&lon=20.015")
+        self.assertEqual(code, 200)
+        self.assertEqual(headers["Content-Type"], "application/json")
+        self.assertEqual(json.loads(body)["cell"], 1)
+
     def test_no_network_call_while_serving(self):
         with mock.patch.object(socket, "create_connection", side_effect=AssertionError("network")), \
                 mock.patch.object(urllib.request, "urlopen", side_effect=AssertionError("network")):
             self.assertEqual(scan.scan("synthville", "specialty coffee")[0], 200)
             self.assertEqual(scan.unit("synthville", "10.005", "20.005")[0], 200)
+            self.assertEqual(scan.spot("synthville", 10.005, 20.015)[0], 200)
 
 
 class ShippedPacks(unittest.TestCase):

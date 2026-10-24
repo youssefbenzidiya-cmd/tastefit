@@ -4,39 +4,89 @@ import unittest
 
 os.environ.pop("QLOO_API_KEY", None)
 import app  # noqa: E402
-import scan  # noqa: E402
 
 
-class ScanPanel(unittest.TestCase):
+class ChicagoPage(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.page = app.render_index("n").decode()
-        cls.panel = cls.page.split('<section class="scan" id="scan">')[1].split("</section>")[0]
-        scripts = [s.split("</script>")[0] for s in cls.page.split('<script nonce="n">')[1:]]
-        cls.script = next(s for s in scripts if "scan-form" in s)
+        cls.js = (app.ROOT / "static" / "app.js").read_text()
 
-    def test_city_options_are_the_shipped_packs(self):
-        self.assertEqual(sorted(re.findall(r'<option value="([a-z0-9-]+)">', self.panel)), scan.available())
+    def test_wordmark_and_chicago_only_copy(self):
+        self.assertIn("TasteFit", self.page)
+        self.assertIn("Who should rent this unit", self.page)
+        self.assertIn("not for sale", self.page)
+        self.assertIn("Chicago", self.page)
+        self.assertNotIn("Rupture", self.page)
+        self.assertNotIn("Broker or landlord", self.page)
+        self.assertNotIn("data-mode", self.page)
+        self.assertNotIn('value="paris"', self.page)
+        self.assertIn("leaflet", self.page.lower())
+        self.assertIn("Qloo", self.page)
+        self.assertIn("Census", self.page)
+        self.assertNotIn("Unclassified", self.page)
+        self.assertIn("not a vetted address", self.page.lower())
 
-    def test_concept_options_are_scanned_everywhere(self):
-        concepts = re.findall(r"<option>([^<]+)</option>", self.panel)
-        self.assertEqual(len(concepts), 6)
-        for slug in ("paris", "chicago"):
-            self.assertEqual(concepts, [s["concept"] for s in scan.pack(slug)["scans"]])
+    def test_concept_chips_are_the_calibrated_groups(self):
+        self.assertEqual(re.findall(r'data-group="([^"]+)"', self.page),
+                         ["restaurant", "fast_food", "bar_cafe"])
+
+    def test_path_losses_live_in_the_script(self):
+        self.assertNotIn('data-layer="lab"', self.page)
+        for token in ("pathLosses", "not for sale", "eighty_for_sale",
+                      "card.caps", "card.fx", "Least expected loss", 'class="who"',
+                      "affineLosses", "matchBase", "expectedShortfall", "kellyBankroll",
+                      "vasicekK", "id=\"frontier\""):
+            self.assertIn(token, self.js, token)
+
+    def test_page_asks_for_build_out(self):
+        self.assertIn('id="capex"', self.page)
+        self.assertIn('id="term"', self.page)
+        self.assertIn('id="share"', self.page)
+        self.assertIn("closed by year 3", self.js)
+        self.assertIn("for sale as a share", self.page.lower())
+
+    def test_credit_book_identities_live_in_the_script(self):
+        self.assertIn("function book(", self.js)
+        self.assertIn("hurdle", self.js)
+        self.assertIn("guarantee", self.js)
+
+    def test_listing_is_a_decision_not_a_fact_sheet(self):
+        self.assertIn('id="belief"', self.page)
+        self.assertIn('id="rent-range"', self.page)
+        self.assertIn("function npvLine(", self.js)
+        self.assertIn("id=\"paths\"", self.js)
+        self.assertIn("card.caps", self.js)
+        self.assertIn("the mean of those two", self.js)
+
+    def test_happy_path_is_pin_census_licences_taste(self):
+        self.assertIn("/ask?", self.js)
+        self.assertIn("/spot?", self.js)
+        self.assertIn("/taste?", self.js)
+        self.assertIn("bootMap", self.js)
+        self.assertIn("L.map", self.js)
+        self.assertIn("pinIcon", self.js)
+        self.assertIn("Reading the tract", self.js)
+        self.assertIn("glance-n", self.js)
+        self.assertIn("openMemo", self.js)
+        self.assertIn("Print memo", self.js)
+        self.assertLess(self.js.index('data-action="memo"'), self.js.index('id="paths"'))
+        self.assertIn('id="lab"', self.js)
+        self.assertIn('id="memo"', self.page)
+        self.assertIn('method="dialog"', self.page)
+        self.assertIn('href="/walkthrough"', self.page)
+        self.assertIn("const CITY = 'chicago'", self.js)
+        self.assertNotIn("/scan/unit", self.js)
+        self.assertNotIn("/tenant", self.js)
+        self.assertNotIn("/demo", self.js)
+        self.assertNotIn('"/run"', self.js)
+        self.assertNotIn("'/run'", self.js)
 
     def test_money_uses_the_response_currency(self):
-        self.assertIn("Intl.NumberFormat('en', { style: 'currency', currency: u.currency", self.script)
-        self.assertNotIn("€", self.script)
-        self.assertNotIn("&euro;", self.script)
-
-    def test_calls_only_same_origin_scan_endpoints(self):
-        fetched = re.findall(r"getJSON\('([^']+)'", self.script)
-        self.assertEqual(sorted(fetched), ["/scan/unit?", "/scan?"])
+        self.assertIn("Intl.NumberFormat('en', {\n  style: 'currency', currency: cur || 'USD'", self.js)
+        self.assertNotIn("€", self.js)
+        self.assertNotIn("&euro;", self.js)
 
     def test_api_text_is_escaped(self):
-        for field in ("d.reason", "d.attribution", "u.note", "r.note", "r.label_en", "t.neighborhood", "why", "watch"):
-            self.assertRegex(self.script, r"esc\(" + re.escape(field), field)
-
-
-if __name__ == "__main__":
-    unittest.main()
+        for field in ("card.source", "card.note", "card.label_en"):
+            self.assertIn("esc(" + field, self.js, field)

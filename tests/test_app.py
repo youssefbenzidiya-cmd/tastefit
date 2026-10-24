@@ -83,9 +83,21 @@ class Server(unittest.TestCase):
             finally:
                 conn.close()
             self.assertEqual((r.status, r.getheader("Content-Type")), (200, ctype), path)
+            age = "60" if path.endswith((".js", ".css")) else "86400"
+            self.assertEqual(r.getheader("Cache-Control"), f"public, max-age={age}", path)
             self.assertGreater(len(body), 0, path)
         self.assertEqual(self.get("/static/app.js")[0], 404)
         self.assertEqual(self.get("/../app.py")[0], 404)
+
+    def test_walkthrough_is_the_sixty_second_reel(self):
+        code, body = self.get("/walkthrough")
+        self.assertEqual(code, 200)
+        self.assertIn("Who should rent this unit", body)
+        self.assertIn("animation-delay: 12s", body)
+        self.assertIn('<html lang="en">', body)
+        code, body = self.get("/walkthrough?scene=2")
+        self.assertEqual(code, 200)
+        self.assertIn('<html lang="en" data-scene="2">', body)
 
     def test_page_csp_allows_self_hosted_font_and_script_only(self):
         csp = self.request("GET", "/")[1]["Content-Security-Policy"]
@@ -98,7 +110,7 @@ class Server(unittest.TestCase):
         body = self.get("/")[1]
         self.assertNotRegex(body, r"\{\{[A-Z]+\}\}")
         self.assertRegex(body, r'property="og:image" content="https://[^"]+/og\.png"')
-        self.assertEqual(len(re.findall(r'<script nonce="[^"]+">', body)), 2)
+        self.assertEqual(len(re.findall(r'<script nonce="[^"]+">', body)), 1)
 
     def test_footer_build_dev_when_commit_unset(self):
         with mock.patch.dict(os.environ):
@@ -117,6 +129,14 @@ class Server(unittest.TestCase):
 
     def test_health(self):
         self.assertEqual(self.get("/health"), (200, "ok"))
+
+    def test_ask_chicago_restaurant_eighty_not_for_sale(self):
+        code, body = self.get("/ask?city=chicago&group=restaurant")
+        self.assertEqual(code, 200)
+        d = json.loads(body)
+        self.assertFalse(d["eighty_for_sale"])
+        self.assertEqual(d["currency"], "USD")
+        self.assertIn("OpenStreetMap", self.get("/")[1])
 
     def test_run_requires_inputs(self):
         self.assertEqual(self.get("/run?concept=x")[0], 400)
@@ -170,12 +190,12 @@ class Server(unittest.TestCase):
     def test_cdn_scripts_are_pinned_with_sri(self):
         body = self.get("/")[1]
         scripts = re.findall(r"<script (?:defer )?src=\"(https://[^\"]+)\"([^>]*)>", body)
-        self.assertEqual(len(scripts), 3)
-        for src, attrs in scripts:
-            self.assertRegex(src, r"@\d+\.\d+\.\d+/")
-            self.assertIn('integrity="sha', attrs)
+        self.assertEqual(len(scripts), 0)
         self.assertEqual(re.findall(r"<script (?:defer )?src=\"(/[^\"]+)\"", body), ["/app.js"])
-        self.assertIn("DOMPurify.sanitize(marked.parse", self.get("/app.js")[1])
+        js = self.get("/app.js")[1]
+        self.assertIn("/ask?", js)
+        self.assertNotIn('"/run"', js)
+        self.assertNotIn("/tenant", js)
 
     def test_copy_has_no_pricing_promise_or_unsourced_claim(self):
         body = self.get("/")[1]
