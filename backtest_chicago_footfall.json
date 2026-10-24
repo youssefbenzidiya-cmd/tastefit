@@ -1,0 +1,126 @@
+{
+ "window": [
+  "2023-01-01",
+  "2024-12-31"
+ ],
+ "survival_seen": "2025-04-01",
+ "radius_km": 1.2,
+ "k": 3,
+ "openings": 1751,
+ "classified": 200,
+ "published_areas": [
+  "Wicker Park",
+  "Logan Square",
+  "Lincoln Park",
+  "West Loop",
+  "Hyde Park",
+  "Andersonville",
+  "Lakeview",
+  "Bridgeport",
+  "Uptown"
+ ],
+ "taste_gap": "Supply leg only. Over-index D is 0 because it was not recomputed. This is not the published Taste Gap Index.",
+ "weights": "Stated priors in footfall.WEIGHTS, not fitted to these outcomes.",
+ "qloo_calls": 0,
+ "areas_scored": [
+  "Wicker Park",
+  "Logan Square",
+  "Lincoln Park",
+  "West Loop",
+  "Hyde Park",
+  "Andersonville",
+  "Lakeview",
+  "Bridgeport",
+  "Uptown"
+ ],
+ "methods": {
+  "footfall": {
+   "areas": 9,
+   "hit_at_k": 0.387,
+   "survivors": 31,
+   "survival_top": 0.522,
+   "opened_top": 23,
+   "survival_rest": 0.463,
+   "opened_rest": 41,
+   "spearman": 0.046
+  },
+  "footfall_tgi": {
+   "areas": 9,
+   "hit_at_k": 0.387,
+   "survivors": 31,
+   "survival_top": 0.545,
+   "opened_top": 22,
+   "survival_rest": 0.452,
+   "opened_rest": 42,
+   "spearman": -0.137
+  },
+  "footfall_prior": {
+   "areas": 9,
+   "hit_at_k": 0.677,
+   "survivors": 31,
+   "survival_top": 0.488,
+   "opened_top": 43,
+   "survival_rest": 0.476,
+   "opened_rest": 21,
+   "spearman": 0.301
+  },
+  "prior": {
+   "areas": 9,
+   "hit_at_k": 0.677,
+   "survivors": 31,
+   "survival_top": 0.488,
+   "opened_top": 43,
+   "survival_rest": 0.476,
+   "opened_rest": 21,
+   "spearman": 0.308
+  }
+ },
+ "published_citywide_hit_at_k": 0.677,
+ "osm_snapshot": "2023-01-01",
+ "sources": [
+  {
+   "id": "m6dm-c72p",
+   "name": "Transportation Network Providers - Trips (2018 - 2022)",
+   "url": "https://data.cityofchicago.org/d/m6dm-c72p",
+   "measure": "Drop-offs grouped by dropoff_community_area.",
+   "evening": "Trip end hour 17 through 21, date_extract_hh.",
+   "weekend": "Each Saturday and Sunday in 2022, by trip end timestamp. A Saturday evening trip is also in the evening series.",
+   "start": "2022-01-01",
+   "end": "2022-12-31"
+  },
+  {
+   "id": "fg6s-gzvg",
+   "name": "Divvy Trips",
+   "url": "https://data.cityofchicago.org/d/fg6s-gzvg",
+   "measure": "Trip ends grouped by station coordinate, then summed into the community area that contains the station.",
+   "start": "2019-01-01",
+   "end": "2019-12-31",
+   "note": "This portal file ends 2020-01-21. 2019 is its last full year and is before the backtest window.",
+   "stations_outside_chicago": 24653,
+   "station_points": 646
+  },
+  {
+   "id": "5neh-572f",
+   "name": "CTA - Ridership - 'L' Station Entries - Daily Totals",
+   "url": "https://data.cityofchicago.org/d/5neh-572f",
+   "measure": "Sum of station entries (rides). Stations located with dataset 8pix-ypme and placed in a community area.",
+   "stations_dataset": "8pix-ypme",
+   "start": "2022-01-01",
+   "end": "2022-12-31",
+   "stations_outside_chicago": 5105024,
+   "note": "Entries at L stations outside the 77 community areas. The system continues into the suburbs, so those rides are not a Chicago community-area count."
+  }
+ ],
+ "footfall_minus_prior_ci90": [
+  -0.519,
+  0.028
+ ],
+ "footfall_tgi_minus_prior_ci90": [
+  -0.435,
+  -0.15
+ ],
+ "footfall_prior_minus_prior_ci90": [
+  0.0,
+  0.0
+ ]
+}

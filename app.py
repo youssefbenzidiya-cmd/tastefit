@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import secrets
+import socket
 import threading
 import time
 import urllib.parse
@@ -12,6 +13,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import agent
+import evidence
+import ledger
+import portfolio
 import scan
 import tenant
 
@@ -26,7 +30,14 @@ _CTA = (f'<a href="mailto:{html.escape(_CONTACT)}?subject=TasteFit%20early%20acc
         f'TasteFit is a hackathon prototype. Follow the project on <a class="plain" href="{SOURCE_URL}">GitLab</a>.')
 # Synthetic replay for /demo; never real Qloo output (AGENTS.md rule 2).
 DEMO_FILE = ROOT / "demo" / "sample-report.json"
+# Aggregates-only saved example. No Qloo response is stored in this file.
+WICKER_FILE = ROOT / "demo" / "wicker-park.json"
 DEMO_DELAY_SCALE = float(os.environ.get("DEMO_DELAY_SCALE", "1"))
+# Comment pings while a run is blocked on the network. Proxies drop a silent stream.
+# The pad and TCP_NODELAY are what make a comment leave the process: an 8-byte
+# ping was held until the next real event on Cloud Run (measured 2026-10-17).
+SSE_PING_S = 10
+SSE_PING = b": ping" + b" " * 2048 + b"\n\n"
 
 STATIC = {
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
@@ -43,6 +54,8 @@ CSP_PAGE = ("default-src 'self'; script-src 'self' 'nonce-{nonce}' https://unpkg
             "font-src 'self'; img-src 'self' data: https://tile.openstreetmap.org; "
             "connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
 CSP_OTHER = "default-src 'none'; frame-ancestors 'none'"
+CSP_LEDGER = ("default-src 'self'; style-src 'self'; img-src 'self'; object-src 'none'; "
+              "base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 STREAMS = ("/run", "/tenant", "/demo")
 
 BUSY_MSG = ("TasteFit is already running as many analyses as it can. Try again in a minute, "
@@ -143,6 +156,8 @@ class Handler(BaseHTTPRequestHandler):
             self._demo()
         elif url.path in ("/scan", "/scan/unit", "/ask", "/spot", "/taste"):
             self._scan(url.path, urllib.parse.parse_qs(url.query))
+        elif url.path == "/street":
+            self._street(urllib.parse.parse_qs(url.query))
         else:
             self._send(*self._page(url.path, url.query))
 
@@ -195,11 +210,19 @@ class Handler(BaseHTTPRequestHandler):
         self._send(429, "text/plain; charset=utf-8", message.encode(), headers=[("Retry-After", str(retry_after))])
 
     def _start_stream(self):
+        try:
+            self.connection.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        except OSError:
+            pass
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
         self.send_header("Cache-Control", "no-cache")
         self.send_header("X-Accel-Buffering", "no")
         self.end_headers()
+        try:
+            self.wfile.flush()
+        except OSError:
+            pass
 
     def _event(self, kind, data):
         self.wfile.write(f"event: {kind}\ndata: {json.dumps(data)}\n\n".encode())
@@ -224,9 +247,58 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(400, "text/plain", b"lat and lon must both be valid coordinates")
         if rent is not None and not (0 < rent < 1e7):
             return self._send(400, "text/plain", b"rent must be a positive monthly amount")
+        extras, k = None, 1
+        raw_portfolio = arg("portfolio")
+        if raw_portfolio:
+            extras = []
+            for part in raw_portfolio.split(","):
+                part = part.strip()
+                if not part:
+                    continue
+                try:
+                    value = float(part)
+                except ValueError:
+                    return self._send(400, "text/plain", b"portfolio rents must be positive monthly amounts")
+                if not (0 < value < 1e7):
+                    return self._send(400, "text/plain", b"portfolio rents must be positive monthly amounts")
+                extras.append(value)
+            if len(extras) > 5:
+                return self._send(400, "text/plain", b"portfolio accepts at most 5 rents")
+        if arg("k"):
+            try:
+                k = int(arg("k"))
+            except ValueError:
+                return self._send(400, "text/plain", b"k must be a whole number from 1 to 5")
+            if not 1 <= k <= 5:
+                return self._send(400, "text/plain", b"k must be a whole number from 1 to 5")
         if lat is None and not (city and location):
             return self._send(400, "text/plain", b"a map point (lat, lon) or a city and location are required")
-        self._stream_agent(lambda: tenant.run(city, location or None, lat, lon, rent))
+        self._stream_agent(lambda: tenant.run(city, location or None, lat, lon, rent,
+                                               portfolio_rents=extras, portfolio_k=k))
+
+    def _street(self, q):
+        """Re-solve a street from concepts the page already has. This makes no Qloo call."""
+        raw = (q.get("payload") or [""])[0]
+        if len(raw) > 20000:
+            return self._send(400, "text/plain", b"street payload is too large")
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError:
+            return self._send(400, "text/plain", b"street payload must be JSON")
+        if not isinstance(payload, dict):
+            return self._send(400, "text/plain", b"street payload must be JSON")
+        try:
+            out = portfolio.what_if(payload.get("units"), payload.get("concepts"),
+                                    remove=payload.get("remove"), add=payload.get("add"))
+        except (ValueError, TypeError) as exc:
+            return self._send(400, "text/plain", str(exc).encode())
+        self._send(200, "application/json", json.dumps(out).encode())
+
+    def log_request(self, code="-", size="-"):
+        """Keep /street query strings, which carry this run's fit and overlap, out of the access log."""
+        path = urllib.parse.urlparse(self.path).path
+        line = f"{self.command} {path}" if path == "/street" else self.requestline
+        self.log_message('"%s" %s %s', line, str(code), str(size))
 
     def _stream_agent(self, start):
         if not os.environ.get("QLOO_API_KEY"):
@@ -237,20 +309,39 @@ class Handler(BaseHTTPRequestHandler):
         if not run_slots.acquire(blocking=False):
             return self._too_many(BUSY_MSG, 60)
         events = None
+        stop = threading.Event()
+        lock = threading.Lock()
+
+        def ping():
+            while not stop.wait(SSE_PING_S):
+                try:
+                    with lock:
+                        if stop.is_set():
+                            return
+                        self.connection.sendall(SSE_PING)
+                except OSError:
+                    return
+
         try:
             self._start_stream()
+            threading.Thread(target=ping, daemon=True).start()
             events = start()
             for kind, data in events:
-                self._event(kind, data)
+                with lock:
+                    self._event(kind, data)
         except (BrokenPipeError, ConnectionResetError):
             log.info("client disconnected during a run")
         except Exception:  # noqa: BLE001  details go to the server log, never to the browser
             log.exception("run failed")
             try:
-                self._event("error", "internal")
+                with lock:
+                    self._event("error", "internal")
             except OSError:
                 pass
         finally:
+            stop.set()
+            with lock:
+                pass
             if hasattr(events, "close"):
                 events.close()
             run_slots.release()

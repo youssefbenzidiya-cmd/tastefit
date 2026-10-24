@@ -2,8 +2,10 @@
 import datetime
 import json
 import unittest
+from pathlib import Path
 from unittest import mock
 
+import ledger
 import qloo
 import tenant
 
@@ -131,6 +133,34 @@ class PipelineTest(unittest.TestCase):
     def kinds(self, events, kind):
         return [d for k, d in events if k == kind]
 
+    def test_started_is_yielded_before_the_unit_scan_and_qloo(self):
+        seen = []
+
+        def unit(*_a, **_k):
+            seen.append("scan")
+            return 200, {"calibrated": True, "rent_ceiling": RENT, "currency": "USD", "note": "model", "cell": 7}
+
+        def taste(op, params, cache=None, timeout=90):
+            seen.append("qloo")
+            return self.fake(op, params, cache=cache, timeout=timeout)
+
+        with mock.patch("tenant.scan.unit", side_effect=unit), mock.patch.object(qloo, "exec_cached", side_effect=taste):
+            gen = tenant.run("chicago", lat=41.9, lon=-87.68, today=datetime.date(2026, 10, 13), chat_fn=chat_script())
+            kind, data = next(gen)
+            self.assertEqual((kind, data), ("started", {"phase": "locate"}))
+            self.assertEqual(seen, [])
+            rest = list(gen)
+        self.assertIn("scan", seen)
+        self.assertIn("qloo", seen)
+        self.assertEqual([k for k, _ in rest if k == "started"], [])
+        self.assertTrue(self.kinds(rest, "unit"))
+        self.assertNotIn("urn:", json.dumps(data))
+
+    def test_page_shows_the_opening_line_before_any_taste_result(self):
+        script = Path("static/app.js").read_text(encoding="utf-8")
+        self.assertIn("started: () => pushTraceRow('open'", script)
+        self.assertIn("No taste result yet.", script)
+
     def test_full_run_uses_eight_workflows_within_budget(self):
         ev = self.run_all(asking_rent=2800)
         budget = self.kinds(ev, "budget")[0]
@@ -219,7 +249,40 @@ class PipelineTest(unittest.TestCase):
     def test_unnamed_point_is_an_error(self):
         with mock.patch("tenant.geo.reverse", return_value=None):
             ev = self.run_all()
-        self.assertEqual(ev, [("error", "Could not name that point; type the neighborhood instead.")])
+        self.assertEqual(ev, [("started", {"phase": "locate"}),
+                              ("error", "Could not name that point; type the neighborhood instead.")])
+
+    def test_portfolio_reuses_this_run_and_adds_no_qloo_call(self):
+        base = self.run_all(asking_rent=2800)
+        street = self.run_all(asking_rent=2800, portfolio_rents=[4200, 5100], portfolio_k=1)
+        self.assertEqual(self.kinds(base, "budget")[0]["qloo_calls"], self.kinds(street, "budget")[0]["qloo_calls"])
+        port = self.kinds(street, "portfolio")[0]
+        self.assertEqual(port["blocking"], [])
+        self.assertIn("No improving move:", port["proof"])
+        self.assertIn("replacements and", port["proof"])
+        self.assertIn("swaps checked", port["proof"])
+        self.assertLessEqual(len(port["matches"]), 5)
+        self.assertEqual(len(port["matches"]), 3)
+        self.assertFalse(self.kinds(base, "portfolio"))
+        memo = self.kinds(street, "memo")[0]["markdown"]
+        self.assertIn(ledger.street_fingerprint(port), memo)
+        body = json.loads(ledger.street_canonical(port))
+        self.assertEqual(set(body), {"needs_rent_flexibility", "replacements", "swaps", "units"})
+        self.assertEqual(set(body["units"][0]), {"concept", "id", "rent"})
+        self.assertIn("Prediction fingerprint", memo)
+        self.assertNotIn("Street certificate", self.kinds(base, "memo")[0]["markdown"])
+
+    def test_memo_carries_a_prediction_fingerprint(self):
+        memo = self.kinds(self.run_all(), "memo")[0]
+        self.assertIn("Prediction fingerprint", memo["markdown"])
+        self.assertRegex(memo["fingerprint"], r"^[0-9a-f]{64}$")
+        self.assertIn(memo["fingerprint"], memo["markdown"])
+
+    def test_unit_event_includes_the_spend_estimate(self):
+        with mock.patch("tenant.market_share.estimate", return_value={"available": True, "note": "estimate", "pays_rent": False}) as est:
+            ev = self.run_all(asking_rent=2800)
+        self.assertEqual(self.kinds(ev, "unit")[0]["market_share"]["note"], "estimate")
+        self.assertEqual(est.call_args.kwargs["asking_rent"], 2800)
 
 
 class TasteGapPipelineTest(unittest.TestCase):

@@ -45,26 +45,49 @@ class ChainTest(unittest.TestCase):
 
     def test_gemini_first_then_fallback_on_error(self):
         os.environ["GEMINI_API_KEY"] = "fake-gemini-key"
-        err = urllib.error.HTTPError("u", 429, "quota", {}, io.BytesIO(b"fake-gemini-key quota"))
+        err = urllib.error.HTTPError("u", 503, "unavailable", {}, io.BytesIO(b"fake-gemini-key down"))
         fake = FakeOpen(err, {"role": "assistant", "content": None, "tool_calls": [{"id": "1"}]})
         with mock.patch("llm.urllib.request.urlopen", fake), self.assertLogs("tastefit.llm", "WARNING") as logs:
             msg = llm.chat([{"role": "user", "content": "x"}], tools=[{"name": "t", "parameters": {}}])
-        (g_req, g_body, _), (c_req, c_body, _) = fake.requests
+        (g_req, g_body, g_timeout), (lite_req, lite_body, lite_timeout) = fake.requests
         self.assertTrue(g_req.full_url.startswith(llm.GEMINI_BASE_URL))
         self.assertEqual(g_body["model"], "gemini-3.8-flash")
+        self.assertEqual(g_timeout, 8)
         self.assertEqual(g_body["reasoning_effort"], "low")
         self.assertEqual(g_req.get_header("Authorization"), "Bearer fake-gemini-key")
-        self.assertEqual(c_body["tools"][0]["type"], "function")
-        self.assertEqual(msg["provider"], "community")
+        self.assertEqual(lite_body["model"], "gemini-3.1-flash-lite")
+        self.assertEqual(lite_timeout, 20)
+        self.assertEqual(lite_body["tools"][0]["type"], "function")
+        self.assertEqual(msg["provider"], "gemini-lite")
         self.assertNotIn("fake-gemini-key", " ".join(logs.output))
+
+    def test_both_gemini_models_fail_then_community(self):
+        os.environ["GEMINI_API_KEY"] = "fake-gemini-key"
+        err = urllib.error.HTTPError("u", 503, "unavailable", {}, io.BytesIO(b""))
+        fake = FakeOpen(err, TimeoutError(), {"role": "assistant", "content": "ok"})
+        with mock.patch("llm.urllib.request.urlopen", fake):
+            msg = llm.chat([{"role": "user", "content": "x"}])
+        self.assertEqual([body["model"] for _, body, _ in fake.requests[:2]],
+                         ["gemini-3.8-flash", "gemini-3.1-flash-lite"])
+        self.assertEqual([t for _, _, t in fake.requests], [8, 20, llm.COMMUNITY_AFTER_GEMINI_TIMEOUT])
+        self.assertEqual(msg["provider"], "community")
+
+    def test_pinned_gemini_model_skips_the_chain(self):
+        os.environ["GEMINI_API_KEY"] = "fake-gemini-key"
+        os.environ["GEMINI_MODEL"] = "gemini-3.1-flash-lite"
+        self.assertEqual(llm.provider_names(), ["gemini", "community"])
+        fake = FakeOpen({"role": "assistant", "content": "ok"})
+        with mock.patch("llm.urllib.request.urlopen", fake):
+            llm.chat([{"role": "user", "content": "x"}])
+        self.assertEqual(fake.requests[0][1]["model"], "gemini-3.1-flash-lite")
 
     def test_all_failures_raise_without_leaking_keys(self):
         os.environ["GEMINI_API_KEY"] = "fake-gemini-key"
-        fake = FakeOpen(TimeoutError(), {"role": "assistant", "content": ""})
+        fake = FakeOpen(TimeoutError(), TimeoutError(), {"role": "assistant", "content": ""})
         with mock.patch("llm.urllib.request.urlopen", fake), self.assertRaises(llm.LLMUnavailable) as ctx:
             llm.chat([{"role": "user", "content": "x"}], timeout=5)
-        self.assertEqual(str(ctx.exception), "gemini: TimeoutError; community: ValueError")
-        self.assertEqual([t for _, _, t in fake.requests], [5, 5])
+        self.assertEqual(str(ctx.exception), "gemini: TimeoutError; gemini-lite: TimeoutError; community: ValueError")
+        self.assertEqual([t for _, _, t in fake.requests], [5, 5, 5])
 
     def test_custom_endpoint_and_model(self):
         os.environ.update(LLM_BASE_URL="https://example.test/v1/", LLM_MODEL="m1")

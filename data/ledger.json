@@ -1,0 +1,48 @@
+{
+  "protocol": {
+    "brier": "Brier score (Brier 1950): the mean of (p - o) squared over the shortlisted concepts. p is not a Qloo fit score and is not stored in this file. When every verdict is GO, ADJUST or NO-GO, p is the fixed map 0.66, 0.50 or 0.33. Any other verdict, including unscored, leaves p undefined, and the Brier score is not defined for that batch. The map is not a calibrated probability of a new licence.",
+    "outcome": "On 2026-11-17, o is 1 when the City of Chicago business-licence file shows a new food licence whose description matches the keyword frozen in this batch, with a start date on or after the registration timestamp and before 2026-11-17, and an address within 1.2 km of the registered point. Otherwise o is 0. The keyword and the point are not revised after publication.",
+    "comparator": "Skill is the Brier score of one constant, the citywide rate of new food licences over the same window, minus TasteFit's Brier score. The constant is computed on the check date from the same public file and is not invented here. The 2023-2024 Chicago backtest found no measurable gain, so a negative skill score is a possible result and will be reported.",
+    "hash": "SHA-256 of canonical JSON with keys area, concept, shortlist, ts, verdict. Each shortlist item has concept and verdict only. Fit scores and other numbers taken from a Qloo response are not written into this file."
+  },
+  "batches": [
+    {
+      "concept": "ramen shop",
+      "area": "Wicker Park, Chicago",
+      "shortlist": [
+        {
+          "concept": "ramen shop",
+          "verdict": "unscored"
+        },
+        {
+          "concept": "Korean fried chicken",
+          "verdict": "unscored"
+        },
+        {
+          "concept": "Mediterranean bowls",
+          "verdict": "unscored"
+        },
+        {
+          "concept": "specialty coffee",
+          "verdict": "unscored"
+        },
+        {
+          "concept": "salad bowls",
+          "verdict": "unscored"
+        },
+        {
+          "concept": "taqueria",
+          "verdict": "unscored"
+        }
+      ],
+      "verdict": "unscored",
+      "ts": "2026-10-14T15:05:00Z",
+      "sha256": "f08f78d5b2a1c2c1b46c87429e30e1e1bf9c912450b19a2ade608891a31d3b46",
+      "check_on": "2026-11-17",
+      "check_against": "City of Chicago business licences",
+      "lat": 41.9088,
+      "lon": -87.6796,
+      "note": "Four live runs on 2026-10-14 resolved these six concepts for Wicker Park and then the rank call returned QLOO_RATE_LIMIT, so no fit score and no GO / ADJUST / NO-GO verdict were produced. No probability is published. The Brier score is not defined for this batch. A later scored batch would be a new fingerprint, not an edit of this one."
+    }
+  ]
+}
