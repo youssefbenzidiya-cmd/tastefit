@@ -10,7 +10,7 @@ not killed. No discounting and no interest.
 ## Try it
 
 - **Live demo:** https://tastefit-776637567140.us-central1.run.app — pin a Chicago block. The pin is a cell to scout, not a vetted address.
-- **Walkthrough:** https://tastefit-776637567140.us-central1.run.app/walkthrough (60-second product reel). Recorded cut: `demo/tastefit-60s.mp4` (60 seconds). Qloo is taste, stamped VOID, not a survival predictor.
+- **Walkthrough:** https://tastefit-776637567140.us-central1.run.app/walkthrough (60-second product reel). Recorded cut: `demo/tastefit-60s.mp4` (60 seconds). Qloo is taste, not survival.
 - **GitLab automation:** https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipelines/2984949822. Duo flows live in `.gitlab/duo/flows/`. The 60s reel is product-only; there is no pipeline screen recording in this repo.
 
 ## Surprise ladder

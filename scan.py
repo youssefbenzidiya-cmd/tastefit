@@ -291,11 +291,17 @@ def taste(concept, location):
     if not os.environ.get("QLOO_API_KEY"):
         return 200, empty
     try:
+        from concurrent.futures import ThreadPoolExecutor
         import qloo
-        tag_res = qloo.find_tags(concept, limit=4)
-        urn = _first_tag(tag_res)
-        rec = qloo.recommend_places(location, signal_tags=[urn] if urn else None, limit=8)
-        loves = qloo.area_taste(location, limit=8)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            loves_f = pool.submit(lambda loc=location: qloo.area_taste(loc, limit=8))
+            tag_res = qloo.find_tags(concept, limit=4)
+            urn = _first_tag(tag_res)
+            rec = qloo.recommend_places(location, signal_tags=[urn] if urn else None, limit=8)
+            try:
+                loves = loves_f.result()
+            except Exception:
+                loves = {}
         return 200, {
             "status": "ok", "places": _taste_places(rec), "loves": _taste_places(loves),
             "concept": concept, "location": location, "tag": urn,

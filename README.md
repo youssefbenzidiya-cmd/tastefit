@@ -12,9 +12,9 @@ license: mit
 
 Click the map. One number answers **Who should rent this unit?**
 
-At a Chicago pin you get three exhibits on one sheet: who lives here (Census ACS 5-year), who dies (official business licences, n = 5,692), and what the street likes (Qloo — stamped VOID, because location did not predict survival). OSM competitors sit on the map as geography, not as a survival claim. 80% open is not for sale as a rent. It is for sale as a share.
+At a Chicago pin you get three exhibits on one sheet: who lives here (Census ACS 5-year), who dies (official business licences, n = 5,692), and what the street loves (Qloo taste graph). OSM competitors sit on the map as geography, not as a survival claim. 80% open is not for sale as a rent. It is for sale as a share.
 
-The pin is the only required action. Print memo is a one-page report from that pin. A cell is a block to scout, not a vetted address. Qloo is the taste exhibit, stamped VOID: location did not predict survival.
+The pin is the only required action. Print memo is a one-page report from that pin. A cell is a block to scout, not a vetted address. Qloo answers who belongs here. Licences answer survival: location did not predict it (κ = 0).
 
 **Live demo:** https://tastefit-776637567140.us-central1.run.app — pin Wicker Park, read the number, run the Qloo agent. Silent reel: https://tastefit-776637567140.us-central1.run.app/walkthrough.
 
