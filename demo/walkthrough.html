@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TasteFit · 60 seconds</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  :root { --ink:#15203B; --paper:#F3F5F7; --hl:#FFD84D; --muted:#5E6779; }
+  html, body { margin: 0; height: 100%; background: #0F1626; color: var(--ink);
+    font-family: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif; }
+  .stage { width: min(100vw, 160vh); aspect-ratio: 16/9; margin: 0 auto; background: var(--paper);
+    overflow: hidden; position: relative; }
+  .scene { position: absolute; inset: 0; padding: 8vh 8vw; opacity: 0;
+    animation: cut 60s linear infinite; }
+  .scene:nth-child(1) { animation-delay: 0s; }
+  .scene:nth-child(2) { animation-delay: 12s; }
+  .scene:nth-child(3) { animation-delay: 24s; }
+  .scene:nth-child(4) { animation-delay: 36s; }
+  .scene:nth-child(5) { animation-delay: 48s; }
+  @keyframes cut {
+    0%, 16% { opacity: 1; }
+    20%, 100% { opacity: 0; }
+  }
+  h1 { font-size: clamp(2.4rem, 7vw, 5.5rem); letter-spacing: -0.05em; line-height: 0.95;
+    max-width: 12ch; text-wrap: balance; margin: 0 0 0.4em; }
+  .n { font-size: clamp(5rem, 16vw, 10rem); font-weight: 800; letter-spacing: -0.08em; line-height: 0.8;
+    color: var(--ink); }
+  p { font-size: clamp(1rem, 2.2vw, 1.5rem); color: var(--muted); max-width: 32ch; }
+  .mark { display: inline-block; padding: 2px 10px; background: var(--hl); border: 1.5px solid var(--ink);
+    font-weight: 800; font-size: 0.85rem; }
+  html[data-scene] .scene { animation: none; opacity: 0; }
+  html[data-scene="1"] .scene:nth-child(1),
+  html[data-scene="2"] .scene:nth-child(2),
+  html[data-scene="3"] .scene:nth-child(3),
+  html[data-scene="4"] .scene:nth-child(4),
+  html[data-scene="5"] .scene:nth-child(5) { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) {
+    .scene { animation: none; opacity: 1; position: relative; height: auto; }
+    .stage { aspect-ratio: auto; height: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="stage" role="img" aria-label="TasteFit sixty-second walkthrough">
+  <section class="scene">
+    <span class="mark">TasteFit · Chicago</span>
+    <h1>Who should rent this unit?</h1>
+    <p>Click the map. One number answers.</p>
+  </section>
+  <section class="scene">
+    <p>Wicker Park. Census tract 2414.</p>
+    <p class="n">64</p>
+    <p>of 100 still open by year 3. Licences, not vibes.</p>
+  </section>
+  <section class="scene">
+    <h1>$186,537</h1>
+    <p>Median household income. Households pay $2,539/mo in gross rent. The listing is commercial — a different market.</p>
+  </section>
+  <section class="scene">
+    <h1>80% open is not for sale as a rent.</h1>
+    <p>It is for sale as a share. Drag α. The landlord’s 36-month take stays. Survival moves.</p>
+  </section>
+  <section class="scene">
+    <span class="mark">VOID</span>
+    <h1>The street does not buy survival.</h1>
+    <p>Qloo is the exhibit. κ = 0. Print the memo. A cell is a block to scout, not a vetted address.</p>
+  </section>
+</div>
+</body>
+</html>

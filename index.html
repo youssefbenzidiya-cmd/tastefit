@@ -1,23 +1,23 @@
 <!doctype html>
-<html lang="en" data-theme="light" data-mode="broker">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>TasteFit: who should rent this unit?</title>
-<meta name="description" content="Pick a storefront. TasteFit's agent reads Qloo's taste graph and returns a ranked tenant shortlist, with the evidence and the rent each concept can carry.">
+<title>Who should rent this unit?</title>
+<meta name="description" content="Drop a pin on Chicago. Census tract, official licences, and a taste exhibit. 80% open is not for sale as a rent. It is for sale as a share.">
 <meta name="theme-color" content="#15203B">
 <meta property="og:type" content="website">
-<meta property="og:title" content="TasteFit: who should rent this unit?">
-<meta property="og:description" content="A ranked tenant shortlist for any storefront, with Qloo taste evidence, open-map supply and the rent each concept can carry.">
+<meta property="og:title" content="Who should rent this unit?">
+<meta property="og:description" content="Chicago licences, n=5,692. Expected loss is a mean of a coin. 80% open is not for sale as a rent. It is for sale as a share.">
 <meta property="og:image" content="https://tastefit-776637567140.us-central1.run.app/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="A street plan with one unit hatched in yellow, next to a ranked tenant shortlist.">
+<meta property="og:image:alt" content="Two thousand Chicago restaurant paths. Most still have a shop. The rest have already spent the build-out.">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="preload" href="/fonts/SchibstedGrotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin>
 <link rel="stylesheet" href="/styles.css">
 <script nonce="{{NONCE}}">
   (function () {
@@ -28,333 +28,122 @@
     } catch (e) {}
   })();
 </script>
-<script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<script defer src="https://cdn.jsdelivr.net/npm/marked@18.1.0/lib/marked.umd.js" integrity="sha384-IvVdUXkhyoD0shbjhiiOnuiTbervTaB0VJcnEcg3shUAMVOOF6lKj4ozJrCwvz6s" crossorigin="anonymous"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/dompurify@3.4.16/dist/purify.min.js" integrity="sha384-a7SzOxErzJ3ZpQz0zJ32d67dSitNzPcbfybc/ykU9KJhMgZkwqfSxlhhdJRS+XGL" crossorigin="anonymous"></script>
+<script nonce="{{NONCE}}" src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 <script defer src="/app.js"></script>
 </head>
 <body>
 
-<!-- Icons: original strokes drawn for TasteFit on a 24px grid, 2px stroke. -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
     <pattern id="hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
       <rect class="f-hl" width="7" height="7"/><rect class="f-hatch" width="1.6" height="7"/>
     </pattern>
-    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11A6.5 6.5 0 0 1 18.5 10c0 5.4-6.5 11-6.5 11Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.4" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
     <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
     <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
-    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
-    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    <symbol id="i-print" viewBox="0 0 24 24"><path d="M7 9V3.5h10V9M7 17H4.5V10a1 1 0 0 1 1-1h13a1 1 0 0 1 1 1v7H17M7 14h10v6.5H7Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
-    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
-    <symbol id="i-grid" viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
-    <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="currentColor"/></symbol>
-    <symbol id="i-trend" viewBox="0 0 24 24"><path d="M4 12h15M14 7l5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-print" viewBox="0 0 24 24"><path d="M7 8V4h10v4M7 17H5a2 2 0 0 1-2-2v-5h18v5a2 2 0 0 1-2 2h-2M7 13h10v7H7v-7Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
   </defs>
 </svg>
 
 <a class="skip" href="#main">Skip to content</a>
+<div id="map" role="application" aria-label="Chicago. Click to drop a pin on a unit."></div>
 
 <header class="topbar">
   <a class="brand" href="#/" aria-label="TasteFit home">
     <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true"><rect class="f-ink" x="1" y="1" width="26" height="26" rx="6"/><rect class="s-hl" x="6" y="6" width="16" height="16" rx="2.5" fill="url(#hatch)" stroke-width="1.4"/></svg>
-    <span>TasteFit</span>
+    <span class="brand-copy"><b>TasteFit</b><small>Chicago · drop a pin</small></span>
   </a>
-
-  <div class="seg" role="radiogroup" aria-label="Who is asking">
-    <button type="button" role="radio" aria-checked="true" data-mode="broker">Broker or landlord</button>
-    <button type="button" role="radio" aria-checked="false" data-mode="founder">Founder</button>
-  </div>
-
   <div class="topbar-end">
     <button type="button" class="icon-btn" id="theme" aria-label="Switch to dark theme">
       <svg class="i i-sun"><use href="#i-sun"/></svg><svg class="i i-moon"><use href="#i-moon"/></svg>
     </button>
-    <a class="btn btn-ink btn-sm" href="#/app" data-go-app><span data-copy="nav-cta">Open the map</span></a>
   </div>
 </header>
 
-<main id="main">
-
-<!-- ============ LANDING ============ -->
-<div id="landing" class="landing">
-
-  <section class="hero" aria-labelledby="hero-title">
-    <div class="hero-copy">
-      <h1 id="hero-title" data-copy="hero-title">Who should rent this unit?</h1>
-      <p class="lede" data-copy="hero-lede">Pick a storefront. An agent reads what the street already loves on Qloo's taste graph, checks what is already served nearby on open map data, and the rent each concept can carry.</p>
-      <div class="hero-actions">
-        <a class="btn btn-hl btn-lg" href="#/app" data-go-app>
-          <svg class="i" aria-hidden="true"><use href="#i-pin"/></svg><span data-copy="hero-cta">Pick a unit on the map</span>
-        </a>
-        <button type="button" class="btn btn-ink btn-lg" data-action="wicker-example">Try the Wicker Park example</button>
-        <button type="button" class="btn btn-ghost btn-lg" data-action="sample-memo">Read a sample memo</button>
-      </div>
-      <p class="proof">Built on Qloo's taste graph, OpenStreetMap and official business registers. Open source under MIT. The plan and comparison on this page are sample data.</p>
-      <p class="cta-line" id="cta-line">{{CTA}}</p>
+<main id="main" class="sheet dock">
+  <section class="lease" aria-labelledby="hero-title">
+    <p class="classif">Chicago business licences, n = 5692. Census ACS. A model, not a forecast</p>
+    <h1 id="hero-title">Who should rent this unit?</h1>
+    <p class="proof" id="lede">Click the map. One number answers. 80% open is not for sale as a rent. It is for sale as a share.</p>
+    <div id="stamp" aria-live="polite">
+      <div class="stamp-skel" aria-hidden="true"><div class="sk" style="width:40%"></div><div class="sk" style="width:70%"></div></div>
     </div>
-
-    <figure class="plan" aria-label="Sample output: a street plan with one unit, and the shortlist TasteFit returns for it">
-      <svg class="plan-svg" viewBox="0 0 560 420" role="img" aria-hidden="true">
-        <rect class="f-surface" x="0" y="0" width="560" height="420" rx="18"/>
-        <path class="s-rule" d="M0 196h560M0 236h560" stroke-width="1"/>
-        <text class="plan-street" x="28" y="221">Rue de l'Exemple</text>
-        <g class="parcels" stroke-width="1.2">
-          <rect x="24" y="40" width="96" height="140" rx="3"/>
-          <rect x="126" y="40" width="74" height="140" rx="3"/>
-          <rect x="206" y="40" width="118" height="140" rx="3"/>
-          <rect x="420" y="40" width="116" height="140" rx="3"/>
-          <rect x="24" y="252" width="132" height="132" rx="3"/>
-          <rect x="162" y="252" width="88" height="132" rx="3"/>
-          <rect x="256" y="252" width="104" height="132" rx="3"/>
-          <rect x="366" y="252" width="170" height="132" rx="3"/>
-        </g>
-        <g class="plan-labels">
-          <text x="36" y="66">Bakery</text>
-          <text x="138" y="66">Optician</text>
-          <text x="218" y="66">Ramen</text>
-          <text x="432" y="66">Pharmacy</text>
-          <text x="36" y="278">Bookshop</text>
-          <text x="174" y="278">Café</text>
-          <text x="268" y="278">Florist</text>
-          <text x="378" y="278">Grocer</text>
-        </g>
-        <g class="vacant">
-          <rect class="vacant-fill" x="330" y="40" width="84" height="140" rx="3" fill="url(#hatch)"/>
-          <rect x="330" y="40" width="84" height="140" rx="3" fill="none" class="s-ink" stroke-width="2"/>
-          <g class="vacant-tag">
-            <rect class="f-ink" x="318" y="150" width="108" height="26" rx="13"/>
-            <text x="372" y="167.5" text-anchor="middle" class="f-on-ink">Vacant, 68 m²</text>
-          </g>
-        </g>
-      </svg>
-
-      <div class="plan-card" aria-hidden="true">
-        <p class="plan-card-title">Who should rent it?</p>
-        <ol class="mini-list">
-          <li style="--i:0"><span class="mini-name">Korean fried chicken</span><span class="mini-score">86</span><span class="badge badge-go badge-xs">GO</span></li>
-          <li style="--i:1"><span class="mini-name">Lebanese grill</span><span class="mini-score">72</span><span class="badge badge-go badge-xs">GO</span></li>
-          <li style="--i:2"><span class="mini-name">Ramen shop</span><span class="mini-score">50</span><span class="badge badge-adjust badge-xs">ADJUST</span></li>
-        </ol>
-        <p class="plan-card-foot">Rank 1 of 6 for this audience, 2 similar places nearby, rent within the ceiling.</p>
+    <form id="lease-form" novalidate>
+      <div class="fields">
+        <div class="field">
+          <label for="asking">Rent / month</label>
+          <div class="input-affix"><span>$</span>
+            <input class="input num" id="asking" name="asking" inputmode="numeric" autocomplete="off" value="4200" aria-describedby="asking-help">
+          </div>
+          <span class="help" id="asking-help">From the listing. The street is not an input.</span>
+          <input type="range" id="rent-range" min="0" max="8000" step="50" value="4200" aria-label="Asking rent slider">
+          <span class="field-error" id="asking-err" hidden>Enter the rent as a number, for example 4200.</span>
+        </div>
+        <div class="field">
+          <label for="share">Landlord share instead of a flat rent</label>
+          <input type="range" id="share" min="0" max="50" step="1" value="0" aria-describedby="share-help">
+          <span class="help" id="share-val">0% · a rent</span>
+          <span class="help" id="share-help">Zero is a rent. Drag to keep the landlord’s 36-month take and buy survival. 80% open is for sale as a share.</span>
+        </div>
+        <details class="more">
+          <summary>Concept, build-out, term</summary>
+          <div class="field">
+            <label for="concept">What would open here</label>
+            <input class="input" id="concept" name="concept" autocomplete="off" value="Korean fried chicken" aria-describedby="concept-help">
+            <span class="help" id="concept-help">Only the concept and the neighborhood go to the taste graph.</span>
+          </div>
+          <div class="field">
+            <label for="capex">Build-out</label>
+            <div class="input-affix"><span>$</span>
+              <input class="input num" id="capex" name="capex" inputmode="numeric" autocomplete="off" value="450000" aria-describedby="capex-help">
+            </div>
+            <span class="help" id="capex-help">Fit-out and equipment. Defaults to the Chicago cost profile; replace with your bid.</span>
+            <span class="field-error" id="capex-err" hidden>Enter the build-out as a number, for example 450000.</span>
+          </div>
+          <div class="field">
+            <label for="term">Term / years</label>
+            <input class="input num" id="term" name="term" inputmode="numeric" autocomplete="off" value="5" aria-describedby="term-help">
+            <span class="help" id="term-help">If your name is on the lease. Used only for the guarantee line.</span>
+            <span class="field-error" id="term-err" hidden>Enter a whole number of years between 1 and 20.</span>
+          </div>
+          <div class="field field-belief">
+            <label for="belief">Stated value at year 3</label>
+            <div class="input-affix"><span>$</span>
+              <input class="input num" id="belief" name="belief" inputmode="numeric" autocomplete="off" value="" placeholder="Needed for expected NPV" aria-describedby="belief-help">
+            </div>
+            <span class="help" id="belief-help">What the living shop is worth if it works. Expected NPV is negative until this beats the hurdle.</span>
+            <span class="field-error" id="belief-err" hidden>Enter a number, or leave blank.</span>
+          </div>
+        </details>
       </div>
-      <figcaption class="plan-cap">Sample output. Street, places and scores are invented.</figcaption>
-    </figure>
-  </section>
-
-  <section class="how" aria-labelledby="how-title">
-    <h2 id="how-title">How it works</h2>
-    <ol class="steps3">
-      <li>
-        <span class="step-n" aria-hidden="true">1</span>
-        <h3 data-copy="how-1">Pick the unit</h3>
-        <p data-copy="how-1p">Choose an example point or drop a pin on any storefront. Add the asking rent if you have it.</p>
-      </li>
-      <li>
-        <span class="step-n" aria-hidden="true">2</span>
-        <h3>Watch the agent ask Qloo</h3>
-        <p>Each lookup appears as it happens: what it asked, what came back, which tag it chose. About 20 calls, a few minutes.</p>
-      </li>
-      <li>
-        <span class="step-n" aria-hidden="true">3</span>
-        <h3 data-copy="how-3">Take the memo to the meeting</h3>
-        <p data-copy="how-3p">A one-page shortlist with a GO, ADJUST or NO-GO call per concept, the evidence behind it and the limits. Prints cleanly.</p>
-      </li>
-    </ol>
-  </section>
-
-  <section class="versus" aria-labelledby="vs-title">
-    <div class="versus-head">
-      <h2 id="vs-title">Same model, same question. One of them can check.</h2>
-      <p>Every run asks the language model alone first, then marks which of its picks the evidence confirmed, contradicted or never tested.</p>
-    </div>
-    <div class="versus-grid">
-      <div class="vs-col vs-without">
-        <h3>Without Qloo</h3>
-        <ul class="vs-list">
-          <li><span>Specialty coffee</span><span class="status status-bad">Contradicted</span><small>More cafés nearby than the city's mix predicts.</small></li>
-          <li><span>Brunch café</span><span class="status status-none">Not tested</span><small>No taste evidence either way.</small></li>
-          <li><span>Neapolitan pizza</span><span class="status status-none">Not tested</span><small>No taste evidence either way.</small></li>
-          <li><span>Korean fried chicken</span><span class="status status-ok">Confirmed</span><small>Qloo ranks it 1 of 6 here.</small></li>
-        </ul>
+      <div class="seg" role="radiogroup" aria-label="Concept">
+        <button type="button" role="radio" data-group="restaurant" aria-checked="true">Restaurant</button>
+        <button type="button" role="radio" data-group="fast_food" aria-checked="false">Fast food</button>
+        <button type="button" role="radio" data-group="bar_cafe" aria-checked="false">Bar &amp; café</button>
       </div>
-      <div class="vs-col vs-with">
-        <h3>With Qloo</h3>
-        <ol class="vs-list">
-          <li><span>Korean fried chicken</span><span class="badge badge-go badge-xs">GO</span><small>Rank 1 of 6, 2 nearby, overlap 0.64.</small></li>
-          <li><span>Lebanese grill</span><span class="badge badge-go badge-xs">GO</span><small>Missed by the model alone. Rank 2 of 6.</small></li>
-          <li><span>Ramen shop</span><span class="badge badge-adjust badge-xs">ADJUST</span><small>Loved, but 7 places nearby. Negotiate rent.</small></li>
-          <li><span>Mediterranean bowls</span><span class="badge badge-nogo badge-xs">NO-GO</span><small>9 places nearby, interest fading.</small></li>
-        </ol>
-      </div>
-    </div>
-    <p class="fine">Sample comparison. In the live app both columns come from the same run.</p>
-  </section>
-
-  <section class="limits-band" aria-labelledby="lim-title">
-    <h2 id="lim-title">What it does not know</h2>
-    <p>Qloo describes the aggregate taste of an area's audience, not foot traffic, sales or any person. Scores rank the candidates in one run against each other. Nearby supply counts OpenStreetMap venues, which can be incomplete. Rent ceilings come from a survival model built on official data, calibrated for Paris and Chicago only. Alcohol-led concepts are left out.</p>
-  </section>
-
-  <section class="scan" id="scan">
-    <div class="scan-head-row">
-      <h2 id="scan-title">City Scan and rent ceiling</h2>
-      <p>Prebuilt from open map data, separate from the taste check. A model, not a forecast.</p>
-    </div>
-    <form class="scan-form" id="scan-form" autocomplete="off">
-      <label>City
-        <select name="city">
-          <option value="paris">Paris</option>
-          <option value="chicago">Chicago</option>
-          <option value="philadelphia">Philadelphia</option>
-          <option value="casablanca">Casablanca</option>
-        </select></label>
-      <label>Concept
-        <select name="concept">
-          <option>specialty coffee</option>
-          <option>burger</option>
-          <option>pizza</option>
-          <option>French bistro</option>
-          <option>sushi</option>
-          <option>brunch</option>
-        </select></label>
-      <button class="btn btn-ink" type="submit">Scan the city</button>
     </form>
-    <div id="scan-out" aria-live="polite"></div>
+    <div id="taste" class="taste"></div>
+    <div id="agent" class="agent" hidden></div>
+    <div id="place" class="place"></div>
+    <div id="census" class="census"></div>
+    <div id="diagram"></div>
+    <div id="tail"></div>
   </section>
-</div>
-
-<!-- ============ APP ============ -->
-<div id="app" class="app" hidden>
-  <div class="map-wrap">
-    <div id="map" aria-label="Map. Use the list in the side panel to choose a point with the keyboard."></div>
-    <div class="map-tools">
-      <button type="button" class="chip-btn" id="scan-toggle" aria-pressed="false">
-        <svg class="i" aria-hidden="true"><use href="#i-grid"/></svg>City Scan
-      </button>
-      <select id="scan-concept" class="chip-btn" aria-label="City Scan concept" hidden>
-        <option>specialty coffee</option>
-        <option>burger</option>
-        <option>pizza</option>
-        <option>French bistro</option>
-        <option>sushi</option>
-        <option>brunch</option>
-      </select>
-    </div>
-    <div class="map-legend" aria-hidden="true">
-      <span><i class="lg lg-vacant"></i>Example point</span>
-      <span><i class="lg lg-love"></i>Where the top concept's audience concentrates</span>
-      <span class="lg-scan-item" hidden><i class="lg lg-scan"></i>Darker block, more opportunity</span>
-    </div>
-    <p class="sample-flag" role="note" id="sample-flag" hidden>Sample data</p>
-  </div>
-
-  <aside class="panel" id="panel" aria-label="Analysis">
-    <div class="panel-scroll" id="panel-body"></div>
-  </aside>
-</div>
+  <footer class="foot" id="foot">
+    <span>TasteFit is open source under the MIT licence. <a href="{{SOURCE}}">Source on GitLab</a>. <a href="/walkthrough">60-second reel</a>. <a href="/evidence">Evidence</a>. <a href="/ledger">Ledger</a>. <button type="button" class="plain" data-action="wicker-example">Try the Wicker Park example</button>. <span class="build">TasteFit build {{BUILD}}</span></span>
+    <!-- market share copy is escaped in JS as esc(u.market_share.note) -->
+    <span>Map: © OpenStreetMap contributors. Survival: Chicago business licences. Tract economics: U.S. Census Bureau ACS 5-year. Taste exhibit: Qloo, when a key is set. A cell is a block to scout, not a vetted address.</span>
+  </footer>
 </main>
 
-<footer class="foot" id="foot">
-  <span>TasteFit is open source under the MIT licence. <a href="{{SOURCE}}">Source on GitLab</a>. <a href="/ledger">Prediction ledger</a>. <a href="/evidence">Evidence</a>. <span class="build">TasteFit build {{BUILD}}</span></span>
-  <span>Taste data: Qloo. Map and venues: © OpenStreetMap contributors. Rent model: official business registers.</span>
-</footer>
-
-<!-- ============ MEMO ============ -->
+<p class="cta-line sr-only" id="cta-line">{{CTA}}</p>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 <dialog class="memo" id="memo" aria-labelledby="memo-title">
   <div class="memo-bar">
-    <button type="button" class="btn btn-ink btn-sm" data-action="print"><svg class="i" aria-hidden="true"><use href="#i-print"/></svg>Print or save as PDF</button>
-    <button type="button" class="icon-btn" data-action="close-memo" aria-label="Close memo"><svg class="i"><use href="#i-x"/></svg></button>
+    <button type="button" class="btn btn-ghost btn-sm" data-action="print">Print</button>
+    <form method="dialog"><button class="btn btn-quiet btn-sm">Close</button></form>
   </div>
   <article class="memo-page" id="memo-page"></article>
 </dialog>
-
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
-<div class="sr-only" id="sr-live" aria-live="polite"></div>
-
-<script nonce="{{NONCE}}">
-'use strict';
-/* City Scan section: prebuilt open-data grids, no Qloo call. */
-{
-const $ = s => document.querySelector(s);
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const scanForm = $('#scan-form'), scanOut = $('#scan-out');
-let scanData = null, scanSeq = 0;
-
-async function getJSON(url) {
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
-  if (res.ok) return res.json();
-  const text = (await res.text()).trim();
-  throw new Error(res.status === 429 ? 'Too many scans from this connection. Try again in a few minutes.'
-    : res.status < 500 && text ? text : 'The scan failed on our side. Try again.');
-}
-
-const scanError = e => e instanceof TypeError ? 'Could not reach TasteFit. Check your connection and try again.' : e.message;
-const scanAttr = d => d.attribution ? '<p class="scan-attr">' + esc(d.attribution) + '</p>' : '';
-
-function scanHTML(d) {
-  if (d.data_thin) return '<div class="state state-warn"><h3>Not enough map data for ' + esc(d.city) + '</h3><p>' + esc(d.reason) + '</p></div>' + shareHTML(d) + scanAttr(d);
-  const cells = d.top.map((t, i) => {
-    const plain = s => s && s.replace(/^[+-]?\d+(\.\d+)?:\s*/, '');
-    const o = t.opportunity || {}, why = plain((t.reasons_en || [])[0]), watch = plain((t.watch_out_en || [])[0]);
-    return '<li class="cell"><div class="cell-head"><h3>' + esc(t.neighborhood || 'Cell ' + t.id) + '</h3>' +
-      '<span><b>' + esc(o.point) + '</b>opportunity' + (o.lcb != null ? ', 90% interval ' + esc(o.lcb) + ' to ' + esc(o.ucb) : '') + '</span></div>' +
-      (why ? '<p>' + esc(why) + '</p>' : '') + (watch ? '<p class="watch">Watch out: ' + esc(watch) + '</p>' : '') +
-      '<button type="button" class="btn btn-ghost btn-sm" data-scan-rent="' + i + '">Rent ceiling here</button><div class="rent" hidden></div></li>';
-  }).join('');
-  return '<p class="scan-sub">Top ' + d.top.length + ' areas for ' + esc(d.label) + ' in ' + esc(d.city) + ', opportunity out of 100</p>' +
-    '<ol class="cells">' + cells + '</ol>' + scanAttr(d);
-}
-
-function shareHTML(u) {
-  return u.market_share && u.market_share.note ? '<p class="scan-attr">' + esc(u.market_share.note) + '</p>' : '';
-}
-function rentHTML(u) {
-  if (u.data_thin) return '<p class="scan-attr">' + esc(u.reason) + '</p>' + shareHTML(u);
-  if (!u.rent_ceiling) return '<p class="scan-attr">' + esc(u.note) + '</p>' + shareHTML(u);
-  const money = new Intl.NumberFormat('en', { style: 'currency', currency: u.currency, maximumFractionDigits: 0 });
-  return '<table class="rent-table"><tr><th>Tenant type</th><th>Max monthly rent</th><th>90% interval</th></tr>' +
-    u.rent_ceiling.map(r => '<tr><th scope="row">' + esc(r.label_en) + '</th>' + (r.rent_max == null
-      ? '<td colspan="2">' + esc(r.note || 'Not viable at any rent here.') + '</td>'
-      : '<td><b>' + esc(money.format(r.rent_max)) + '</b></td><td>' + (r.ci90 ? esc(money.format(r.ci90[0])) + ' to ' + esc(money.format(r.ci90[1])) : '–') + '</td>') + '</tr>').join('') +
-    '</table><p class="scan-attr">' + esc(u.note) + '</p>' + shareHTML(u);
-}
-
-async function rentCeiling(btn) {
-  const t = scanData.top[+btn.dataset.scanRent], box = btn.nextElementSibling;
-  btn.disabled = true; box.hidden = false;
-  box.innerHTML = '<div class="sk" style="width:60%"></div>';
-  try {
-    box.innerHTML = rentHTML(await getJSON('/scan/unit?' + new URLSearchParams({ city: scanData.slug, lat: t.centroid.lat, lon: t.centroid.lon })));
-  } catch (e) {
-    box.innerHTML = '<p class="scan-attr">' + esc(scanError(e)) + '</p>';
-  }
-  btn.disabled = false;
-}
-
-scanOut.addEventListener('click', e => { const b = e.target.closest('[data-scan-rent]'); if (b) rentCeiling(b); });
-
-scanForm.onsubmit = async e => {
-  e.preventDefault();
-  const city = scanForm.city.value, mine = ++scanSeq, btn = scanForm.querySelector('button');
-  btn.disabled = true;
-  scanOut.innerHTML = '<div class="sk" style="width:55%"></div><div class="sk" style="width:85%"></div>';
-  try {
-    const d = await getJSON('/scan?' + new URLSearchParams({ city, concept: scanForm.concept.value, top: 5 }));
-    if (mine !== scanSeq) return;
-    scanData = { ...d, slug: city };
-    scanOut.innerHTML = scanHTML(d);
-  } catch (err) {
-    if (mine === scanSeq) scanOut.innerHTML = '<div class="state state-error"><h3>The scan did not load</h3><p>' + esc(scanError(err)) + '</p></div>';
-  } finally {
-    if (mine === scanSeq) btn.disabled = false;
-  }
-};
-}
-</script>
 </body>
 </html>

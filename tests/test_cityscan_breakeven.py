@@ -1,5 +1,6 @@
 import math
 import unittest
+from statistics import NormalDist
 
 import cityscan_breakeven as be
 
@@ -111,6 +112,104 @@ class Calibrated(unittest.TestCase):
         city = card["ceilings"]["city"]
         self.assertEqual(city["target"], c["official"]["s3"])
         self.assertTrue(0 < city["ci90"][0] <= city["rent_max"] <= city["ci90"][1] < 0.25 * revenue)
+
+    def test_chicago_corpse_cash_counts_only_draws_dead_by_year_three(self):
+        c = be.calibration("chicago", "restaurant")
+        draws = be.survival_draws(c["inputs"], 400, 20261011)
+        caps = be.rent_capacity(c["theta"], c["sigma"], c.get("kappa") or 0.0, 1.0, draws)
+        p0 = be.survival_at_rent(caps, 0, 1.0)
+        p = be.survival_at_rent(caps, 4200, 1.0)
+        m0 = be.corpse_months(caps, draws, 0)
+        m = be.corpse_months(caps, draws, 4200)
+        capex = c["inputs"]["capex"]["mode"]
+        self.assertGreaterEqual(m0, 0)
+        self.assertLessEqual(m, (1 - p) * 36 + 1e-9)
+        self.assertGreater(capex * (1 - p) + 4200 * m, capex * (1 - p0))
+        card_full = be.rent_ceiling_card(1.0, c, asking=12000, n=400)
+        self.assertEqual(len(card_full["curve"][0]), 5)
+        self.assertEqual(len(card_full["caps"]), 400)
+        book = be.credit_book(p, m, capex, 4200, 60)
+        self.assertAlmostEqual(book["drawn"], capex * (1 - p) + 4200 * m)
+        self.assertAlmostEqual(book["guarantee"], (1 - p) * (capex + 4200 * 60))
+        self.assertAlmostEqual(book["hurdle"], book["drawn"] / p)
+        self.assertGreater(book["ttk"], 0)
+        self.assertLess(book["ttk"], 36)
+        sure = be.credit_book(1.0, 0.0, capex, 4200, 60)
+        self.assertEqual(sure["drawn"], 0)
+        self.assertIsNone(sure["ttk"])
+        self.assertEqual(sure["hurdle"], 0)
+        xs = be.path_losses(caps, draws, 4200, capex)
+        lb = be.loss_book(xs)
+        self.assertAlmostEqual(lb["el"], book["drawn"], delta=1)
+        self.assertAlmostEqual(lb["el"], lb["p_dead"] * lb["ruined_mean"], delta=1)
+        self.assertEqual(lb["p50"], 0)
+        self.assertGreaterEqual(be.loss_book(be.path_losses(caps, draws, 0, capex))["p90"], capex - 1)
+        self.assertEqual(len(card_full["fx"]), 400)
+        self.assertEqual(len(card_full["fx"]), len(card_full["caps"]))
+
+
+class TasteFitContract(unittest.TestCase):
+    """Affine lease, coherent tail, Kelly bankroll, Vasicek book. Chicago restaurant draws."""
+
+    def setUp(self):
+        c = be.calibration("chicago", "restaurant")
+        self.n = 400
+        self.draws = be.survival_draws(c["inputs"], self.n, 20261011)
+        self.b = c["buffer_months"]
+        self.caps = be.rent_capacity(c["theta"], c["sigma"], c.get("kappa") or 0.0, 1.0, self.draws, 36, self.b)
+        self.capex = c["inputs"]["capex"]["mode"]
+        self.rent = 4200.0
+
+    def test_zero_share_is_the_fixed_rent_coin(self):
+        xs = be.path_losses(self.caps, self.draws, self.rent, self.capex, self.b)
+        ys, harvest = be.affine_paths(self.caps, self.draws, self.rent, 0.0, self.capex, self.b)
+        self.assertEqual(xs, ys)
+        self.assertEqual(be.affine_capacity(self.caps, self.draws, 0.0, self.b), list(self.caps))
+        H = sum(harvest) / len(harvest)
+        base = be.match_base(self.caps, self.draws, 0.0, H, self.capex, self.b)
+        self.assertAlmostEqual(base, self.rent, delta=2)
+
+    def test_harvest_matched_share_buys_survival(self):
+        _, h0 = be.affine_paths(self.caps, self.draws, self.rent, 0.0, self.capex, self.b)
+        H0 = sum(h0) / len(h0)
+        p0 = be.survival_at_rent(self.caps, self.rent)
+        p_prev, el_prev = p0, be.loss_book(be.path_losses(self.caps, self.draws, self.rent, self.capex, self.b))["el"]
+        for share in (0.08, 0.20, 0.40):
+            base = be.match_base(self.caps, self.draws, share, H0, self.capex, self.b)
+            losses, harvest = be.affine_paths(self.caps, self.draws, base, share, self.capex, self.b)
+            self.assertAlmostEqual(sum(harvest) / len(harvest), H0, delta=50)
+            p = 1.0 - be.loss_book(losses)["p_dead"]
+            el = be.loss_book(losses)["el"]
+            self.assertGreater(p, p_prev - 1e-9)
+            self.assertLess(el, el_prev + 1)
+            p_prev, el_prev = p, el
+        self.assertGreater(p_prev, 0.80)
+        self.assertLess(be.match_base(self.caps, self.draws, 0.40, H0, self.capex, self.b), 0)
+
+    def test_pure_percentage_rent_without_lowering_the_floor_kills_more(self):
+        p0 = be.survival_at_rent(self.caps, self.rent)
+        losses, _ = be.affine_paths(self.caps, self.draws, self.rent, 0.20, self.capex, self.b)
+        self.assertLess(1.0 - be.loss_book(losses)["p_dead"], p0)
+
+    def test_expected_shortfall_is_the_mean_of_the_worst_tail(self):
+        xs = be.path_losses(self.caps, self.draws, self.rent, self.capex, self.b)
+        lb = be.loss_book(xs)
+        es95 = be.expected_shortfall(xs, 0.95)
+        self.assertGreaterEqual(es95, lb["p90"] - 1e-6)
+        self.assertGreater(es95, lb["el"])
+        self.assertAlmostEqual(be.expected_shortfall(xs, 0.0), lb["el"], delta=1)
+
+    def test_distance_to_default_and_kelly_and_vasicek(self):
+        dd = be.distance_to_default(self.caps, self.rent)
+        p = be.survival_at_rent(self.caps, self.rent)
+        self.assertGreater(dd["sd"], 0)
+        self.assertAlmostEqual(dd["normal_pd"], NormalDist().cdf(-dd["dd"]), places=12)
+        self.assertLess(abs(dd["normal_pd"] - (1 - p)), 0.08)
+        self.assertIsNone(be.kelly_bankroll(p, self.capex / p, self.capex))
+        self.assertAlmostEqual(be.kelly_bankroll(0.6, 900000, 450000), 2_250_000)
+        self.assertAlmostEqual(be.vasicek_k(0.36, 0.0, 0.999), 0.36, places=12)
+        self.assertGreater(be.vasicek_k(0.36, be.ASSET_RHO, 0.999), 0.36)
+        self.assertAlmostEqual(be.ASSET_RHO, 0.12)
 
 
 if __name__ == "__main__":

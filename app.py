@@ -28,8 +28,6 @@ _CTA = (f'<a href="mailto:{html.escape(_CONTACT)}?subject=TasteFit%20early%20acc
         "Tell us your city and how many sites you check a year."
         if _CONTACT else
         f'TasteFit is a hackathon prototype. Follow the project on <a class="plain" href="{SOURCE_URL}">GitLab</a>.')
-_TEMPLATE = (ROOT / "index.html").read_text().replace("{{CTA}}", _CTA).replace("{{SOURCE}}", SOURCE_URL)
-
 # Synthetic replay for /demo; never real Qloo output (AGENTS.md rule 2).
 DEMO_FILE = ROOT / "demo" / "sample-report.json"
 # Aggregates-only saved example. No Qloo response is stored in this file.
@@ -45,11 +43,11 @@ STATIC = {
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/styles.css": ("styles.css", "text/css; charset=utf-8"),
     "/favicon.svg": ("favicon.svg", "image/svg+xml"),
+    "/favicon.ico": ("favicon.svg", "image/svg+xml"),
     "/og.png": ("og.png", "image/png"),
     "/apple-touch-icon.png": ("apple-touch-icon.png", "image/png"),
     "/fonts/SchibstedGrotesk-latin.woff2": ("fonts/SchibstedGrotesk-latin.woff2", "font/woff2"),
 }
-_STATIC_BODIES = {path: ((ROOT / "static" / name).read_bytes(), ctype) for path, (name, ctype) in STATIC.items()}
 
 CSP_PAGE = ("default-src 'self'; script-src 'self' 'nonce-{nonce}' https://unpkg.com https://cdn.jsdelivr.net; "
             "style-src 'self' 'unsafe-inline' https://unpkg.com; "
@@ -101,7 +99,10 @@ def build_label():
 
 
 def render_index(nonce=""):
-    return _TEMPLATE.replace("{{BUILD}}", html.escape(build_label())).replace("{{NONCE}}", nonce).encode()
+    page = ((ROOT / "index.html").read_text()
+            .replace("{{CTA}}", _CTA).replace("{{SOURCE}}", SOURCE_URL)
+            .replace("{{BUILD}}", html.escape(build_label())).replace("{{NONCE}}", nonce))
+    return page.encode()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -124,25 +125,31 @@ class Handler(BaseHTTPRequestHandler):
         hops = [h.strip() for h in self.headers.get("X-Forwarded-For", "").split(",") if h.strip()]
         return hops[-1] if hops else self.client_address[0]
 
-    def _page(self, path):
+    def _page(self, path, query=""):
         if path == "/":
             nonce = secrets.token_urlsafe(16)
             return 200, "text/html; charset=utf-8", render_index(nonce), CSP_PAGE.format(nonce=nonce)
         if path == "/health":
             return 200, "text/plain", f"ok {os.environ.get('RENDER_GIT_COMMIT', '')}".strip().encode(), None
+        if path == "/walkthrough":
+            nonce = secrets.token_urlsafe(16)
+            page = (ROOT / "demo" / "walkthrough.html").read_text(encoding="utf-8")
+            scene = urllib.parse.parse_qs(query).get("scene", [""])[0]
+            if scene in ("1", "2", "3", "4", "5"):
+                page = page.replace('<html lang="en">', f'<html lang="en" data-scene="{scene}">', 1)
+            return 200, "text/html; charset=utf-8", page.encode(), CSP_PAGE.format(nonce=nonce)
         if path == "/ledger":
             return 200, "text/html; charset=utf-8", ledger.page().encode(), CSP_LEDGER
         if path == "/evidence":
             return 200, "text/html; charset=utf-8", evidence.page().encode(), CSP_LEDGER
         if path == "/wicker-example.json":
-            try:
-                body = WICKER_FILE.read_bytes()
-            except OSError:
-                return 404, "text/plain", b"not found", None
-            return 200, "application/json", body, None
-        if path in _STATIC_BODIES:
-            body, ctype = _STATIC_BODIES[path]
-            return 200, ctype, body, None
+            return 200, "application/json", WICKER_FILE.read_bytes(), CSP_OTHER
+        if path in STATIC:
+            name, ctype = STATIC[path]
+            age = "60" if name.endswith((".js", ".css")) else "86400"
+            return 200, ctype, (ROOT / "static" / name).read_bytes(), None, (
+                ("Cache-Control", f"public, max-age={age}"),
+            )
         return 404, "text/plain", b"not found", None
 
     def do_GET(self):
@@ -153,18 +160,18 @@ class Handler(BaseHTTPRequestHandler):
             self._tenant(urllib.parse.parse_qs(url.query))
         elif url.path == "/demo":
             self._demo()
-        elif url.path in ("/scan", "/scan/unit"):
+        elif url.path in ("/scan", "/scan/unit", "/ask", "/spot", "/taste"):
             self._scan(url.path, urllib.parse.parse_qs(url.query))
         elif url.path == "/street":
             self._street(urllib.parse.parse_qs(url.query))
         else:
-            self._send(*self._page(url.path))
+            self._send(*self._page(url.path, url.query))
 
     def do_HEAD(self):
-        path = urllib.parse.urlparse(self.path).path
-        if path in STREAMS:
+        url = urllib.parse.urlparse(self.path)
+        if url.path in STREAMS:
             return self._not_allowed()
-        self._send(*self._page(path))
+        self._send(*self._page(url.path, url.query))
 
     def _not_allowed(self):
         path = urllib.parse.urlparse(self.path).path
@@ -350,14 +357,23 @@ class Handler(BaseHTTPRequestHandler):
             return self._too_many(RATE_MSG, 600)
         arg = lambda k: q.get(k, [""])[0]  # noqa: E731
         try:
-            code, body = (scan.scan(arg("city"), arg("concept"), arg("top")) if path == "/scan"
-                          else scan.unit(arg("city"), arg("lat"), arg("lon")))
+            if path == "/scan":
+                code, body = scan.scan(arg("city"), arg("concept"), arg("top"))
+            elif path == "/ask":
+                code, body = scan.ask(arg("city"), arg("group"))
+            elif path == "/spot":
+                code, body = scan.spot(arg("city"), arg("lat"), arg("lon"))
+            elif path == "/taste":
+                code, body = scan.taste(arg("concept"), arg("location"))
+            else:
+                code, body = scan.unit(arg("city"), arg("lat"), arg("lon"))
         except Exception:  # noqa: BLE001  details go to the server log, never to the browser
             log.exception("scan failed")
             return self._send(500, "text/plain; charset=utf-8", b"internal")
         if "error" in body:
             return self._send(code, "text/plain; charset=utf-8", body["error"].encode())
-        self._send(code, "application/json", json.dumps(body, ensure_ascii=False).encode())
+        extra = (("Cache-Control", "public, max-age=300"),) if path == "/ask" else ()
+        self._send(code, "application/json", json.dumps(body, ensure_ascii=False).encode(), headers=extra)
 
     def _demo(self):
         if not demo_limiter.allow(self.client_ip()):
