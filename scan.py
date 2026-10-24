@@ -236,18 +236,33 @@ def spot(city, lat, lon):
 
 
 def _taste_places(res):
-    import geo as geo_mod
-    out = []
-    for p in geo_mod.extract(res)[:8]:
-        name = p.get("name")
-        if not name:
-            continue
-        w = p.get("w")
-        try:
-            w = float(w) if w is not None else None
-        except (TypeError, ValueError):
-            w = None
-        out.append({"name": name, "affinity": w})
+    """Named Qloo entities. Names without coordinates still count — the pin is the geography."""
+    out, seen = [], set()
+
+    def walk(o):
+        if len(out) >= 8:
+            return
+        if isinstance(o, dict):
+            name = o.get("name")
+            if isinstance(name, str):
+                name = name.strip()
+                if name and name not in seen:
+                    seen.add(name)
+                    q = o.get("query") if isinstance(o.get("query"), dict) else {}
+                    w = o.get("affinity", q.get("affinity"))
+                    try:
+                        w = float(w) if w is not None else None
+                    except (TypeError, ValueError):
+                        w = None
+                    out.append({"name": name, "affinity": w})
+                    return
+            for v in o.values():
+                walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+
+    walk(res)
     return out
 
 
@@ -264,7 +279,7 @@ def taste(concept, location):
         import qloo
         tag_res = qloo.find_tags(concept, limit=4)
         urn = _first_tag(tag_res)
-        rec = qloo.recommend_places(location, include_tags=[urn] if urn else None, limit=8)
+        rec = qloo.recommend_places(location, signal_tags=[urn] if urn else None, limit=8)
         loves = qloo.area_taste(location, limit=8)
         return 200, {
             "status": "ok", "places": _taste_places(rec), "loves": _taste_places(loves),
