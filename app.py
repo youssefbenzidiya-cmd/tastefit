@@ -138,6 +138,12 @@ class Handler(BaseHTTPRequestHandler):
             if scene in ("1", "2", "3", "4", "5"):
                 page = page.replace('<html lang="en">', f'<html lang="en" data-scene="{scene}">', 1)
             return 200, "text/html; charset=utf-8", page.encode(), CSP_PAGE.format(nonce=nonce)
+        if path == "/ledger":
+            return 200, "text/html; charset=utf-8", ledger.page().encode(), CSP_LEDGER
+        if path == "/evidence":
+            return 200, "text/html; charset=utf-8", evidence.page().encode(), CSP_LEDGER
+        if path == "/wicker-example.json":
+            return 200, "application/json", WICKER_FILE.read_bytes(), CSP_OTHER
         if path in STATIC:
             name, ctype = STATIC[path]
             age = "60" if name.endswith((".js", ".css")) else "86400"

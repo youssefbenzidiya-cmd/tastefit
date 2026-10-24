@@ -11,6 +11,7 @@ from pathlib import Path
 
 import census
 import cityscan_breakeven as be
+import market_share
 
 PACKS = Path(__file__).parent / "packs"
 SLUG = re.compile(r"[a-z0-9-]{1,40}")
@@ -137,7 +138,8 @@ def unit(city, lat, lon):
             + ("" if units.get("location_specific", True) else
                " Same figure in every cell of this city: location did not predict survival in held-out data here.")
             + " A model, not a forecast.")
-    return 200, out | {"calibrated": True, "currency": units["currency"], "rent_ceiling": rows, "note": note}
+    return 200, _with_share(out | {"calibrated": True, "currency": units["currency"], "rent_ceiling": rows, "note": note},
+                            city, lat, lon, p)
 
 
 def cell_box(grid, j):
