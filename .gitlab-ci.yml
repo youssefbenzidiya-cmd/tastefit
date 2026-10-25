@@ -21,7 +21,7 @@ include:
       stage: security
 
 variables:
-  LIVE_URL: https://tastefit.onrender.com
+  LIVE_URL: https://tastefit-776637567140.us-central1.run.app
   IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
   CS_IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
   # Run the security templates inside merge request pipelines too.
@@ -254,11 +254,11 @@ smoke-gcp:
 smoke-test:
   stage: verify
   image: curlimages/curl:8.10.1
-  needs: [deploy-render]
+  needs: [deploy-gcp]
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
       when: never
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $RENDER_DEPLOY_KEY
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   environment:
     name: production
     url: $LIVE_URL
@@ -326,7 +326,7 @@ release:
       - Container image (signed with Sigstore keyless, verified in CI): $IMAGE_DIGEST
       - SBOM (CycloneDX): $CI_PROJECT_URL/-/jobs/$SBOM_JOB_ID/artifacts/raw/gl-sbom-image.cdx.json
 
-      Render builds its own image from the same Dockerfile and commit; the signed registry image is the CI-tested build.
+      Cloud Run serves the signed registry image from deploy-gcp. A leftover Render deploy may still exist; it is not the live demo.
     assets:
       links:
         - name: SBOM (CycloneDX JSON)

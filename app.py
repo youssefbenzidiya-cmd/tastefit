@@ -44,7 +44,6 @@ STATIC = {
     "/favicon.ico": ("favicon.svg", "image/svg+xml"),
     "/og.png": ("og.png", "image/png"),
     "/apple-touch-icon.png": ("apple-touch-icon.png", "image/png"),
-    "/fonts/SchibstedGrotesk-latin.woff2": ("fonts/SchibstedGrotesk-latin.woff2", "font/woff2"),
 }
 
 CSP_PAGE = ("default-src 'self'; script-src 'self' 'nonce-{nonce}' https://unpkg.com https://cdn.jsdelivr.net; "

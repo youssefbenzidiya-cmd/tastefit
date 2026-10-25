@@ -198,11 +198,19 @@ def page(chicago=None, tgi=None, bias=None, ledger_doc=None, footfall=None, stre
     parts = [
         """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TasteFit evidence</title><link rel="stylesheet" href="/styles.css"></head>
+<title>TasteFit evidence</title>
+<meta name="description" content="Qloo is taste, not survival. Pin a Chicago block. The Chicago backtest stays on this page.">
+<meta property="og:title" content="TasteFit evidence">
+<meta property="og:description" content="Qloo is taste, not survival. Pin a Chicago block. The Chicago backtest stays on this page.">
+<meta property="og:image" content="https://tastefit-776637567140.us-central1.run.app/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://tastefit-776637567140.us-central1.run.app/og.png">
+<link rel="stylesheet" href="/styles.css"></head>
 <body><main class="wrap">
 <p><a href="/">TasteFit</a> · <a href="/ledger">Prediction ledger</a></p>
 <h1>Evidence</h1>
-<p>TasteFit is the location tool you can prove wrong. The figures below are the committed backtests.
+<p>Pin a Chicago block. Qloo is taste, not survival: named places a broker can show a landlord.
+Survival is Chicago licences. The figures below are the committed backtests.
 A negative result stays on the page.</p>
 <h2>Backtest, Chicago 2023–2024</h2>
 <p>Nine areas where a Qloo rank call returned an order. Surviving catalog openings in the top 3 of each

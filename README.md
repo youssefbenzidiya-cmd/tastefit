@@ -20,10 +20,10 @@ The pin is the only required action. Print memo is a one-page report from that p
 
 ## 60-second demo
 
-1. Open the live demo. The pin is Wicker Park. Read the big number: how many of 100 still open at this rent.
-2. Click another block. Census and the cell move. Licences do not: κ = 0.
-3. Drag “landlord share” toward 35%. 80% open is for sale as a share, not as a cheaper pin.
-4. Print memo. Qloo, the ACS tract, and the lease maths (EL, ES 95%, Merton, Kelly, Vasicek) are on one sheet, in English and in the desk’s language. Limits stay. Write youssefbenzidiya@gmail.com.
+1. Open the live demo. Pin a block (Wicker Park is the start). Qloo names who already eats there.
+2. Print memo. Taste from Qloo, survival from licences, ACS tract, lease maths. Limits stay. Write youssefbenzidiya@gmail.com.
+3. Licences: how many of 100 still open. Location did not beat the city mean (κ = 0).
+4. Drag “landlord share” toward 35%. 80% open is for sale as a share, not as a cheaper pin.
 
 A silent 60-second reel is at `/walkthrough` on the running app (source: [`demo/walkthrough.html`](demo/walkthrough.html)). Freeze a beat with `?scene=1` … `?scene=5`. A recorded cut is [`demo/tastefit-60s.mp4`](demo/tastefit-60s.mp4) (60 seconds, product only).
 
@@ -71,7 +71,7 @@ Two read-only JSON endpoints serve prebuilt city packs (`packs/`, built offline 
 
 ## Qloo
 
-TasteFit is a new project, started Oct 10, 2026. The broker / landlord mode ("who should rent this unit?") was built for the Qloo hackathon on top of it.
+TasteFit is a new project, started Oct 10, 2026. The live product is pin-first: who should rent this unit.
 
 ### Workflows used and why
 
@@ -79,15 +79,15 @@ All calls go through the official harness (`qloo exec`); 8 of its 9 workflows ar
 
 | Workflow | Where | Why |
 |---|---|---|
-| `recommend` (place, location signal) | both modes | What the area's audience over-indexes on: the taste a tenant would sell into |
-| `recommend` (place, tag + location filter) | both modes | Benchmarks for a concept in the city, and the existing supply inside the area where no OpenStreetMap venue file ships for the city |
-| `entity_tags` | tenant | The tags behind the area's favourite places (cuisine, vibe, price) |
-| `audience_demographics` | tenant | Age and gender skew of the area's top place, shown as relative bars |
-| `find_tags` | both modes | Turn a concept into a Qloo tag URN; the choice and the alternatives are shown |
-| `rank` | tenant | One call ranks every benchmark for the area's audience, so the demand scores are comparable (scores from separate calls are not); a second ranks the same benchmarks for the whole city, for the over-index |
-| `compare_audiences` | tenant | Shared taste between the area's favourites and the top concepts' benchmarks |
-| `where_popular` | both modes | Where the top benchmark's audience concentrates, and how far the unit is from it |
-| `trends` | tenant | Reach of the top concept's reference chain (trends cover brands, not places) |
+| `recommend` (place, location signal) | pin | What the area's audience over-indexes on: the taste a tenant would sell into |
+| `recommend` (place, tag + location filter) | pin | Benchmarks for a concept in the city, and the existing supply inside the area where no OpenStreetMap venue file ships for the city |
+| `entity_tags` | tenant pipeline | The tags behind the area's favourite places (cuisine, vibe, price) |
+| `audience_demographics` | tenant pipeline | Age and gender skew of the area's top place, shown as relative bars |
+| `find_tags` | pin | Turn a concept into a Qloo tag URN; the choice and the alternatives are shown |
+| `rank` | tenant pipeline | One call ranks every benchmark for the area's audience, so the demand scores are comparable (scores from separate calls are not); a second ranks the same benchmarks for the whole city, for the over-index |
+| `compare_audiences` | tenant pipeline | Shared taste between the area's favourites and the top concepts' benchmarks |
+| `where_popular` | pin | Where the top benchmark's audience concentrates, and how far the unit is from it |
+| `trends` | tenant pipeline | Reach of the top concept's reference chain (trends cover brands, not places) |
 
 `describe` is not needed: `recommend` already returns each place's description. A tenant run makes at most 25 Qloo calls; a cache that lives for one request makes repeated calls free and is dropped when the run ends.
 
@@ -211,7 +211,7 @@ export QLOO_API_KEY=...            # Qloo hackathon key, never commit it
 export QLOO_BASE_URL=https://hackathon.api.qloo.com
 export GEMINI_API_KEY=...          # optional: free Google AI Studio key. Tries gemini-3.8-flash (8s), then gemini-3.1-flash-lite
 export LLM_BASE_URL=...            # optional fallback: any OpenAI-compatible endpoint (default: a free keyless one)
-python app.py                      # http://localhost:8000 (broker mode: /?mode=broker)
+python app.py                      # http://localhost:8000
 python backtest_chicago.py --no-llm  # optional: the Qloo backtest above (public Chicago data, about 35 Qloo calls)
 python backtest_chicago.py --public-only  # register only: IPW and conformal, no Qloo call
 python tgi.py build chicago 2023-01-01 /tmp/chicago_2023.json.gz && \
@@ -233,9 +233,9 @@ CLI: `python agent.py "Korean fried chicken counter" "Austin, TX"`
 
 **Claim ledger** (the "without Qloo" panel): the same LLM, with no tools, suggests concepts and names up to 5 competitors within 500 m. Each concept is marked confirmed (Taste Gap "white space", or "neutral" with a positive over-index), contradicted ("proven demand, crowded", "empty for a reason", "avoid"), partly supported, or not tested by this run. Each named venue is looked up in OpenStreetMap within 500 m with City Scan's name matcher (similarity >= 0.6 found, 0.45-0.6 ambiguous); Qloo's own area favourites that read as food venues go through the same check (1.5 km, since they are area-level; the OSM file holds food venues only). The page shows counts, and calls them agreement with the run's evidence and existence in open data, not accuracy: OSM misses real venues too. Supply estimates whose city-wide prior carries >= 80% of the weight are badged "Data coverage: low": the local OSM count barely moves them. This happens when the expected count near the unit is small or the city's block counts vary little; it is not a measure of how complete OSM mapping is.
 
-Front end: `index.html` plus `static/` (`app.js`, `styles.css`, icons, and the Schibsted Grotesk font under the SIL Open Font License, served from the app itself), no build step. The map starts from a few example points; they are places on a map, not vacancy listings. "Try the Wicker Park example" loads `demo/wicker-park.json` at once (`GET /wicker-example.json`): stated scores, the City Scan rent ceiling, a Stable Street certificate, the rent split, a what-if, and the pop-up line, labelled "saved example from 2026-10-15". The file stores no Qloo response. "Read a sample memo" replays `/demo` (synthetic data, labelled as such).
+Front end: `index.html` plus `static/` (`app.js`, `styles.css`, icons), no build step. The map starts on Wicker Park; that pin is geography, not a vacancy listing. "Try the Wicker Park example" drops the pin and opens Print memo (live `/spot` and `/taste`). `demo/wicker-park.json` remains in the repo as an aggregates-only snapshot (`GET /wicker-example.json`); it stores no Qloo response.
 
-Tests: `python -m unittest discover -s tests -t . -v` (276 tests).
+Tests: `python -m unittest discover -s tests -t . -v` (389 tests).
 
 ## Deploy
 

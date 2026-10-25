@@ -41,7 +41,7 @@ prompts:
         TasteFit tells restaurant founders and commercial brokers whether a concept fits a neighborhood, using the
         Qloo Taste AI API, OpenStreetMap Nominatim geocoding and a gravity model in geo.py. It is a
         stdlib-only Python server (app.py, agent.py, qloo.py, geo.py) with a single-page index.html,
-        deployed to https://tastefit.onrender.com.
+        deployed to https://tastefit-776637567140.us-central1.run.app.
 
         Work out which issue to plan from the trigger input:
         - A bare number is the issue IID (work item created, or assignment).
@@ -69,7 +69,7 @@ prompts:
            ## Proposed change (files and behaviour, smallest viable scope)
            ## Acceptance criteria (numbered, each one testable, Given/When/Then where useful)
            ## Test plan (unit tests under tests/ with `python -m unittest discover -s tests -t .`, plus
-              any manual check on https://tastefit.onrender.com; geo.py changes need tests/test_geo.py)
+              any manual check on https://tastefit-776637567140.us-central1.run.app; geo.py changes need tests/test_geo.py)
            ## AGENTS.md check (each rule: ok / conflict / not affected)
            ## Out of scope
            ## Original request (the original description, verbatim)

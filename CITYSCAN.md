@@ -17,7 +17,7 @@ and friends are being edited in parallel; this file is the plan.
 | `cityscan_dvf.py` | **offline**: capitalisation test. Streams DVF Paris (about 2 MB per year, cached in `/tmp/cityscan-dvf`) and correlates commercial €/m² with cell demand measures. Writes `/tmp/cityscan-dvf-paris.json` |
 | `cityscan_calibration.json` | calibrated aggregates only (θ, σ, κ, bootstrap draws, official 1-/3-year survival per group, covariate scaling); no venue-level data. The app reads it with `json` (stdlib) |
 | `tests/test_cityscan_calibration.py` | calibration recovers known θ, σ and κ on simulated outcomes; conditional break-even covers formula; calibrated card and badge logic |
-| `scan.html` | standalone results page (map choropleth + ranked list + backtest + unit cards with the break-even panel); loads `/scan`, a JSON file, or `?src=URL`; `?view=unit&unit=0&concept=…` opens a unit card |
+| `scan.html` | **Not shipped.** Plan for a standalone results page. The live app does not serve `/scan.html`. |
 | `tests/test_cityscan_math.py`, `tests/test_cityscan.py`, `tests/test_cityscan_breakeven.py` | synthetic, offline tests |
 
 What the score is (after `ABLATION.md`): cells are ranked by the point estimate of **suitability** among cells at
@@ -135,13 +135,17 @@ attribution, limits[], timings
   nearest competitors, and the break-even scenario (rent buttons, editable assumptions, tornado chart, banner
   "SCENARIO MODEL · NOT A FORECAST"). `/scan/unit` should accept `rent` (repeatable) and pass it as `rents`.
 
-## Production on Render free tier
+## Production on Cloud Run free tier
+
+`scan.html` is not shipped. The live app is pin-first on Cloud Run
+(https://tastefit-776637567140.us-central1.run.app). City Scan JSON (`/scan`, `/scan/unit`) is served
+from prebuilt packs. The notes below are pack-build constraints, not a claim that Render is live.
 
 - **Overpass**: one bounded query per city per TTL (6 h in memory). Dense cities are heavy (Paris: 16 MB, 34 s;
   the main instance answered 504 twice at `maxsize` 512 MB, then 200 at 256 MB). Serialise fetches (`_fetch_lock`,
   already there), send the User-Agent, retry on the mirror, and do not fan out per concept. Better: build packs offline
   (a scheduled CI job or a cron on a laptop, `cityscan.py pack`) for the launch cities and ship them as a cache
-  outside git (object storage, or a Render disk), refreshed weekly. ODbL attribution travels with the pack.
+  outside git (object storage), refreshed weekly. ODbL attribution travels with the pack.
 - **Overture**: never queried from the server. DuckDB is a ~50 MB native wheel and a city query reads hundreds of MB
   of Parquet ranges; it belongs in the same offline pack job. The server only reads `pack["overture"]` (plain JSON),
   so the app stays standard library only. Show "© Overture Maps Foundation" next to the OSM attribution whenever

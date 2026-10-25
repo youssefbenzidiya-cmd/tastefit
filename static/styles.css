@@ -1,13 +1,5 @@
 /* TasteFit redesign prototype. Tokens are documented in TASTEFIT-DESIGN-SYSTEM.md. */
 
-@font-face {
-  font-family: "Schibsted Grotesk";
-  src: url("fonts/SchibstedGrotesk-latin.woff2") format("woff2");
-  font-weight: 400 900;
-  font-style: normal;
-  font-display: swap;
-}
-
 /* ---------- tokens ---------- */
 :root {
   --paper: #F3F5F7;
@@ -31,7 +23,7 @@
   --love: #2445A8;
   --comp: #B42318;
 
-  --font: "Schibsted Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
   --t-12: 0.75rem; --t-13: 0.8125rem; --t-14: 0.875rem; --t-16: 1rem; --t-18: 1.125rem;
   --t-22: 1.375rem; --t-28: 1.75rem; --t-36: 2.25rem; --t-48: 3rem;

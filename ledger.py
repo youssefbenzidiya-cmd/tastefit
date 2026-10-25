@@ -183,11 +183,19 @@ def page(doc=None, contact="youssefbenzidiya@gmail.com"):
     body = "".join(rows) or "<p>No batch is pre-registered yet.</p>"
     return """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TasteFit prediction ledger</title><link rel="stylesheet" href="/styles.css"></head>
+<title>TasteFit prediction ledger</title>
+<meta name="description" content="Pre-registered Chicago batch. This is not the Print memo from a live pin.">
+<meta property="og:title" content="TasteFit prediction ledger">
+<meta property="og:description" content="Pre-registered Chicago batch. This is not the Print memo from a live pin.">
+<meta property="og:image" content="https://tastefit-776637567140.us-central1.run.app/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://tastefit-776637567140.us-central1.run.app/og.png">
+<link rel="stylesheet" href="/styles.css"></head>
 <body><main class="wrap">
 <p><a href="/">TasteFit</a></p>
 <h1>Prediction ledger</h1>
-<p>Each batch is a SHA-256 fingerprint of the concept, the area, the shortlist verdicts and the UTC time.
+<p>This page is the pre-registered Chicago batch, not the Print memo from a live pin.
+Each batch is a SHA-256 fingerprint of the concept, the area, the shortlist verdicts and the UTC time.
 The file is committed in the repository. A live memo shows its own fingerprint and does not write this page.
 No Qloo payload and no personal data are stored here.</p>
 <h2>How the check is scored</h2>
