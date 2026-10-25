@@ -9,6 +9,7 @@ import evidence
 class Page(unittest.TestCase):
     def test_negative_results_and_the_links_are_on_the_page(self):
         html = evidence.page()
+        self.assertIn("Qloo is taste, not survival", html)
         self.assertIn("No measurable gain", html)
         self.assertIn("Heckman (1979)", html)
         self.assertIn("not defined", html.lower())

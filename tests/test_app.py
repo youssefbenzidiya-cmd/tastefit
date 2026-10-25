@@ -119,6 +119,9 @@ class Server(unittest.TestCase):
         body = self.get("/")[1]
         self.assertNotRegex(body, r"\{\{[A-Z]+\}\}")
         self.assertRegex(body, r'property="og:image" content="https://[^"]+/og\.png"')
+        self.assertIn('name="twitter:image"', body)
+        self.assertIn('property="og:site_name"', body)
+        self.assertIn("Qloo shows who already eats there", body)
         self.assertEqual(len(re.findall(r'<script nonce="[^"]+">', body)), 1)
 
     def test_footer_build_dev_when_commit_unset(self):

@@ -61,15 +61,6 @@ function consumeSSE(text) {
   const data = parseData(payload);
   if (HANDLERS[event]) HANDLERS[event](data);
 }
-function wickerHTML(W) {
-  if (!W) return '';
-  const rows = ((W.shortlist || {}).concepts || []).slice(0, 3).map(c =>
-    `<li><b>${esc(c.concept)}</b><span>Example rank ${esc(c.position)} of ${esc(c.of)}</span></li>`).join('');
-  return `<p class="hood"><b>Wicker Park · stated example</b><small>saved example from 2026-10-15</small></p>
-    <ul class="exhibit">${rows}</ul>
-    <p class="acs-src">saved example, aggregates only, no Qloo call. Sources: stated example.</p>`;
-}
-
 const state = {
   asking: 4200,
   capex: 450000,
@@ -1153,28 +1144,16 @@ function runAgent() {
   });
 }
 
-let wickerLoad = 0;
 async function openWicker() {
-  const token = ++wickerLoad;
-  try {
-    const res = await fetch('/wicker-example.json', { headers: { Accept: 'application/json' } });
-    if (!res.ok) throw new Error('missing');
-    const W = await res.json();
-    if (token !== wickerLoad) return;
-    state.lat = WICKER[0];
-    state.lon = WICKER[1];
-    if (W.asking_rent) state.asking = W.asking_rent;
-    dropPin(state.lat, state.lon, { fly: true });
-    const box = $('#agent');
-    if (box) {
-      box.hidden = false;
-      box.innerHTML = wickerHTML(W);
-    }
-    toast('Wicker Park example · aggregates only');
-  } catch (err) {
-    if (token !== wickerLoad) return;
-    toast('The saved example did not load');
-  }
+  state.lat = WICKER[0];
+  state.lon = WICKER[1];
+  if (map) map.setView(WICKER, 15);
+  history.replaceState(null, '', '#' + shareQuery());
+  openMemo();
+  toast('Wicker Park pin · Print memo');
+  await dropPin(state.lat, state.lon);
+  const d = $('#memo');
+  if (d && d.open) openMemo();
 }
 
 function openMemo() {

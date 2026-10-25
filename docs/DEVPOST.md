@@ -1,11 +1,11 @@
 # TasteFit
 
-The only location tool you can prove wrong.
+Pin a Chicago block. Qloo shows who already eats there. Print memo is that pin's GO / ADJUST / NO-GO.
 
-TasteFit tells a restaurant founder or a broker whether a concept fits a street, and it publishes the
-checks that can show the answer is wrong. A run makes at most 25 Qloo calls. At 230 seconds, later
-LLM calls are cut short so the memo can still finish inside a 300 second host limit. The process is
-not killed. No discounting and no interest.
+Taste is Qloo (named places on the block). Survival is Chicago licences — a coin; location did not beat
+the city mean. The suggested cell is a block to scout, not a vetted address. A run makes at most 25
+Qloo calls. At 230 seconds, later LLM calls are cut short so the memo can still finish inside a 300
+second host limit. No discounting and no interest.
 
 ## Try it
 
@@ -13,17 +13,17 @@ not killed. No discounting and no interest.
 - **Walkthrough:** https://tastefit-776637567140.us-central1.run.app/walkthrough (60-second product reel). Recorded cut: `demo/tastefit-60s.mp4` (60 seconds). Qloo is taste, not survival.
 - **GitLab automation:** https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43239248/tastefit/-/pipelines/2984949822. Duo flows live in `.gitlab/duo/flows/`. The 60s reel is product-only; there is no pipeline screen recording in this repo.
 
-## Surprise ladder
-
-### 1. What Qloo adds
+## What Qloo adds
 
 Qloo's taste graph says what an area's audience over-indexes on, which benchmarks they would rank,
 and where that audience is. The page shows each call. The Chicago 2023–2024 backtest is the check:
 on nine areas, Qloo's top 3 caught 29% of surviving catalog openings. A citywide baseline caught 68%.
 The 90% interval for Qloo minus that baseline is −66 to −4 points. No measurable gain. Qloo is
-evidence a broker can show, not a validated predictor of survival.
+taste a broker can show, not a validated predictor of survival.
 
-### 2. Rent-first, then value of information
+## Also in the repo (not the 60-second product)
+
+### Rent-first, then value of information
 
 Where a concept has a Taste Gap label, the rent is checked before taste. An unpayable rent cannot
 become a GO. "Check first, before signing" ranks which cost input is worth knowing, in currency per
@@ -32,7 +32,7 @@ month (Howard 1966). The figures are monthly. There is no NPV and no interest.
 The captured-spend figure is a rough ceiling: equal shares 1/(1+n), which is the conditional logit
 when utilities are tied (McFadden 1974). It is not profit.
 
-### 3. Building-wide stable matching
+### Building-wide stable matching
 
 Two or more asking rents on the same street are matched to the concepts that run already scored.
 Gale and Shapley (1962), unit-proposing. At most k concepts of one rent category are matched; k is 1
@@ -41,7 +41,7 @@ No extra Qloo call. The page says when there is no blocking pair. Stability is n
 The score breakdown on a single concept is an exact Shapley split (Shapley 1953) of TasteFit's own
 weights, not a cause.
 
-### 4. Self-corrected bias, and an interval that does not get tighter
+### Self-corrected bias, and an interval that does not get tighter
 
 A Heckman correction (Heckman 1979) is not identified: the Chicago file has no exclusion restriction.
 Inverse-probability weights (Horvitz and Thompson 1952) raise the citywide baseline's hit rate from
@@ -49,7 +49,7 @@ Inverse-probability weights (Horvitz and Thompson 1952) raise the citywide basel
 The split-conformal interval (Vovk, Gammerman and Shafer 2005) around the citywide share has width 2
 on a rate in [0, 1]. It covers the whole range. It does not tighten the claim.
 
-### 5. Pre-registered predictions
+### Pre-registered predictions
 
 Every memo ends with a SHA-256 of the concept, the area, the shortlist verdicts and the UTC time.
 The ledger is a file in the repository. The Chicago batch registered on 2026-10-14 is unscored: the
@@ -57,12 +57,12 @@ rank call was rate-limited, so no probability was published. The Brier score (Br
 defined for that batch. The check date is 2026-11-17, against Chicago business licences. The first
 listed concept is not a ranking.
 
-### 6. Agent-native
+### Agent-native
 
 `mcp_server.py` exposes `tenant_match`, `city_scan` and `city_scan_unit` over stdio. A tool result is
 not written to disk. Setup notes: `docs/MCP-DEMO.md`.
 
-### 7. Evidence page
+### Evidence page
 
 `/evidence`, linked from the landing page, quotes the committed backtests. Qloo's top-3 hit rate is
 29%. The citywide baseline is 68%. Qloo is taste, not survival.
